@@ -1,130 +1,124 @@
 # ⚡ Lodestone
 
-每日 GitHub AI 热门仓库自动雷达 · 已为 AI 应用工程师分类整理 · 中文友好
+爬取 GitHub AI 热门仓库，按用途分成 9 类。
 
-> **跨平台 Skill + 双 UI 模式**：一份 Python 数据 → 静态 HTML 或 Vue 3 SPA；同时集成 **Claude Code** 和 **Codex CLI**。
+一份 Python 数据层（`radar.py`），两种前端：`render` 生成的静态 HTML（`out/index.html`）或 Vite 起的 Vue 3 SPA。可作为 **Claude Code** 与 **Codex CLI** 的 skill 安装。
 
 ---
 
-## 🎯 一键安装为 Skill（同时支持 Claude Code 和 Codex CLI）
+## 安装为 Skill（Claude Code + Codex CLI）
 
 ```bash
-cd /Users/zhangpeng/workspace/liaohe/lodestone
+cd lodestone        # 项目根目录
 ./install.sh
 ```
 
-→ 自动在 `~/.claude/skills/lodestone` 和 `~/.codex/skills/lodestone` 各创建一个 **symlink**（不是复制，单一真实源）。
+`install.sh` 在 `~/.claude/skills/lodestone` 和 `~/.codex/skills/lodestone` 各创建一个指向本项目的 **symlink**（非复制），两端读同一份 `radar.py` / `data/`。
 
-之后：
+安装后在任一 CLI 里说「刷一下 AI 雷达」即可触发（触发短语见 `SKILL.md`）。
 
-- **Claude Code**：说"刷一下 AI 雷达" → 自动触发
-- **Codex CLI**：说"刷一下 AI 雷达" → 自动触发
-- 两个 CLI 都直接读同一个 `radar.py` / `data/`，0 维护成本
+卸载：`./uninstall.sh`。
 
-卸载：`./uninstall.sh`
-
-> **为什么 symlink 而不是复制**：项目含 `node_modules/` 175MB，复制两遍浪费 350MB 且改一处忘了同步。symlink 单一真实源，编辑一处两边即时生效。
+> symlink 而非复制：项目含 `node_modules/`，复制到两处会重复占用磁盘，且改一处需手动同步。
 
 ---
 
-## 🏃 直接启动（不用 Skill）
+## 直接启动（不装 skill）
 
-### 一条命令全栈启动（Vue 3 + Python API）
+### 全栈：Vue 3 SPA + Python API
 
 ```bash
-cd /Users/zhangpeng/workspace/liaohe/lodestone/frontend
-npm install       # 首次需安装 (~80MB)
-npm run dev       # → http://localhost:5173
+cd frontend
+npm install        # 首次
+npm run dev        # → http://localhost:5173
 ```
 
-`npm run dev` 自动：
-1. 启动 Python API 服务器（`:8765`）— `/api/data` `/api/local` `/api/install` `/api/crawl`
-2. 启动 Vite 开发服务器（`:5173`）— 代理 `/api/*` 到 Python
-3. UI 自动每 30s 轮询新数据；点 "🔄 刷新" 立即拉；点 "⬇ 重新爬取 GitHub" 触发后台 crawl
+`npm run dev` 运行 `dev.cjs`（Node stdlib，48 行），并行做两件事：
 
-UI 内嵌三个新能力：
-- **本机 Skills 面板** — 实时扫描 `~/.claude/skills` + `~/.codex/skills`
-- **未安装推荐** — 智能筛选未装但值得装的 skills，一键安装
-- **抽屉里的一键安装** — 任何 repo 详情页 → "一键安装为 Skill（Claude + Codex）"
+1. `python radar.py serve 8765` —— API 服务器
+2. 本地 `vite` —— 开发服务器（`:5173`），`/api/*` 代理到 `:8765`（见 `vite.config.js`）
 
-### 只跑数据层（不需要 UI）
+`Ctrl-C` 同时关闭两个进程。
+
+前端（`src/App.vue`）行为：
+
+- 每 30s 轮询 `/api/data`
+- 「刷新」按钮 —— 立即重新拉取
+- 「重新爬取」按钮 —— 触发后台 `crawl`
+- 本机 Skills 面板 —— 扫描 `~/.claude/skills` + `~/.codex/skills`（`/api/local`）
+- repo 抽屉内「一键安装为 Skill（Claude + Codex）」
+
+### 静态 HTML（无需 Node）
 
 ```bash
-cd /Users/zhangpeng/workspace/liaohe/lodestone
-./radar.py crawl      # 拉 GitHub + 翻译 + 写 data/latest.json
-./radar.py today      # 终端打印 Top 15 + 分类
-./radar.py serve 8765 # 单跑 API（前端用 vite preview / 别的工具连）
+./radar.py all     # crawl → 生成 out/index.html → 打开浏览器
+```
+
+### 只跑数据层
+
+```bash
+./radar.py crawl        # 拉 GitHub + 翻译 → 写 data/latest.json
+./radar.py today        # 终端打印 Top 15 + 分类
+./radar.py serve 8765   # 单跑 API
 ```
 
 ---
 
-## 🤔 这是 Skills 还是项目？
-
-**两者都是，且跨两个 CLI 平台。**
-
-| 平台 | Skill 路径 | 安装方式 |
-|------|----------|---------|
-| Claude Code | `~/.claude/skills/lodestone/` | `./install.sh`（symlink） |
-| Codex CLI | `~/.codex/skills/lodestone/` | `./install.sh`（symlink） |
-| 独立项目 | `npm run dev` | 不需要安装 |
-| Cron/launchd | `radar.py crawl` + UI 自动轮询 | 不需要安装 |
-
-`SKILL.md` frontmatter 格式两边相同（`name` + `description`），`./install.sh` 一行命令双端可用。
-
----
-
-## 🛠️ 技术栈
-
-### 后端（数据 + API）
-- **Python 3.10+ stdlib** — 零依赖（仅 urllib 调 Google Translate）
-- **`gh` CLI** — GitHub API 走认证通道（5000 req/hr）
-- **Google Translate 免费端点** — 描述中文翻译，结果缓存到 `data/zh_cache.json`
-- **`http.server.ThreadingTCPServer`** — 零依赖 API server，端点：`/api/{data,local,install,crawl}`
-
-### 前端（Vue 3 SPA）
-- **Vue 3** + **Vite** — 最主流前端栈
-- **Element Plus** — 最主流 Vue 3 组件库（el-tag / el-drawer / el-button / el-message）
-- **lucide-vue-next** — Vue 3 图标组件
-- **Tailwind CSS** + PostCSS — 原子化样式
-- **Aurora 动画背景** — CSS-only 三层径向渐变 + 56px 网格 overlay
-
-### 启动编排
-- **`frontend/dev.cjs`** — Node stdlib 写的小编排器（30 行），并行启动 Python + Vite，Ctrl-C 优雅关闭
-
----
-
-## 📋 命令一览
+## 命令一览
 
 | 命令 | 作用 |
 |------|------|
-| `cd frontend && npm run dev` | 一条命令全栈启动（Vue 3 + Python API） |
-| `cd frontend && npm run vite-only` | 只启动 Vite（API 单独跑） |
+| `cd frontend && npm run dev` | 全栈启动（Python API + Vite）|
+| `cd frontend && npm run vite-only` | 只启动 Vite |
 | `cd frontend && npm run build` | 打包到 `frontend/dist/` |
-| `./radar.py crawl` | 拉取 GitHub Search API → 翻译 → 写 `data/latest.json` |
+| `./radar.py crawl` | 拉 GitHub Search API → 翻译 → 写 `data/latest.json` |
+| `./radar.py render` | 从 `latest.json` 生成 `out/index.html` |
+| `./radar.py all` | `crawl` → `render` → 打开浏览器 → 继续 serve |
 | `./radar.py today` | 终端打印今日 Top 15 + 分类概览 |
-| `./radar.py serve [port]` | 单跑 API server（默认 8765） |
-
-> 历史命令 `./radar.py all` / `./radar.py render` 已移除 — Vue 3 模式下数据由 Python crawl 写 `latest.json`，UI 自动 30s 轮询拉取。
+| `./radar.py serve [port]` | 单跑 API server（默认 8765）|
 
 ---
 
-## 🗂 9 个自动分类
+## 技术栈
 
-1. 🤖 **AI Agent & Skills** — agent / claude-code / MCP / autonomous / multi-agent
-2. 🧠 **RAG / Memory / Vector** — vector-db / agent-memory / embedding
-3. 💬 **LLM Interface & Chat** — LLM SDK / chatbot / prompt-engineering / claude-api
-4. ⚙️ **Code Generation & Dev Tools** — copilot / ai-coding / code-agent
-5. 🔗 **Workflow & Orchestration** — langgraph / langchain / pipeline
-6. 🎨 **Multimodal** — vision / text-to-video / multimodal
-7. 🏋️ **Fine-tuning & Training** — LoRA / PEFT / llama-factory
-8. 📊 **Eval & Benchmark** — llm-evaluation / benchmark
-9. ⭐ **Awesome Lists** — awesome-ai / awesome-llm / awesome-claude
+**后端（`radar.py`，单文件 ~1470 行，Python 3.10+ stdlib）**
+
+- 依赖 `gh` CLI 调 GitHub Search API（走认证通道）
+- 描述经 Google Translate 免费端点翻译，缓存到 `data/zh_cache.json`
+- API server 基于 `http.server.ThreadingHTTPServer`，端点：
+  `/api/data`、`/api/local`、`/api/top`、`/api/install`、`/api/install-cli`、`/api/crawl`
+
+**前端（`frontend/`）**
+
+- Vue 3 + Vite
+- Element Plus（`el-tag` / `el-drawer` / `el-button` / `el-message`）
+- `lucide-vue-next` 图标
+- Tailwind CSS + PostCSS
+- CSS-only aurora 背景（径向渐变 blob + 网格 overlay）
 
 ---
 
-## 🕐 定时刷新
+## 9 个分类
+
+分类在 `radar.py` 顶部的 `CATEGORIES` 列表中定义，每类对应一组 GitHub 查询：
+
+1. 🤖 AI Agent & Skills
+2. 🧠 RAG / Memory / Vector
+3. 💬 LLM Interface & Chat
+4. ⚙️ Code Generation & Dev Tools
+5. 🔗 Workflow & Orchestration
+6. 🎨 Multimodal (Vision / Audio / Video)
+7. 🏋️ Fine-tuning & Training
+8. 📊 Eval & Benchmark
+9. ⭐ Awesome Lists & 资源合集
+
+---
+
+## 定时刷新
 
 ### macOS launchd
+
+将 `PROJECT_DIR` 替换为项目绝对路径：
 
 ```bash
 cat > ~/Library/LaunchAgents/com.lodestone.daily.plist <<'EOF'
@@ -135,11 +129,11 @@ cat > ~/Library/LaunchAgents/com.lodestone.daily.plist <<'EOF'
   <key>Label</key><string>com.lodestone.daily</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/zhangpeng/workspace/liaohe/lodestone/radar.py</string>
-    <string>all</string>
+    <string>PROJECT_DIR/radar.py</string>
+    <string>crawl</string>
   </array>
   <key>StartCalendarInterval</key><dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
-  <key>WorkingDirectory</key><string>/Users/zhangpeng/workspace/liaohe/lodestone</string>
+  <key>WorkingDirectory</key><string>PROJECT_DIR</string>
 </dict>
 </plist>
 EOF
@@ -149,53 +143,44 @@ launchctl load ~/Library/LaunchAgents/com.lodestone.daily.plist
 ### Linux cron
 
 ```cron
-0 8 * * * cd /path/to/lodestone && ./radar.py all >/dev/null 2>&1
+0 8 * * * cd /path/to/lodestone && ./radar.py crawl >/dev/null 2>&1
 ```
+
+> 定时用 `crawl` 只更新数据；SPA 每 30s 自动轮询到新数据。若要同时刷新静态 HTML，用 `all`（会打开浏览器，不适合无头 cron）。
 
 ---
 
-## 📁 目录结构
+## 目录结构
 
 ```
 lodestone/
-├── SKILL.md              # Claude Skill 入口（放进 ~/.claude/skills/ 让 Claude 自动触发）
-├── radar.py              # 全部 Python 逻辑（单文件 ~1100 行，stdlib only）— crawl + API + install
-├── install.sh            # 创建 ~/.claude/skills/ + ~/.codex/skills/ symlink
+├── SKILL.md              # skill 入口（frontmatter: name + description）
+├── radar.py              # Python 全部逻辑（~1470 行，stdlib）— crawl + render + API + install
+├── install.sh            # 创建 ~/.claude/skills + ~/.codex/skills symlink
 ├── uninstall.sh          # 移除 symlink
-├── README.md             # 本文件
 ├── data/
-│   ├── latest.json       # 最新一次快照（前端通过 /api/data 读这个）
+│   ├── latest.json       # 最新快照（/api/data 读这个）
 │   ├── YYYY-MM-DD.json   # 历史归档
-│   ├── zh_cache.json     # 翻译缓存（持久化，再跑 0 翻译开销）
+│   ├── zh_cache.json     # 翻译缓存
 │   └── crawl.log         # 后台 crawl 输出
-└── frontend/             # Vue 3 SPA（npm run dev 启动）
+├── out/index.html        # render 生成的静态页
+└── frontend/             # Vue 3 SPA
     ├── package.json
-    ├── dev.cjs           # Node stdlib 启动编排器（25 行）— 并行拉 Python + Vite
-    ├── vite.config.js    # 含 /api/* → :8765 代理
+    ├── dev.cjs           # Node stdlib 编排器（48 行）— 并行起 Python + Vite
+    ├── vite.config.js    # /api/* → :8765 代理
     ├── tailwind.config.js
     ├── postcss.config.js
     ├── index.html
     └── src/
         ├── main.js
-        ├── App.vue       # 单文件组件（fetch API + auto-poll + 本机 Skills + 一键安装）
+        ├── App.vue       # 主组件（971 行）— fetch + 30s 轮询 + 本机 Skills + 一键安装
         └── style.css
 ```
 
 ---
 
-## ⚠️ 已知限制
+## 已知限制
 
-- **GitHub Search secondary rate limit**：30 req/min。`crawl` 一次约 30 个查询，踩线。冷却几分钟重试。
-- **翻译质量**：Google Translate 长 description 偶尔不通顺；原始英文在 modal 里可折叠查看。
-- **分类粒度**：基于 topic/name 关键词，不读 README 语义判断；误分类时改 `radar.py` 顶部 `CATEGORIES` 字典即可。
-
----
-
-## 🚀 升级路径
-
-- 接 LLM 做语义解读（每个 repo 一句话，cache 到 JSON）
-- 接入 GitHub Trending HTML 抓取作补充数据源
-- 多日数据对比，识别"昨天新冒出的项目"
-- 自动 PR / 周报推送（基于 hot_now 增量）
-- WebSocket 推送替换 30s 轮询（数据变更即时反映）
-- install 加进度条（前端订阅 /api/install/<job_id> SSE）
+- **GitHub Search 二级限流**：约 30 req/min，`crawl` 一次约 30 个查询会踩线，冷却几分钟重试。
+- **翻译质量**：长 description 偶尔不通顺；原始英文可在详情里查看。
+- **分类粒度**：基于 topic / name 关键词匹配，不读 README 语义。误分类时改 `radar.py` 的 `CATEGORIES`。

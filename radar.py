@@ -1,27 +1,24 @@
 #!/usr/bin/env python3
 """
-lodestone: GitHub AI trending crawler + categorized dashboard.
+lodestone: GitHub AI trending crawler + JSON API for the Vue 3 frontend.
 
 Commands:
-  radar.py crawl   - fetch trending AI repos from GitHub, save to data/
-  radar.py render  - regenerate out/index.html from latest data
-  radar.py serve   - serve dashboard on http://localhost:PORT
+  radar.py crawl   - fetch trending AI repos from GitHub, write to PG
+  radar.py serve   - JSON API on http://localhost:PORT (Vite at :5173 proxies /api/* here)
   radar.py today   - print today's top picks in terminal
-  radar.py all     - crawl + render + open browser
 
 Reuses `gh` CLI for GitHub auth (avoids token management).
-Ponytail: minimum code, stdlib only, single static HTML output.
+Ponytail: minimum code, stdlib only, Vue UI lives in frontend/.
 """
-import json, subprocess, sys, os, re, datetime, time, html, webbrowser, http.server, socketserver, urllib.request, urllib.parse
+import json, subprocess, sys, os, re, datetime, time, http.server, socketserver, urllib.request, urllib.parse, shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from collections import defaultdict
+import db  # ponytail: PG is source of truth (was: data/latest.json)
 
 ROOT = Path(__file__).parent
 DATA = ROOT / "data"
-OUT = ROOT / "out"
 DATA.mkdir(exist_ok=True)
-OUT.mkdir(exist_ok=True)
 
 # ponytail: cache for cloned skill repos; sidecar stores install origin (URL survives latest.json roll)
 SKILLS_CACHE = Path.home() / ".cache" / "lodestone" / "skills"
@@ -116,6 +113,46 @@ CATEGORIES = [
         ],
     },
     {
+        "id": "ide",
+        "name": "AI IDE & 编辑器",
+        "desc": "AI 编程 IDE、Cursor 替代品、嵌入式代码助手",
+        "queries": [
+            "topic:cursor stars:>200",
+            "topic:cursor-ai stars:>200",
+            "topic:windsurf stars:>200",
+            "topic:ai-ide stars:>100",
+            "aider in:name,description stars:>500",
+            "cline in:name,description stars:>500",
+            "continue in:name stars:>500",
+        ],
+    },
+    {
+        "id": "gateway",
+        "name": "LLM Gateway & Router",
+        "desc": "统一接入多家 LLM 的代理/路由 — OpenRouter、LiteLLM、Portkey",
+        "queries": [
+            "topic:litellm stars:>200",
+            "topic:openrouter stars:>200",
+            "topic:llm-gateway stars:>100",
+            "topic:llm-router stars:>100",
+            "LLM gateway in:name,description stars:>200",
+            "LLM proxy in:name,description stars:>300",
+        ],
+    },
+    {
+        "id": "observability",
+        "name": "LLM 可观测 & Tracing",
+        "desc": "LLM 应用监控、trace、token 计费、prompt 调优 — Langfuse / Helicone / Phoenix",
+        "queries": [
+            "topic:langfuse stars:>200",
+            "topic:llm-observability stars:>100",
+            "topic:llmops stars:>200",
+            "topic:helicone stars:>100",
+            "LLM tracing in:name,description stars:>200",
+            "LLM observability in:name,description stars:>100",
+        ],
+    },
+    {
         "id": "awesome",
         "name": "Awesome Lists & 资源合集",
         "desc": "精选列表、教程、Awesome-* 仓库 — 发现新方向的入口",
@@ -128,14 +165,54 @@ CATEGORIES = [
 ]
 
 # ponytail: 5k+ pass — broad queries to catch mainstream AI tools not in category queries
+# ponytail: GitHub Search API 422s on `stars:>N topic:X OR topic:Y` (multi-topic OR). Each topic
+# gets its own single-topic query. New repos are added slowly enough that 1 query per topic is
+# fine — duplicates collapse in the `top_5k_repos` dict.
 TOP_5K_QUERIES = [
-    "stars:>5000 topic:ai",
-    "stars:>5000 topic:llm",
-    "stars:>5000 topic:agent",
-    "stars:>5000 topic:rag OR topic:vector-database",
-    "stars:>5000 topic:claude OR topic:claude-code OR topic:mcp-server",
+    # ponytail: threshold is 1000 (matches SQL gate) so we don't waste API quota on rows
+    # the UI will filter out. Topic queries — the obvious AI hard-tags.
+    "stars:>1000 topic:ai",
+    "stars:>1000 topic:llm",
+    "stars:>1000 topic:agent",
+    "stars:>1000 topic:rag",
+    "stars:>1000 topic:vector-database",
+    # ponytail: each Claude/Codex/MCP family topic on its own line (the OR-combined version 422s).
+    "stars:>1000 topic:claude",
+    "stars:>1000 topic:claude-code",
+    "stars:>1000 topic:mcp-server",
+    "stars:>1000 topic:mcp",
+    # ponytail: code agent / AI dev tools — caught by topic tags common in 1k-5k tier.
+    "stars:>1000 topic:ai-coding",
+    "stars:>1000 topic:ai-coding-agent",
+    "stars:>1000 topic:code-agent",
+    "stars:>1000 topic:agent-skills",
+    "stars:>1000 topic:claude-skills",
+    "stars:>1000 topic:ai-skills",
+    "stars:>1000 topic:copilot",
+    "stars:>1000 topic:ai-coding-tools",
+    "stars:>1000 topic:developer-tools",
+    # ponytail: framework topics — one each.
+    "stars:>1000 topic:langchain",
+    "stars:>1000 topic:langgraph",
+    "stars:>1000 topic:llamaindex",
+    # ponytail: text-based queries catch topic=[] projects (openai/codex 100k⭐, msitarzewski/agency-agents
+    # 135k⭐, earendil-works/pi 74k⭐). Same AI phrases the topic whitelist uses, but searched in
+    # name/description instead.
+    'stars:>1000 "AI agent" in:name,description',
+    'stars:>1000 "coding agent" in:name,description',
+    'stars:>1000 "LLM" in:name,description',
+    'stars:>1000 "Claude Code" in:name,description',
+    'stars:>1000 "knowledge graph" in:name,description',
+    'stars:>1000 "agent skill" in:name,description',
+    'stars:>1000 "AI skill" in:name,description',
+    # ponytail: awesome lists are huge but escape topic filters (their topic tags are generic).
+    'stars:>10000 awesome-llm in:name',
+    'stars:>10000 awesome-ai in:name',
+    # ponytail: provider gateways (volcengine/OpenViking etc.)
+    'stars:>1000 "agent memory" in:name,description',
+    'stars:>1000 "context database" in:name,description',
 ]
-TOP_5K_LIMIT = 200
+TOP_5K_LIMIT = 300
 
 # ponytail: AI topic whitelist — used to drop non-AI high-star repos (e.g. awesome-go) from top_5k list
 AI_TOPIC_WHITELIST = frozenset({
@@ -150,6 +227,68 @@ AI_TOPIC_WHITELIST = frozenset({
     "llama", "llama-index", "langgraph", "autogen", "crewai",
 })
 
+# ponytail: HARD AI topics — strict subset. Bare 'ai' is NOT here. Used to require a strong
+# AI signal so non-AI repos with just an 'ai' topic (dbeaver, netdata) get filtered out.
+AI_TOPIC_HARD = frozenset({
+    "llm", "llms", "gpt", "chatgpt", "openai", "anthropic", "claude", "claude-code",
+    "gemini", "deepseek", "llama", "qwen", "mistral", "ollama", "vllm",
+    "transformer", "transformers", "huggingface", "hugging-face",
+    "autogen", "crewai", "langchain", "langgraph", "llamaindex",
+    "rag", "embedding", "embeddings", "vector-database", "pgvector",
+    "stable-diffusion", "comfyui", "diffusion-models",
+    "text-to-image", "text-to-video", "image-generation", "image2image",
+    "whisper", "tts", "speech-to-text", "speech-recognition",
+    "voice-cloning", "voice-ai",
+    "object-detection", "computer-vision", "nlp",
+    "natural-language-processing", "artificial-intelligence",
+    "copilot", "cursor-ai", "code-assistant", "ai-coding",
+    "ai-coding-agent", "prompt-engineering",
+    "agentic", "agentic-ai", "autonomous-agent", "multi-agent",
+    "agent-skills", "ai-agent",
+    "mcp-server",
+    "spring-ai", "springai",
+})
+
+# ponytail: text-level AI hints — checked in repo name + description when topic check fails.
+# Bare ' ai ' (with spaces) catches "personal AI assistant" / "Build with AI" without matching
+# 'ai-powered', 'email', 'main', etc.
+AI_TEXT_HINTS = frozenset({
+    " ai ",
+    " llm ", " gpt ",
+    "chatgpt", "openai", "anthropic", "claude",
+    "langchain", "huggingface", "stable-diffusion", "comfyui",
+    "voice-cloning", "autogen", "crewai", "langgraph",
+    "mcp-server", "mcp_server",
+    "deepfake", "face swap", "face-swap",
+    "generative", "neural network", "deep learning", "machine learning",
+    "natural language", "computer vision", "object detection",
+    "speech recognition", "speech-to-text", "speech to text",
+    "coding agent",
+})
+
+# ponytail: high-star noise that would otherwise sneak past the AI whitelist
+AI_TOPIC_BLOCKLIST = frozenset({
+    "stock", "stocks", "trading", "crypto", "nft", "forex", "porn",
+    "ai-porn", "ai-girlfriend", "adult-content",
+    "astrology", "fortune-telling",
+})
+
+
+def is_ai_relevant(repo):
+    """Strict AI filter — requires at least one HARD topic, OR an AI phrase in name/description.
+    ponytail: bare 'ai' topic alone is no longer enough — that caught dbeaver/netdata."""
+    topics = [t.lower() for t in (repo.get("topics") or [])]
+    if any(t in AI_TOPIC_BLOCKLIST for t in topics):
+        return False
+    blob_topics = " ".join(topics)
+    if any(h in blob_topics for h in AI_TOPIC_HARD):
+        return True
+    # fallback: name + description must contain a strong AI phrase
+    name = (repo.get("name") or "").lower()
+    desc = (repo.get("description") or repo.get("desc") or "").lower()
+    text = f" {name} {desc} "
+    return any(h in text for h in AI_TEXT_HINTS)
+
 # ponytail: static dictionaries, cheap & deterministic — LLM-based per-repo intro is overkill for a daily radar
 PLAIN_BY_CAT = {
     "agent":    "让 AI 像人一样自主决策、调用工具完成复杂任务",
@@ -160,6 +299,9 @@ PLAIN_BY_CAT = {
     "multimodal": "AI 处理图片、音频、视频等多种感官信息",
     "finetune": "用自家数据训练/微调大模型，让 AI 更懂你的业务",
     "eval":     "评估 AI 表现和质量、跑基准测试",
+    "ide":      "AI 原生 IDE / 嵌入式代码助手 — Cursor 替代品",
+    "gateway":  "统一接入多家 LLM 的代理/路由，一套代码跑全模型",
+    "observability": "监控 LLM 应用的 trace、token 消耗、prompt 调优",
     "awesome":  "精心整理的 AI 资源列表，发现新方向的入口",
 }
 
@@ -272,6 +414,92 @@ def facts_for_repo(repo):
 # SKILLS_CACHE / SKILL_ORIGINS defined at top of file (lines 27-28)
 
 
+def _parse_frontmatter_desc(path) -> str | None:
+    """Read the YAML frontmatter `description` field from a .md file. Cheap — reads first 4KB only."""
+    try:
+        with open(path, "rb") as fp:
+            head = fp.read(4096).decode("utf-8", errors="ignore")
+    except OSError:
+        return None
+    if not head.startswith("---"):
+        return None
+    end = head.find("\n---", 3)
+    if end < 0:
+        return None
+    block = head[3:end]
+    for line in block.splitlines():
+        s = line.strip()
+        if s.startswith("description:"):
+            val = s[len("description:"):].strip()
+            return val.strip('"').strip("'") or None
+    return None
+
+
+def _repo_slug_from_url(url: str | None) -> str:
+    """Extract 'owner/repo' from a GitHub URL, or return '' for empty/invalid."""
+    if not url or "github.com/" not in url:
+        return ""
+    tail = url.split("github.com/", 1)[1].rstrip("/").rstrip(".git")
+    parts = tail.split("/")
+    if len(parts) >= 2 and parts[0] and parts[1]:
+        return f"{parts[0]}/{parts[1]}"
+    return ""
+
+
+def _gh_repo_meta(full_name: str) -> dict | None:
+    """Query GitHub via `gh` for {stars, topics, pushed_at, description}. Caches per process.
+    Returns None if `gh` unavailable or repo private/missing."""
+    if not full_name or "/" not in full_name:
+        return None
+    if not hasattr(_gh_repo_meta, "_cache"):
+        _gh_repo_meta._cache = {}
+    if full_name in _gh_repo_meta._cache:
+        return _gh_repo_meta._cache[full_name]
+    try:
+        r = subprocess.run(
+            ["gh", "api", f"repos/{full_name}"],
+            capture_output=True, text=True, timeout=15,
+        )
+        if r.returncode != 0:
+            _gh_repo_meta._cache[full_name] = None
+            return None
+        data = json.loads(r.stdout)
+        out = {
+            "name": data.get("full_name"),
+            "url": data.get("html_url"),
+            "stars": data.get("stargazers_count") or 0,
+            "topics": data.get("topics") or [],
+            "pushed_at": data.get("pushed_at"),
+            "description": data.get("description"),
+        }
+        _gh_repo_meta._cache[full_name] = out
+        return out
+    except Exception:
+        _gh_repo_meta._cache[full_name] = None
+        return None
+
+
+def _load_repo_index() -> dict:
+    """Build repo lookup {segment → repo} from PG. Used for topic/stars enrichment + replacement detection."""
+    by_repo = {}
+    try:
+        import db
+        with db.connect() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT name, url, description, desc_zh, stars, lang, topics, pushed_at, best_category
+                FROM repos WHERE is_ai_relevant
+            """)
+            cols = [d[0] for d in cur.description]
+            for row in cur.fetchall():
+                rec = dict(zip(cols, row))
+                rec["topics"] = list(rec.get("topics") or [])
+                by_repo[rec["name"].split("/")[-1]] = rec
+    except Exception:
+        pass
+    return by_repo
+
+
 def detect_local_skills():
     """Scan all forms of installed Claude/Codex capabilities.
     Returns: {
@@ -284,29 +512,23 @@ def detect_local_skills():
     """
     out = {"skills": {}, "commands": {}, "agents": {}, "plugins": []}
 
-    # ponytail: build lookup from latest.json — match by repo segment (last path component)
-    by_repo = {}  # repo segment → repo data
-    latest = DATA / "latest.json"
-    if latest.exists():
-        try:
-            snap = json.loads(latest.read_text())
-            for r in (snap.get("hot_now") or []):
-                by_repo[r["name"].split("/")[-1]] = r
-            for cat in (snap.get("categories") or []):
-                for r in cat.get("repos") or []:
-                    by_repo.setdefault(r["name"].split("/")[-1], r)
-        except (OSError, ValueError):
-            pass
+    # ponytail: build lookup from PostgreSQL — match by repo segment (last path component). DB is source of truth (latest.json deprecated).
+    by_repo = _load_repo_index()
 
     # ponytail: build lookup from sidecar — covers installs not in latest.json
-    by_origin = {}
+    by_origin = {"skills": {}, "commands": {}, "agents": {}, "plugins": {}}
     if SKILL_ORIGINS.exists():
         try:
             data = json.loads(SKILL_ORIGINS.read_text())
-            for repo_name, info in (data.get("skills") or {}).items():
-                by_origin[repo_name] = info
+            for kind in ("skills", "commands", "agents", "plugins"):
+                for key, info in (data.get(kind) or {}).items():
+                    by_origin[kind][key] = info
         except (OSError, ValueError):
             pass
+    # ponytail: index by bare name for commands/agents (file stem matches name)
+    cmd_origin_by_name = by_origin["commands"]
+    agent_origin_by_name = by_origin["agents"]
+    plugin_origin_by_key = by_origin["plugins"]  # plugin key format: name@marketplace
 
     # skills dirs
     for label, d in [("claude", Path.home() / ".claude" / "skills"),
@@ -340,10 +562,19 @@ def detect_local_skills():
                 "stars": r.get("stars") or 0,
                 "source": "cache",
             })
-        elif name in by_origin:
-            o = by_origin[name]
+        elif name in by_origin["skills"]:
+            o = by_origin["skills"][name]
             meta["url"] = o.get("url")
             meta["source"] = "origin"
+            # ponytail: installed skill not in our PG — fetch stars/topics live from GitHub so the source card shows real ⭐
+            full = f"{o.get('owner')}/{o.get('repo')}" if o.get("owner") and o.get("repo") else None
+            if full:
+                gh = _gh_repo_meta(full)
+                if gh:
+                    meta["stars"] = gh.get("stars") or 0
+                    meta["topics"] = gh.get("topics") or []
+                    meta["desc_en"] = gh.get("description") or meta.get("desc_en")
+                    meta["pushed_at"] = gh.get("pushed_at")
         else:
             for skills_root in [Path.home() / ".claude" / "skills",
                                 Path.home() / ".codex" / "skills"]:
@@ -374,7 +605,15 @@ def detect_local_skills():
         try:
             for f in cmd_dir.iterdir():
                 if f.suffix == ".md" and not f.name.startswith("."):
-                    out["commands"][f.stem] = {"claude": True}
+                    origin = cmd_origin_by_name.get(f.stem, {})
+                    desc_en = origin.get("desc_en") or _parse_frontmatter_desc(f)
+                    out["commands"][f.stem] = {
+                        "claude": True,
+                        "path": str(f),
+                        "url": origin.get("url"),
+                        "desc_zh": origin.get("desc_zh"),
+                        "desc_en": desc_en,
+                    }
         except OSError:
             pass
 
@@ -384,11 +623,33 @@ def detect_local_skills():
         try:
             for f in agent_dir.iterdir():
                 if f.suffix == ".md" and not f.name.startswith("."):
-                    out["agents"][f.stem] = {"claude": True}
+                    origin = agent_origin_by_name.get(f.stem, {})
+                    desc_en = origin.get("desc_en") or _parse_frontmatter_desc(f)
+                    out["agents"][f.stem] = {
+                        "claude": True,
+                        "path": str(f),
+                        "url": origin.get("url"),
+                        "desc_zh": origin.get("desc_zh"),
+                        "desc_en": desc_en,
+                    }
         except OSError:
             pass
 
-    # ponytail: plugins from installed_plugins.json (v2 schema)
+    # ponytail: plugins from installed_plugins.json (v2 schema).
+    # GitHub URL priority: sidecar override > known_marketplaces.json dynamic read > none.
+    # Reading known_marketplaces.json means we auto-pick-up every marketplace the user has
+    # installed — no need to maintain a hardcoded list.
+    marketplace_urls: dict[str, str] = {}
+    known_mp_file = Path.home() / ".claude" / "plugins" / "known_marketplaces.json"
+    if known_mp_file.exists():
+        try:
+            mp_data = json.loads(known_mp_file.read_text())
+            for mp_name, mp_info in (mp_data or {}).items():
+                src = mp_info.get("source") or {}
+                if src.get("source") == "github" and src.get("repo"):
+                    marketplace_urls[mp_name] = f"https://github.com/{src['repo']}"
+        except (OSError, ValueError):
+            pass
     plugins_file = Path.home() / ".claude" / "plugins" / "installed_plugins.json"
     if plugins_file.exists():
         try:
@@ -399,11 +660,16 @@ def detect_local_skills():
                 else:
                     name, marketplace = plugin_key, ""
                 inst = max(installs, key=lambda i: i.get("installedAt", "")) if installs else {}
+                origin = plugin_origin_by_key.get(plugin_key, {})
+                default_url = marketplace_urls.get(marketplace)
                 out["plugins"].append({
                     "name": name,
                     "marketplace": marketplace,
                     "version": inst.get("version", ""),
                     "install_path": inst.get("installPath", ""),
+                    "url": origin.get("url") or default_url,
+                    "desc_zh": origin.get("desc_zh"),
+                    "desc_en": origin.get("desc_en"),
                 })
         except (OSError, ValueError, TypeError):
             pass
@@ -426,8 +692,18 @@ def install_skill_from_github(name, url):
         raise ValueError(f"only github.com urls allowed: {url!r}")
     if not url:
         url = f"https://github.com/{name}"
+    else:
+        # ponytail: name/url consistency — refuse mismatched pair to prevent cloning malicious
+        # content under a trusted name. Parse the path and require it to match name.
+        from urllib.parse import urlparse
+        path = urlparse(url).path.strip("/")
+        # path may include trailing ".git" — strip it
+        if path.endswith(".git"):
+            path = path[:-4]
+        if path != name:
+            raise ValueError(f"url {url!r} does not match name {name!r} — refusing to clone mismatch")
 
-    target = SKILLS_CACHE / repo
+    target = SKILLS_CACHE / f"{owner}__{repo}"   # ponytail: namespace by owner to avoid collisions across different owners with same repo name
     if not target.exists():
         target.parent.mkdir(parents=True, exist_ok=True)
         result = subprocess.run(
@@ -467,12 +743,302 @@ def install_skill_from_github(name, url):
     return str(target)
 
 
+def uninstall_skill(name: str) -> dict:
+    """Remove a skill: unlink from ~/.claude/skills + ~/.codex/skills, drop cache dir, remove sidecar entry.
+    Returns {removed_links: [paths], cache: path_or_null}."""
+    if not name or not all(c.isalnum() or c in "-_." for c in name):
+        raise ValueError(f"invalid skill name: {name!r}")
+    removed = []
+    for skills_root in [Path.home() / ".claude" / "skills",
+                        Path.home() / ".codex" / "skills"]:
+        link = skills_root / name
+        if link.is_symlink() or link.exists():
+            try:
+                if link.is_symlink():
+                    link.unlink()
+                elif link.is_dir():
+                    shutil.rmtree(link)
+                removed.append(str(link))
+            except OSError as e:
+                sys.stderr.write(f"  [warn] failed to remove {link}: {e}\n")
+    # ponytail: also remove the cache clone dir if no other skill symlinks point to it
+    if SKILL_ORIGINS.exists():
+        try:
+            origins = json.loads(SKILL_ORIGINS.read_text())
+            entry = (origins.get("skills") or {}).pop(name, None)
+            if entry:
+                owner = entry.get("owner", "")
+                repo = entry.get("repo", name)
+                # ponytail: check both new (owner__repo) and legacy (bare repo) cache paths
+                candidates = [SKILLS_CACHE / f"{owner}__{repo}"]
+                if owner:
+                    candidates.append(SKILLS_CACHE / repo)
+                still_used = False
+                for r in (origins.get("skills") or {}).values():
+                    if r.get("owner") == owner and r.get("repo") == repo:
+                        still_used = True
+                        break
+                for cache_dir in candidates:
+                    if cache_dir.exists() and not still_used:
+                        try:
+                            shutil.rmtree(cache_dir)
+                        except OSError:
+                            pass
+            SKILL_ORIGINS.write_text(json.dumps(origins, ensure_ascii=False, indent=2))
+        except (OSError, ValueError):
+            pass
+    return {"removed_links": removed}
+
+
+def replace_skill(old_name: str, new_name: str, new_url: str = "") -> dict:
+    """Install `new_name` then remove `old_name`. Used when user picks a superior alternative.
+    ponytail: rollback on uninstall failure — if new installs but old can't be removed,
+    we uninstall new to restore pre-call state. Without this the user is left with BOTH
+    installed, which is the opposite of "replace"."""
+    new_path = install_skill_from_github(new_name, new_url)
+    try:
+        removed = uninstall_skill(old_name)
+    except Exception as e:
+        # ponytail: rollback — best-effort, log if rollback itself fails so user sees the state
+        sys.stderr.write(f"  [warn] replace: uninstall {old_name!r} failed ({e}); rolling back new install\n")
+        try:
+            uninstall_skill(new_name)
+        except Exception as e2:
+            sys.stderr.write(f"  [ERROR] rollback also failed: {e2}; new still installed at {new_path}\n")
+        raise
+    return {"new_path": new_path, "old_removed": removed}
+
+
+# ponytail: generic topics every AI tool has — exclude from "same domain" matching so we don't
+# falsely recommend hermes-agent as a replacement for graphify just because both have "claude-code".
+# Threshold for "generic" = ≥5 repos in DB share this tag. Picked empirically; tighten if too noisy.
+_GENERIC_TOPICS = frozenset({
+    # AI/agent meta
+    "ai", "ai-agents", "ai-agent", "ai-tools", "agent", "agents", "agentic", "agentic-ai",
+    "agentic-framework", "agentic-workflow", "llm", "llms", "large-language-models",
+    "machine-learning", "deep-learning", "generative-ai", "genai", "rag",
+    # RAG/embedding/data layer buzzwords — shared by every RAG-flavored repo, can't be anchors
+    "graphrag", "knowledge-graph", "embedding", "embeddings", "vector-database", "pgvector",
+    "gpt", "gpt-4", "openai-api",
+    # vendor names (every Claude/Codex tool has these)
+    "anthropic", "claude", "claude-code", "claude-ai", "codex", "openai", "chatgpt",
+    "google", "gemini", "deepseek", "qwen", "kimi", "openclaw",
+    # generic IDE/coding tool names
+    "opencode", "antigravity", "kiro", "qoder", "trae", "windsurf", "windsurf-ai",
+    "cursor", "cursor-ai", "copilot", "command-line",
+    # scaffolding
+    "skills", "agent-skills", "skill", "obra", "superpowers",
+    "awesome", "awesome-list", "awesome-llm-apps", "awesome-claude-skills",
+    "developer-tools", "devtools", "tools", "cli",
+    # languages
+    "python", "typescript", "javascript", "rust", "go", "ruby",
+})
+
+
+def find_skill_replacements(local: dict, repos_by_segment: dict, min_anchors: int = 1,
+                            min_topic_repos: int = 1) -> list[dict]:
+    """For each installed skill with topics+stars, find uninstalled repos that share
+    VERTICAL-domain topics AND look like a stronger alternative.
+
+    Strategy:
+      1. Filter out generic topics (claude, codex, ai, agent, llm, graphrag, knowledge-graph, ...) —
+         these are universal across many AI tools, so overlapping on them is meaningless. The
+         graphrag/knowledge-graph/etc. terms (RAG-flavored) are generic because they're shared
+         by every RAG repo regardless of vertical; using them as anchors gave wrong matches
+         like LightRAG → graphify.
+      2. ponytail: VERTICAL ANCHOR requirement — at least one of the overlap topics must be a
+         vertical-specific topic shared by ≤ a few repos in DB. Topics like 'graphrag' or
+         'knowledge-graph' don't qualify as anchors even after the generic filter, because the
+         overlap itself could be just two AI buzzwords. Require ≥1 overlap topic that's NOT a
+         known "buzzword" (i.e. appears in < threshold repos).
+      3. Same-category guard — candidate's best_category MUST match installed's best_category.
+      4. Score = specific overlap count × 100 + candidate stars.
+      5. Sort candidates by score; require ≥min_topic_repos candidates to confirm a category
+         exists before surfacing a replacement.
+
+    Returns [{installed, recommended}]."""
+    out = []
+    # ponytail: build dynamic anchor topic whitelist — a topic is a "vertical anchor" if
+    # fewer than 8 repos in our DB share it. Topics like graphrag/knowledge-graph show up in
+    # 4-5 repos but they cross distinct verticals (LightRAG vs graphify), so we additionally
+    # exclude RAG-flavored anchors entirely.
+    _RAG_FLAVORED_ANCHORS = frozenset({"graphrag", "knowledge-graph", "rag", "vector-database",
+                                       "embedding", "embeddings", "large-language-models",
+                                       "llm-evaluation", "llm-memory", "agent-memory"})
+    for name, meta in (local.get("skills") or {}).items():
+        url = meta.get("url")
+        if not url:
+            continue
+        inst_topics = set(meta.get("topics") or [])
+        inst_specific = inst_topics - _GENERIC_TOPICS
+        inst_stars = meta.get("stars") or 0
+        if not inst_specific or not inst_stars:
+            continue
+        # ponytail: vertical anchor — installed must have ≥1 specific topic that is also
+        # a real vertical differentiator (not just another AI buzzword).
+        inst_anchors = inst_specific - _RAG_FLAVORED_ANCHORS
+        if len(inst_anchors) < min_anchors:
+            continue
+        # ponytail: look up installed skill's best_category from the same PG index
+        inst_record = repos_by_segment.get(name) or {}
+        inst_cat = inst_record.get("best_category")
+        candidates = []
+        for r in repos_by_segment.values():
+            rseg = r["name"].split("/")[-1]
+            rurl = (r.get("url") or "").lower()
+            if rseg == name:
+                continue
+            if rurl and rurl == (url or "").lower():
+                continue
+            # ponytail: same-domain guard. If installed has a category, candidate must match.
+            c_cat = r.get("best_category")
+            if inst_cat and c_cat and inst_cat != c_cat:
+                continue
+            c_topics = set(r.get("topics") or [])
+            c_specific = c_topics - _GENERIC_TOPICS
+            overlap = inst_specific & c_specific
+            # ponytail: vertical anchor — overlap must contain ≥min_anchors TRUE vertical anchor(s)
+            # shared between installed and candidate. Pure RAG-flavored overlap
+            # (graphrag/knowledge-graph only) doesn't count. This is the SOLE filter; we dropped
+            # the old `min_overlap=2` gate because vertical-anchored matches with 1 specific
+            # topic (e.g. graphify↔tirth8205/code-review-graph via tree-sitter) are valid.
+            anchor_overlap = inst_anchors & c_specific
+            if len(anchor_overlap) < min_anchors:
+                continue
+            c_stars = r.get("stars") or 0
+            if c_stars < 200:
+                continue
+            # ponytail: score favors anchor strength + topic count + stars
+            score = len(anchor_overlap) * 200 + len(overlap) * 50 + min(c_stars, 50000) // 100
+            reasons = [
+                f"共享 vertical anchor：{', '.join(sorted(anchor_overlap))}",
+                f"共 {len(overlap)} 个特定 topic：{', '.join(sorted(list(overlap))[:4])}",
+                f"⭐ {c_stars:,}" + (f" vs 已装 {inst_stars:,}" if inst_stars else ""),
+            ]
+            if inst_cat and c_cat and inst_cat == c_cat:
+                reasons.append(f"同领域：{inst_cat}")
+            candidates.append({
+                "name": r["name"], "url": r["url"], "stars": c_stars,
+                "topics": sorted(c_topics),
+                "desc_zh": r.get("desc_zh"), "desc_en": r.get("description"),
+                "overlap": sorted(overlap), "anchors": sorted(anchor_overlap),
+                "reasons": reasons, "score": score,
+            })
+        if len(candidates) >= min_topic_repos:
+            candidates.sort(key=lambda x: x["score"], reverse=True)
+            top = candidates[0]
+            # ponytail: decide replace vs alongside per installed→recommended pair.
+            # "替代" requires ALL three signals to fire — same vertical AND ≥2 anchor overlap
+            # AND the recommended is meaningfully stronger. Anything less → "并存" (coexist
+            # with the existing install). Conservative on purpose: better to nudge coexistence
+            # than to talk the user into uninstalling something that works.
+            top_record = repos_by_segment.get(top["name"].split("/")[-1]) or {}
+            top_cat = top_record.get("best_category")
+            same_cat = bool(inst_cat and top_cat and inst_cat == top_cat)
+            strong_overlap = len(top.get("anchors") or []) >= 2
+            much_stronger = top["stars"] > (inst_stars or 0) * 1.5
+            mode = "replace" if (same_cat and strong_overlap and much_stronger) else "alongside"
+            out.append({
+                "installed": {
+                    "name": name, "url": url, "stars": inst_stars,
+                    "topics": sorted(inst_topics),
+                    "best_category": inst_cat,
+                },
+                "recommended": {**top, "best_category": top_cat},
+                "alternatives_count": len(candidates),
+                "mode": mode,
+            })
+    out.sort(key=lambda x: x["recommended"]["score"], reverse=True)
+    return out
+
+
+def set_capability_origin(kind: str, name: str, url: str = "", desc_zh: str = "", desc_en: str = ""):
+    """Write/edit GitHub origin for a command/agent/plugin in the sidecar.
+    `kind` ∈ {commands, agents, plugins}. For plugins, `name` is the full plugin key (name@marketplace).
+    Empty `url` clears the entry. Returns the merged origin dict for this item."""
+    if kind not in ("commands", "agents", "plugins"):
+        raise ValueError(f"unsupported kind: {kind!r}")
+    if not name or "/" in name and kind != "plugins":
+        raise ValueError(f"invalid name: {name!r}")
+    if url and not url.startswith("https://github.com/"):
+        raise ValueError(f"only github.com urls allowed: {url!r}")
+
+    SKILL_ORIGINS.parent.mkdir(parents=True, exist_ok=True)
+    origins = {}
+    if SKILL_ORIGINS.exists():
+        try:
+            origins = json.loads(SKILL_ORIGINS.read_text())
+        except (OSError, ValueError):
+            origins = {}  # ponytail: corrupted sidecar — start fresh
+
+    bucket = origins.setdefault(kind, {})
+    if url or desc_zh or desc_en:
+        entry = bucket.get(name, {})
+        if url:
+            entry["url"] = url
+        if desc_zh:
+            entry["desc_zh"] = desc_zh
+        if desc_en:
+            entry["desc_en"] = desc_en
+        entry["updated_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+        bucket[name] = entry
+    else:
+        bucket.pop(name, None)
+
+    SKILL_ORIGINS.write_text(json.dumps(origins, ensure_ascii=False, indent=2))
+    return bucket.get(name, {})
+
+
 # ponytail: well-known AI/dev CLI tools worth surfacing to the user
 KNOWN_CLIS = [
     "rtk", "gh", "docker", "kubectl", "helm", "terraform",
     "jq", "rg", "fd", "fzf", "tmux", "git", "curl", "ffmpeg",
     "aws", "gcloud", "az", "supabase", "vercel", "wrangler",
 ]
+
+
+def group_capabilities_by_origin(local: dict) -> list[dict]:
+    """Bucket skills/commands/agents/plugins by their `url` (source repo). Only items with
+    a URL are included — local-only / unknown-source items are dropped per UX rule:
+    "if it's from a GitHub repo, show this source card; the rest don't need to be shown".
+    Returns [{url, slug, name, counts, items}], where `items` is a flat list of
+    {type, name, desc_en, desc_zh, path, url, stars, topics} for drill-in display."""
+    bucket: dict[str, dict] = {}
+    # ponytail: skills are a dict {name: meta}; commands/agents are same shape; plugins is a list
+    sources = [
+        ("skills",   [(n, m) for n, m in (local.get("skills") or {}).items() if m.get("url")]),
+        ("commands", [(n, m) for n, m in (local.get("commands") or {}).items() if m.get("url")]),
+        ("agents",   [(n, m) for n, m in (local.get("agents") or {}).items() if m.get("url")]),
+        ("plugins",  [(f"{p['name']}@{p.get('marketplace','')}", p) for p in (local.get("plugins") or []) if p.get("url")]),
+    ]
+    for kind, items in sources:
+        for name, entry in items:
+            url = entry.get("url")
+            slug = _repo_slug_from_url(url)
+            grp = bucket.setdefault(url, {
+                "url": url,
+                "slug": slug,
+                "name": slug,
+                "counts": {"skills": 0, "commands": 0, "agents": 0, "plugins": 0},
+                "items": [],
+            })
+            grp["counts"][kind] += 1
+            grp["items"].append({
+                "type": kind,
+                "name": entry.get("name") or name,
+                "desc_en": entry.get("desc_en"),
+                "desc_zh": entry.get("desc_zh"),
+                "path": entry.get("path") or entry.get("install_path"),
+                "url": url,
+                "stars": entry.get("stars"),
+                "topics": entry.get("topics") or [],
+            })
+    groups = sorted(bucket.values(), key=lambda g: g["slug"])
+    for g in groups:
+        g["items"].sort(key=lambda it: (it["type"], it["name"] or ""))
+        # ponytail: expose total for the stat tile convenience
+        g["total"] = len(g["items"])
+    return groups
 
 
 def detect_cli_tools():
@@ -503,11 +1069,30 @@ def detect_cli_tools():
 
 def install_cli_wrapper(name, command):
     """Create ~/.claude/commands/<name>.md slash command wrapping `command`.
-    Validates name (no traversal). `command` is the literal shell command to invoke."""
+
+    Security: the generated markdown uses Claude Code's `!`cmd`` syntax which EXECUTES
+    the command when the slash command is invoked. So `command` is treated as shell —
+    we must reject anything that could redirect, pipe, substitute, or chain.
+    ponytail: allowlist = "a single executable token + optional safe flags + safe path args".
+    Examples that pass: `claude`, `gh`, `git status --short`, `ls /tmp`, `python3 script.py`
+    Examples that fail: `curl x|sh`, `rm -rf ~`, `$(whoami)`, `a; b`, `a && b`, backticks.
+    """
     if not name or not all(c.isalnum() or c in "-_." for c in name) or ".." in name:
         raise ValueError(f"invalid command name: {name!r}")
     if not command or len(command) > 200:
         raise ValueError("command must be 1-200 chars")
+
+    # ponytail: shell metacharacter check — reject any of these BEFORE writing to disk.
+    # They enable pipe/chain/substitution/redirection that turn this into RCE.
+    forbidden = set(";|&$()<>`\\\"'*?[]{}~#\n\r\t")
+    bad = sorted({c for c in command if c in forbidden})
+    if bad:
+        raise ValueError(f"command contains forbidden shell metacharacters: {bad!r}")
+    # ponytail: require single executable at start (alnum + _-.+), then whitespace + args.
+    # Each arg = same safe charset. No `$VAR`, no `~`, no backticks already blocked above.
+    import re as _re
+    if not _re.fullmatch(r"[A-Za-z0-9_.\-+]+(?:\s+[A-Za-z0-9_.\-+/=@:]+)*", command):
+        raise ValueError(f"command must be a single executable + safe args: {command!r}")
 
     target = Path.home() / ".claude" / "commands" / f"{name}.md"
     if target.exists():
@@ -567,6 +1152,119 @@ def gh_search(q, per_page=20):
     return out
 
 
+# ponytail: hand-picked repos that escape topic/description search but are obvious AI tools
+# (some maintainers never set topics, some are <5k stars at crawl time). Force-include on every
+# crawl so the 5k+ view reflects what users actually expect to see.
+MANUAL_SEED_REPOS = frozenset({
+    # User-curated 2026-07-21 list — these all slipped past TOP_5K_QUERIES at crawl time
+    "Egonex-AI/Understand-Anything",  # knowledge-graph IDE (75k stars, claude-code topic)
+    "lodestone/hallmark",             # anti-AI-slop design skill
+    "Shubhamsaboo/awesome-llm-apps",  # 100+ AI agent apps (125k stars, generic topics)
+    "stablyai/orca",                  # desktop ADE for parallel coding agents (24k stars)
+    "GaoSSR/best-claude-hud",         # Claude HUD plugin
+    "lidge-jun/opencodex",            # universal LLM proxy for codex/claude-code
+    "lodestone/ai-agent-book",        # 《深入理解 AI Agent》开源书
+    "volcengine/OpenViking",          # ByteDance context DB for agents (27k stars)
+    "msitarzewski/agency-agents",     # complete AI agency (135k stars, no topics)
+    # Safety net
+    "all-hands-ai/openhands",         # common 2025 coding agent
+})
+
+
+def gh_fetch_repo(full_name):
+    """Fetch a single repo's full metadata. Used for MANUAL_SEED_REPOS."""
+    try:
+        r = subprocess.run(
+            ["gh", "api", f"repos/{full_name}"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if r.returncode != 0:
+            return None
+        item = json.loads(r.stdout)
+    except Exception:
+        return None
+    return {
+        "name": item["full_name"],
+        "desc": (item.get("description") or "").strip(),
+        "url": item["html_url"],
+        "stars": item.get("stargazers_count", 0),
+        "forks": item.get("forks_count", 0),
+        "lang": item.get("language") or "—",
+        "topics": item.get("topics", []) or [],
+        "updated": item.get("updated_at", "")[:10],
+        "pushed": item.get("pushed_at", "")[:10],
+        "score": 0,
+    }
+
+
+def fetch_github_trending(since: str = "daily", max_repos: int = 30):
+    """Scrape github.com/trending and enrich each entry with full data via gh_search.
+
+    Why: search-by-stars misses fresh AI tools that haven't crossed 5k yet but are trending today.
+    Returns normalized repo dicts (same shape as gh_search output) with extra 'source' marker.
+    """
+    url = f"https://github.com/trending?since={since}"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        html_text = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", errors="replace")
+    except Exception as e:
+        print(f"  ! github trending scrape failed: {e}", file=sys.stderr)
+        return []
+
+    seeds = []
+    seen = set()
+    for art in re.findall(r'<article class="Box-row">(.+?)</article>', html_text, re.DOTALL):
+        h2 = re.search(r'<h2[^>]*>\s*<a[^>]+href="/([^"]+)"', art)
+        if not h2:
+            continue
+        name = h2.group(1).strip()
+        # filter out sponsors/, apps/, and other non-repo paths
+        parts = name.split("/")
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            continue
+        if name in seen:
+            continue
+        seen.add(name)
+        lang_m = re.search(r'itemprop="programmingLanguage">([^<]+)<', art)
+        lang = (lang_m.group(1).strip() if lang_m else None) or "—"
+        stars_m = re.search(r'([\d,]+)\s*</span>\s*</a>\s*</span>', art)
+        stars = int(stars_m.group(1).replace(",", "")) if stars_m else 0
+        desc_m = re.search(r'<p class="col-9[^"]*"[^>]*>(.+?)</p>', art, re.DOTALL)
+        desc = re.sub(r"<[^>]+>", "", desc_m.group(1)).strip() if desc_m else ""
+        # ponytail: github shows "X stars today" — that's the literal 24h delta we want for /api/gain
+        today_m = re.search(r'([\d,]+)\s*stars\s*today', art)
+        stars_today = int(today_m.group(1).replace(",", "")) if today_m else None
+        seeds.append({"name": name, "desc": desc, "stars": stars, "lang": lang, "stars_today": stars_today})
+        if len(seeds) >= max_repos:
+            break
+
+    # Enrich each seed via gh_search to get topics + url + canonical desc.
+    # repo:owner/name query returns just that one repo (if it exists); per_page=1 caps the call.
+    out = []
+    for s in seeds:
+        try:
+            hits = gh_search(f"repo:{s['name']}", per_page=1)
+        except Exception:
+            hits = []
+        if hits:
+            r = hits[0]
+            r["source"] = "github_trending"
+            # ponytail: gh_search returns the repo's *total* stars but not today's gain — carry over
+            # the "X stars today" we parsed from the trending HTML so upsert_repos can persist it.
+            r["stars_today"] = s.get("stars_today")
+            out.append(r)
+        else:
+            # fallback: synthesize minimal dict (no topics → will fail is_ai_relevant, dropped)
+            out.append({
+                "name": s["name"], "url": f"https://github.com/{s['name']}",
+                "desc": s["desc"], "stars": s["stars"], "forks": 0,
+                "lang": s["lang"], "topics": [], "source": "github_trending",
+                "stars_today": s.get("stars_today"),
+                "updated": "", "pushed": "", "score": 0,
+            })
+    return out
+
+
 def crawl():
     """Fetch all categories, dedupe, save."""
     today = datetime.date.today().isoformat()
@@ -609,9 +1307,7 @@ def crawl():
         time.sleep(2)  # rate limit: 30 req/min
         try:
             for r in gh_search(q, per_page=100):
-                # ponytail: filter to AI-relevant — drop awesome-go etc. that have 5k+ stars
-                topics = [t.lower() for t in r.get("topics", [])]
-                if not any(t in AI_TOPIC_WHITELIST for t in topics):
+                if not is_ai_relevant(r):
                     continue
                 top_5k_repos.setdefault(r["name"], r)
         except Exception as e:
@@ -619,6 +1315,35 @@ def crawl():
 
     top_5k_sorted = sorted(top_5k_repos.values(), key=lambda x: x.get("stars", 0), reverse=True)[:TOP_5K_LIMIT]
     print(f"  ✓ 5k+ pass: {len(top_5k_sorted)} repos after AI filter")
+
+    # ponytail: manual seed — guaranteed inclusion of well-known AI tools that escape topic search
+    for full_name in MANUAL_SEED_REPOS:
+        if full_name in top_5k_repos:
+            continue
+        r = gh_fetch_repo(full_name)
+        if not r or not is_ai_relevant(r):
+            continue
+        top_5k_repos[full_name] = r
+        print(f"  ✓ manual seed: {full_name} ({r['stars']} ⭐)")
+
+    # ponytail: GitHub trending — catches fresh AI tools with <5k stars that are hot today.
+    # Pull BOTH daily and weekly — daily = today's buzz, weekly = rising stars the daily
+    # doesn't yet show. Dedupe on name so a repo on both lists is counted once.
+    print("[crawl] GitHub trending (daily + weekly)…")
+    trending_daily = fetch_github_trending(since="daily", max_repos=30)
+    trending_weekly = fetch_github_trending(since="weekly", max_repos=30)
+    trending_seen, trending = set(), []
+    for r in trending_daily + trending_weekly:
+        if r["name"] in trending_seen:
+            continue
+        trending_seen.add(r["name"])
+        trending.append(r)
+    for r in trending:
+        if r["name"] not in top_5k_repos:
+            top_5k_repos[r["name"]] = r
+    trending_ai = [r for r in trending if is_ai_relevant(r)]
+    print(f"  ✓ trending: {len(trending_daily)} daily + {len(trending_weekly)} weekly → {len(trending)} unique → {len(trending_ai)} AI-relevant → merged into 5k+ pool")
+    top_5k_sorted = sorted(top_5k_repos.values(), key=lambda x: x.get("stars", 0), reverse=True)[:TOP_5K_LIMIT]
 
     # Detect local skills — runs every crawl, cheap (just iterates 2 dirs)
     local = detect_local_skills()
@@ -632,654 +1357,59 @@ def crawl():
         r["facts"] = facts_for_repo(r)
         r["local_installed"] = r["name"].split("/")[-1] in local
 
-    snapshot = {
-        "date": today,
-        "fetched_at": datetime.datetime.now().isoformat(timespec="seconds"),
-        "total_unique": len(all_repos),
-        "categories": cat_results,
-        "hot_now": [{
-            "name": r["name"], "desc": r["desc"], "url": r["url"],
-            "stars": r["stars"], "lang": r["lang"], "topics": r["topics"],
-            "categories": r["categories"],
-        } for r in hot_now],
-        "top_5k_plus": {
-            "count": len(top_5k_sorted),
-            "fetched_at": datetime.datetime.now().isoformat(timespec="seconds"),
-            "repos": [{
-                "name": r["name"], "desc": r["desc"], "url": r["url"],
-                "stars": r["stars"], "lang": r["lang"], "topics": r["topics"],
-                "pushed": r.get("pushed", ""),
-                "desc_zh": r.get("desc_zh", ""),
-                "facts": r.get("facts", ""),
-                "local_installed": r.get("local_installed", False),
-            } for r in top_5k_sorted],
-        },
-        "local_skills": {
-            "installed": local,
-            "installed_count": len(local),
-            "detected_at": datetime.datetime.now().isoformat(timespec="seconds"),
-        },
-    }
+    # ponytail: build flat deduped list of (cats ∪ 5k+); assign best_category; is_ai_relevant
+    to_persist = []
+    cat_pairs = []  # (repo_name, category_id) for repo_categories
+    for cat in cat_results:
+        for r in cat["repos"]:
+            r["best_category"] = cat["id"]
+            to_persist.append(r)
+            cat_pairs.append((r["name"], cat["id"]))
+    for r in top_5k_sorted:
+        r["best_category"] = None  # 5k+ doesn't belong to a single category
+        to_persist.append(r)
+    seen = set()
+    deduped = []
+    for r in to_persist:
+        if r["name"] in seen:
+            continue
+        seen.add(r["name"])
+        r["is_ai_relevant"] = is_ai_relevant(r)
+        deduped.append(r)
 
     # ponytail: translate once, cache forever — descriptions don't change day-to-day
     print("[crawl] translating to Chinese…")
-    pairs = []
-    for cat in cat_results:
-        for r in cat["repos"]:
-            pairs.append((f"{r['name']}::desc", r["desc"]))
+    pairs = [(f"{r['name']}::desc", r.get("desc", "")) for r in deduped]
     zh = translate_batch(pairs)
-
-    # Attach Chinese fields — facts only, no invented phrases
-    for cat in cat_results:
-        for r in cat["repos"]:
-            r["desc_zh"] = zh.get(f"{r['name']}::desc", "")
-            r["facts"] = facts_for_repo(r)
-            r["local_installed"] = r["name"].split("/")[-1] in local
-    for r in snapshot["hot_now"]:
-        r["desc_zh"] = zh.get(f"{r['name']}::desc", "")
+    for r in deduped:
+        r["desc_zh"] = zh.get(f"{r['name']}::desc", "") or r.get("desc_zh", "")
         r["facts"] = facts_for_repo(r)
         r["local_installed"] = r["name"].split("/")[-1] in local
-    out_path = DATA / f"{today}.json"
-    out_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2))
-    latest = DATA / "latest.json"
-    latest.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2))
-    print(f"[crawl] saved → {out_path.relative_to(ROOT)} + latest.json ({snapshot['total_unique']} unique)")
-    return snapshot
+
+    # ponytail: write everything to Postgres in one transaction
+    import db
+    db.ensure_database()
+    db.ensure_schema()
+    conn = db.connect()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO crawl_log DEFAULT VALUES RETURNING id")
+    crawl_id = cur.fetchone()[0]
+    n_inserted, n_updated = db.upsert_repos(conn, deduped)
+    db.replace_categories(conn, cat_pairs)
+    db.snapshot_stars(conn, [r["name"] for r in deduped])
+    # ponytail: trending flag is recomputed each crawl — clear stale, then set today's trending repos
+    db.set_trending(conn, [r["name"] for r in trending_ai])
+    cur.execute(
+        "UPDATE crawl_log SET finished_at = NOW(), repos_seen = %s, repos_added = %s, repos_updated = %s WHERE id = %s",
+        (len(deduped), n_inserted, n_updated, crawl_id),
+    )
+    conn.commit()
+    conn.close()
+    print(f"[crawl] saved → postgres ai_radar ({n_inserted} added, {n_updated} updated, {len(deduped)} unique this run)")
+    return {"total_unique": len(deduped), "crawl_id": crawl_id}
 
 
 
-def render():
-    """Generate out/index.html from latest data — cool dark, evidence-based cards, local skill install."""
-    latest = DATA / "latest.json"
-    if not latest.exists():
-        print("[render] no data yet — run `radar.py crawl` first", file=sys.stderr)
-        sys.exit(1)
-    snap = json.loads(latest.read_text())
-
-    local = snap.get("local_skills", {}).get("installed", {})
-
-    # ----- Build "Recommended to install" — top trending agent/skills repos not yet installed locally -----
-    recommend_pool = []
-    seen_names = set()
-    # pull from agent + memory + devtool categories, prioritize by stars
-    for cat in snap["categories"]:
-        if cat["id"] not in ("agent", "memory", "devtool", "llm"):
-            continue
-        for r in cat["repos"]:
-            short = r["name"].split("/")[-1]
-            if short in local or short in seen_names:
-                continue
-            # heuristic: must look "skill-ish" — has topics like skill/mcp/agent, OR has SKILL.md
-            topic_set = {t.lower() for t in r.get("topics", [])}
-            skill_signal = bool(topic_set & {"skill", "skills", "mcp", "mcp-server", "claude-code", "claude", "agent"})
-            if not skill_signal:
-                continue
-            seen_names.add(short)
-            recommend_pool.append({
-                "name": short, "full": r["name"], "url": r["url"],
-                "stars": r["stars"], "lang": r["lang"],
-                "desc_zh": (r.get("desc_zh") or r.get("desc") or "")[:120],
-                "topics": (r.get("topics") or [])[:4],
-            })
-    recommend_pool.sort(key=lambda x: x["stars"], reverse=True)
-    recommend_cards = recommend_pool[:8]
-
-    # ----- Local skills badges -----
-    installed_badges = []
-    for name, where in sorted(local.items()):
-        in_claude = where.get("claude", False)
-        in_codex = where.get("codex", False)
-        platforms = []
-        if in_claude: platforms.append("Claude")
-        if in_codex: platforms.append("Codex")
-        installed_badges.append({"name": name, "platforms": " · ".join(platforms)})
-
-    # ----- Hot Now — 4-col grid, evidence-based cards -----
-    hot_cards = []
-    for i, r in enumerate(snap["hot_now"][:24], 1):
-        facts = r.get("facts", "")
-        desc_zh = (r.get("desc_zh") or r.get("desc") or "").strip()
-        local_mark = " · <span style='color:#22c55e'>✓ 本机已装</span>" if r.get("local_installed") else ""
-        payload = json.dumps(r, ensure_ascii=False)
-        hot_cards.append(f'''
-        <div class="repo-card hot" data-payload='{html.escape(payload, quote=True)}' onclick="showRepo(this)">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-2xl font-black text-purple-300">#{i}</span>
-            <span class="text-amber-400 font-mono text-sm">⭐ {r["stars"]:,}</span>
-          </div>
-          <h3 class="font-bold text-base leading-tight mb-2 truncate">{html.escape(r["name"])}</h3>
-          <div class="text-xs text-cyan-300/80 font-mono leading-relaxed mb-2">{html.escape(facts)}{local_mark}</div>
-          <p class="text-xs text-white/60 leading-relaxed" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">{html.escape(desc_zh[:160])}</p>
-        </div>''')
-
-    # ----- Category sections — 3-col evidence-based cards -----
-    sections_html = []
-    for cat in snap["categories"]:
-        icon = CAT_ICONS.get(cat["id"], "star")
-        cat_plain = PLAIN_BY_CAT.get(cat["id"], cat["desc"])
-        cards = []
-        for r in cat["repos"][:12]:
-            facts = r.get("facts", "")
-            desc_zh = (r.get("desc_zh") or r.get("desc") or "").strip()
-            tags = "".join(
-                f'<span class="tag-chip">{html.escape(t)}</span>'
-                for t in r["topics"][:3]
-            )
-            local_dot = '<span class="local-dot" title="本机已安装">●</span>' if r.get("local_installed") else ""
-            payload = json.dumps({**r, "cat_id": cat["id"], "cat_name": cat["name"]}, ensure_ascii=False)
-            cards.append(f'''
-            <div class="repo-card" data-payload='{html.escape(payload, quote=True)}' onclick="showRepo(this)">
-              <div class="flex items-start justify-between gap-2 mb-2">
-                <h3 class="font-bold text-base leading-tight flex items-center gap-1.5">{local_dot}{html.escape(r["name"])}</h3>
-                <span class="text-amber-400 font-mono text-sm whitespace-nowrap">⭐ {r["stars"]:,}</span>
-              </div>
-              <div class="text-xs text-cyan-300/80 font-mono leading-relaxed mb-3">{html.escape(facts)}</div>
-              <p class="text-sm text-white/70 leading-relaxed mb-3" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">{html.escape(desc_zh[:200])}</p>
-              <div class="flex items-center justify-between flex-wrap gap-1">
-                <div class="flex gap-1 flex-wrap">{tags}</div>
-                <span class="text-xs text-white/40 font-mono">{html.escape(r["lang"])}</span>
-              </div>
-            </div>''')
-        sections_html.append(f'''
-        <section id="cat-{cat["id"]}" class="scroll-mt-24 mb-20">
-          <div class="flex items-end justify-between mb-6 flex-wrap gap-3">
-            <div>
-              <div class="flex items-center gap-2 mb-2">
-                <i data-lucide="{icon}" class="w-7 h-7 text-purple-300"></i>
-                <h2 class="text-2xl md:text-3xl font-bold tracking-tight">{html.escape(cat["name"])}</h2>
-              </div>
-              <p class="text-white/60 max-w-2xl mb-1">{html.escape(cat["desc"])}</p>
-              <p class="text-purple-300/70 text-sm italic">👉 {html.escape(cat_plain)}</p>
-            </div>
-            <span class="font-mono text-sm text-white/40">{cat["count"]} 个项目</span>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {''.join(cards)}
-          </div>
-        </section>''')
-
-    # ----- Local Skills section cards -----
-    rec_html = []
-    for r in recommend_cards:
-        rec_html.append(f'''
-        <div class="install-card">
-          <div class="flex items-start justify-between gap-2 mb-2">
-            <div class="min-w-0 flex-1">
-              <h3 class="font-bold text-sm truncate">{html.escape(r["full"])}</h3>
-              <div class="text-xs text-cyan-300/80 font-mono mt-0.5">⭐ {r["stars"]:,} · {html.escape(r["lang"])}</div>
-            </div>
-            <button class="btn-install" onclick="installSkill(this, '{html.escape(r["name"], quote=True)}', '{html.escape(r["url"], quote=True)}')">
-              ⬇ 安装
-            </button>
-          </div>
-          <p class="text-xs text-white/60 leading-relaxed" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{html.escape(r["desc_zh"])}</p>
-          <div class="flex gap-1 flex-wrap mt-2">
-            {''.join(f'<span class="tag-chip">{html.escape(t)}</span>' for t in r["topics"])}
-          </div>
-        </div>''')
-
-    installed_html = []
-    for b in installed_badges:
-        installed_html.append(f'''
-        <div class="installed-badge" title="平台：{html.escape(b["platforms"])}">
-          <span class="text-green-400">●</span>
-          <span class="font-mono text-xs">{html.escape(b["name"])}</span>
-        </div>''')
-
-    fetched_time = snap["fetched_at"][:16].replace("T", " ")
-    nav_tabs = ['<a href="#local" class="nav-tab" data-target="local"><i data-lucide="package" class="w-4 h-4"></i>本机 Skills</a>']
-    nav_tabs.append('<a href="#hot" class="nav-tab" data-target="hot"><i data-lucide="flame" class="w-4 h-4"></i>今日最热</a>')
-    nav_tabs += [
-        f'<a href="#cat-{c["id"]}" class="nav-tab" data-target="cat-{c["id"]}">'
-        f'<i data-lucide="{CAT_ICONS.get(c["id"], "star")}" class="w-4 h-4"></i>'
-        f'{html.escape(c["name"].split("(")[0].split("&")[0].strip())}</a>'
-        for c in snap["categories"]
-    ]
-
-    html_doc = f'''<!DOCTYPE html>
-<html lang="zh-CN" data-theme="radar">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>⚡ Lodestone · 每日 GitHub AI 热门情报站</title>
-<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-[data-theme="radar"] {{
-  --p: 262 83% 65%; --s: 189 94% 55%; --a: 262 83% 65%;
-  --n: 240 12% 8%; --b1: 240 14% 6%; --b2: 240 14% 9%;
-  --b3: 240 14% 14%; --bc: 220 13% 92%;
-}}
-* {{ box-sizing: border-box; }}
-html {{ scroll-behavior: smooth; }}
-
-/* ponytail: cool dark — animated aurora mesh + grid overlay */
-body {{
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  color: hsl(var(--bc));
-  min-height: 100vh;
-  position: relative;
-  background-color: #050509;
-  background-image:
-    radial-gradient(ellipse 60% 50% at 12% 8%, rgba(124, 58, 237, 0.35) 0%, transparent 55%),
-    radial-gradient(ellipse 50% 40% at 88% 12%, rgba(6, 182, 212, 0.25) 0%, transparent 55%),
-    radial-gradient(ellipse 55% 45% at 50% 95%, rgba(236, 72, 153, 0.18) 0%, transparent 60%);
-  background-attachment: fixed;
-  animation: aurora 25s ease-in-out infinite;
-}}
-@keyframes aurora {{
-  0%, 100% {{ background-position: 0% 0%, 100% 0%, 50% 100%; }}
-  33% {{ background-position: 50% 30%, 0% 60%, 100% 50%; }}
-  66% {{ background-position: 100% 0%, 50% 100%, 0% 30%; }}
-}}
-/* grid overlay — fades at edges */
-body::before {{
-  content: '';
-  position: fixed; inset: 0;
-  background-image:
-    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
-  background-size: 56px 56px;
-  pointer-events: none;
-  z-index: 0;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 0%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 0%, transparent 75%);
-}}
-.font-mono {{ font-family: 'JetBrains Mono', ui-monospace, monospace; }}
-
-/* Hero */
-.hero {{
-  position: relative; z-index: 1;
-  padding: 5rem 1.5rem 3rem;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-  overflow: hidden;
-}}
-.hero h1 {{
-  font-size: clamp(2.8rem, 7vw, 5rem);
-  font-weight: 900;
-  letter-spacing: -0.04em;
-  line-height: 1.0;
-  background: linear-gradient(135deg, #c4b5fd 0%, #67e8f9 50%, #f0abfc 100%);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: gradient 8s ease infinite;
-  margin: 0;
-}}
-@keyframes gradient {{ 0%,100% {{ background-position: 0% 50%; }} 50% {{ background-position: 100% 50%; }} }}
-.hero .tagline {{ color: rgba(255,255,255,0.65); margin-top: 1.25rem; font-size: 1.15rem; max-width: 38rem; line-height: 1.6; }}
-.stat-pill {{
-  background: rgba(255,255,255,0.04);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.08);
-  padding: 0.6rem 1.1rem;
-  border-radius: 999px;
-  font-size: 0.9rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}}
-.stat-pill b {{ color: #c4b5fd; font-family: 'JetBrains Mono', monospace; }}
-
-/* Sticky nav */
-.nav-tabs {{
-  position: sticky; top: 0; z-index: 30;
-  background: rgba(5, 5, 9, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-  padding: 0.75rem 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}}
-.nav-tabs::-webkit-scrollbar {{ display: none; }}
-.nav-tab {{
-  display: inline-flex; align-items: center; gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-radius: 999px;
-  font-size: 0.875rem;
-  color: rgba(255,255,255,0.6);
-  text-decoration: none;
-  white-space: nowrap;
-  transition: all 0.2s;
-  border: 1px solid transparent;
-}}
-.nav-tab:hover {{ background: rgba(255,255,255,0.05); color: white; }}
-.nav-tab.active {{
-  background: rgba(124, 58, 237, 0.15);
-  color: #c4b5fd;
-  border-color: rgba(124, 58, 237, 0.4);
-}}
-
-/* Repo cards */
-.repo-card {{
-  position: relative; z-index: 1;
-  background: rgba(15, 13, 25, 0.55);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 0.9rem;
-  padding: 1.25rem;
-  cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}}
-.repo-card.hot {{ padding: 1.1rem; }}
-.repo-card:hover {{
-  transform: translateY(-2px);
-  border-color: rgba(124, 58, 237, 0.45);
-  background: rgba(20, 18, 32, 0.7);
-  box-shadow: 0 10px 40px rgba(124, 58, 237, 0.15);
-}}
-.local-dot {{ color: #22c55e; font-size: 0.7rem; }}
-
-/* Install section */
-.section-title {{
-  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.18em;
-  color: rgba(255,255,255,0.45); margin-bottom: 0.5rem; font-weight: 600;
-}}
-.install-card {{
-  background: rgba(15, 13, 25, 0.55);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 0.85rem;
-  padding: 1rem;
-  transition: all 0.2s;
-}}
-.install-card:hover {{ border-color: rgba(124, 58, 237, 0.4); }}
-.btn-install {{
-  background: linear-gradient(135deg, #7c3aed, #06b6d4);
-  color: white;
-  border: none;
-  padding: 0.45rem 0.9rem;
-  border-radius: 0.5rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}}
-.btn-install:hover {{ transform: scale(1.05); box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4); }}
-.btn-install:disabled {{ opacity: 0.6; cursor: not-allowed; }}
-.btn-install.done {{ background: #16a34a; }}
-.btn-install.error {{ background: #dc2626; }}
-
-.installed-badge {{
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  padding: 0.3rem 0.7rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  color: rgba(255,255,255,0.85);
-  transition: all 0.2s;
-}}
-.installed-badge:hover {{ background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.5); }}
-
-.tag-chip {{
-  display: inline-block;
-  background: rgba(255,255,255,0.06);
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  color: rgba(255,255,255,0.65);
-  font-size: 0.7rem;
-  font-family: 'JetBrains Mono', monospace;
-}}
-
-/* Modal */
-dialog.modal {{ background: transparent; }}
-dialog.modal::backdrop {{
-  background: rgba(5, 5, 9, 0.75);
-  backdrop-filter: blur(8px);
-}}
-.modal-box {{
-  background: #15131f;
-  border: 1px solid rgba(255,255,255,0.1);
-  max-width: 640px;
-  border-radius: 1.25rem;
-  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6);
-}}
-
-.search-wrap {{ position: relative; max-width: 38rem; margin-top: 2rem; }}
-.search-wrap input {{
-  width: 100%;
-  background: rgba(255,255,255,0.04);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: white;
-  padding: 0.9rem 1rem 0.9rem 3rem;
-  border-radius: 999px;
-  font-size: 1rem;
-  outline: none;
-  transition: all 0.2s;
-}}
-.search-wrap input:focus {{ border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2); }}
-.search-wrap .icon {{ position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.4); }}
-
-*::-webkit-scrollbar {{ width: 10px; height: 10px; }}
-*::-webkit-scrollbar-thumb {{ background: rgba(255,255,255,0.1); border-radius: 5px; }}
-*::-webkit-scrollbar-thumb:hover {{ background: rgba(255,255,255,0.2); }}
-*::-webkit-scrollbar-track {{ background: transparent; }}
-
-.toast {{
-  position: fixed; bottom: 2rem; right: 2rem; z-index: 100;
-  background: #15131f;
-  border: 1px solid rgba(255,255,255,0.1);
-  padding: 0.9rem 1.25rem;
-  border-radius: 0.75rem;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-  font-size: 0.9rem;
-  animation: slideIn 0.25s ease-out;
-  max-width: 22rem;
-}}
-.toast.success {{ border-color: rgba(34, 197, 94, 0.4); }}
-.toast.error {{ border-color: rgba(220, 38, 38, 0.4); }}
-@keyframes slideIn {{ from {{ transform: translateY(20px); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
-</style>
-</head>
-<body>
-
-<header class="hero">
-  <div class="max-w-7xl mx-auto">
-    <h1>⚡ Lodestone</h1>
-    <p class="tagline">每日 GitHub AI 热门仓库 · 已为 AI 应用工程师分类整理 · 自动检测本机 Skills · 一键安装缺失的好工具</p>
-    <div class="flex flex-wrap gap-2 mt-6">
-      <div class="stat-pill">📅 <b>{snap["date"]}</b></div>
-      <div class="stat-pill">📦 <b>{snap["total_unique"]}</b> 个项目</div>
-      <div class="stat-pill">🗂 <b>{len(snap["categories"])}</b> 个分类</div>
-      <div class="stat-pill">🛠 <b>{len(local)}</b> 个本机 Skills</div>
-      <div class="stat-pill">🕒 <b>{fetched_time}</b></div>
-    </div>
-    <div class="search-wrap">
-      <i data-lucide="search" class="icon w-5 h-5"></i>
-      <input id="q" type="text" placeholder="搜索项目名、tag、语言…" autocomplete="off">
-    </div>
-  </div>
-</header>
-
-<nav class="nav-tabs">
-  <div class="max-w-7xl mx-auto px-4 flex gap-1">
-    {''.join(nav_tabs)}
-  </div>
-</nav>
-
-<main class="max-w-7xl mx-auto px-4 md:px-8 py-12" style="position:relative;z-index:1;">
-
-  <!-- Local Skills -->
-  <section id="local" class="scroll-mt-24 mb-20">
-    <div class="section-title">🛠 本机 Skills · 自动检测</div>
-    <p class="text-white/50 text-sm mb-6">扫描 <code class="px-1.5 py-0.5 rounded bg-white/5 text-purple-300">~/.claude/skills/</code> + <code class="px-1.5 py-0.5 rounded bg-white/5 text-cyan-300">~/.codex/skills/</code> · 点 "⬇ 安装" 一键拉取到本机</p>
-
-    <h3 class="text-lg font-bold mb-3 flex items-center gap-2">
-      <i data-lucide="download" class="w-5 h-5 text-purple-300"></i>
-      推荐安装 · Top {len(recommend_cards)}
-    </h3>
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mb-10">
-      {''.join(rec_html) if rec_html else '<p class="text-white/40 col-span-full">暂无推荐 — 今日趋势中没匹配到 skills/mcp/agent 类项目</p>'}
-    </div>
-
-    <h3 class="text-lg font-bold mb-3 flex items-center gap-2">
-      <i data-lucide="check-circle-2" class="w-5 h-5 text-green-400"></i>
-      已安装 · {len(installed_badges)}
-    </h3>
-    <div class="flex flex-wrap gap-2">
-      {''.join(installed_html) if installed_html else '<p class="text-white/40">本机未检测到任何 Skills — 试试 `./install.sh` 安装 lodestone 自己</p>'}
-    </div>
-  </section>
-
-  <!-- Hot Now -->
-  <section id="hot" class="scroll-mt-24 mb-20">
-    <div class="section-title">🔥 Top 24 · 今日最热</div>
-    <p class="text-white/50 text-sm mb-6">按 ⭐ 排序 · <span class="text-green-400">●</span> = 本机已装</p>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {''.join(hot_cards)}
-    </div>
-  </section>
-
-  {''.join(sections_html)}
-
-  <footer class="text-center py-12 mt-12 border-t border-white/5 text-white/40 text-sm">
-    <div>一次 <code class="px-2 py-0.5 rounded bg-white/5 text-purple-300">radar.py crawl</code> 拉取 · 数据存 <code class="px-2 py-0.5 rounded bg-white/5">data/latest.json</code></div>
-    <div class="mt-2">支持挂 cron / launchd 每日自动刷新 · 为 AI 应用工程师的情报站</div>
-  </footer>
-</main>
-
-<dialog id="modal" class="modal">
-  <div class="modal-box max-w-2xl">
-    <div id="m-body"></div>
-    <div class="modal-action">
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal').close()">关闭</button>
-    </div>
-  </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
-</dialog>
-
-<div id="toast-host"></div>
-
-<script>
-lucide.createIcons();
-
-// === Search ===
-const q = document.getElementById('q');
-q.addEventListener('input', () => {{
-  const term = q.value.trim().toLowerCase();
-  document.querySelectorAll('.repo-card').forEach(el => {{
-    const hay = el.textContent.toLowerCase();
-    el.style.display = (!term || hay.includes(term)) ? '' : 'none';
-  }});
-  document.querySelectorAll('.install-card').forEach(el => {{
-    const hay = el.textContent.toLowerCase();
-    el.style.display = (!term || hay.includes(term)) ? '' : 'none';
-  }});
-}});
-q.focus();
-
-// === Nav active state ===
-const tabs = document.querySelectorAll('.nav-tab');
-const sections = Array.from(tabs).map(t => document.querySelector(t.getAttribute('href')));
-const obs = new IntersectionObserver((entries) => {{
-  entries.forEach(e => {{
-    if (e.isIntersecting) {{
-      tabs.forEach(t => t.classList.remove('active'));
-      const id = '#' + e.target.id;
-      const active = document.querySelector(`.nav-tab[href="${{id}}"]`);
-      if (active) active.classList.add('active');
-    }}
-  }});
-}}, {{ rootMargin: '-40% 0px -55% 0px' }});
-sections.forEach(s => s && obs.observe(s));
-
-// === Modal ===
-function showRepo(el) {{
-  const r = JSON.parse(el.dataset.payload);
-  const tags = (r.topics || []).slice(0, 8).map(t => `<span class="tag-chip">${{escapeHtml(t)}}</span>`).join(' ');
-  const cats = (r.categories || []).map(c => `<span class="badge badge-sm badge-primary badge-outline">${{escapeHtml(c)}}</span>`).join(' ');
-  const facts = r.facts || '';
-  const descZh = r.desc_zh || r.desc || '（暂无描述）';
-  document.getElementById('m-body').innerHTML = `
-    <div class="flex items-start justify-between gap-3 mb-4">
-      <div class="min-w-0">
-        <h2 class="text-xl font-bold break-all">${{escapeHtml(r.name)}}</h2>
-        <div class="flex flex-wrap gap-1 mt-2">${{cats}}</div>
-      </div>
-      <a href="${{escapeHtml(r.url)}}" target="_blank" rel="noopener" class="btn btn-primary btn-sm gap-1">
-        <i data-lucide="external-link" class="w-4 h-4"></i> GitHub
-      </a>
-    </div>
-    <div class="text-xs text-cyan-300/80 font-mono leading-relaxed mb-3">${{escapeHtml(facts)}}</div>
-    <div class="rounded-lg bg-purple-500/10 border border-purple-500/20 p-4 mb-4">
-      <div class="text-xs uppercase tracking-wider text-purple-300/70 mb-1.5 font-semibold">📖 官方描述（中文翻译）</div>
-      <p class="text-sm leading-relaxed text-white/85">${{escapeHtml(descZh)}}</p>
-    </div>
-    ${{r.desc && r.desc !== descZh ? `
-    <details class="mb-4">
-      <summary class="text-xs uppercase tracking-wider text-white/50 cursor-pointer font-semibold">🌐 英文原描述</summary>
-      <p class="text-xs text-white/60 mt-2 leading-relaxed">${{escapeHtml(r.desc)}}</p>
-    </details>` : ''}}
-    <div class="flex items-center gap-2 flex-wrap pt-3 border-t border-white/5">
-      <span class="text-amber-400 font-mono font-bold">⭐ ${{r.stars.toLocaleString()}}</span>
-      <span class="badge badge-sm badge-outline">${{escapeHtml(r.lang)}}</span>
-      <div class="flex flex-wrap gap-1">${{tags}}</div>
-    </div>
-  `;
-  lucide.createIcons();
-  document.getElementById('modal').showModal();
-}}
-
-// === Install ===
-async function installSkill(btn, name, url) {{
-  if (!confirm(`确认安装 skill "${{name}}" 到 ~/.claude/skills/ 和 ~/.codex/skills/？\\n\\n这会 git clone + 创建 symlink。`)) return;
-  btn.disabled = true;
-  const oldText = btn.innerHTML;
-  btn.innerHTML = '⏳ 克隆中…';
-  try {{
-    const resp = await fetch('/api/install', {{
-      method: 'POST',
-      headers: {{ 'Content-Type': 'application/json' }},
-      body: JSON.stringify({{ name, url }})
-    }});
-    const data = await resp.json();
-    if (data.ok) {{
-      btn.innerHTML = '✓ 已装';
-      btn.classList.add('done');
-      toast(`✓ 已安装 ${{name}} · 重新加载中…`, 'success');
-      setTimeout(() => location.reload(), 1200);
-    }} else {{
-      btn.innerHTML = '✗ 失败';
-      btn.classList.add('error');
-      btn.disabled = false;
-      toast(`✗ 安装失败：${{data.error || '未知错误'}}`, 'error');
-    }}
-  }} catch (e) {{
-    btn.innerHTML = oldText;
-    btn.disabled = false;
-    toast(`✗ 网络错误：${{e.message}}`, 'error');
-  }}
-}}
-
-function toast(msg, kind) {{
-  const host = document.getElementById('toast-host');
-  const el = document.createElement('div');
-  el.className = `toast ${{kind || ''}}`;
-  el.textContent = msg;
-  host.appendChild(el);
-  setTimeout(() => el.remove(), 4000);
-}}
-
-function escapeHtml(s) {{
-  return String(s || '').replace(/[&<>"']/g, c => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[c]));
-}}
-</script>
-</body>
-</html>'''
-    out_path = OUT / "index.html"
-    out_path.write_text(html_doc)
-    print(f"[render] {out_path.relative_to(ROOT)} ({len(html_doc)//1024} KB)")
-    return out_path
 
 
 def today():
@@ -1300,20 +1430,50 @@ def today():
         print(f"  · {cat['name']:<35} {cat['count']} repos")
 
 
+def _installed_segments(local: dict) -> set:
+    """Flatten detect_local_skills() output to a set of repo segment names.
+    ponytail: the existing `name in local` check in crawl() was broken (local is a
+    dict of dicts; `"foo" in {"skills": ...}` always False). This is the right shape."""
+    segs = set()
+    for kind in ("skills", "commands", "agents"):
+        segs.update((local.get(kind) or {}).keys())
+    for p in (local.get("plugins") or []):
+        if p.get("name"):
+            segs.add(p["name"].split("@")[0])
+    return segs
+
+
+def _annotate_local_installed(rows, installed_segments: set):
+    """Single-pass walk: list → recurse; dict with 'repos' → descend; dict with 'name' → annotate leaf.
+    ponytail: category dicts have BOTH `name` AND `repos`, so a `name`-first check would
+    annotate the container instead of descending. Prefer the structural `repos` branch."""
+    if isinstance(rows, list):
+        for r in rows:
+            _annotate_local_installed(r, installed_segments)
+    elif isinstance(rows, dict):
+        if "repos" in rows:
+            _annotate_local_installed(rows["repos"], installed_segments)
+        elif "name" in rows:
+            rows["local_installed"] = rows["name"].split("/")[-1] in installed_segments
+
+
 def serve(port=8765):
-    """API + static server for Vue 3 frontend (proxies through Vite).
+    """Pure JSON API server — Vite (5173) proxies /api/* here.
     Endpoints:
-      GET  /api/data    → data/latest.json contents
-      GET  /api/local   → installed skills in ~/.claude/skills + ~/.codex/skills
+      GET  /api/data    → {hot_now, categories, fetched_at}
+      GET  /api/local   → {skills, commands, agents, plugins, clis, ...}
+      GET  /api/top     → paginated 1k+ star AI repos
+      GET  /api/gain    → repos with star delta ≥ min_delta (24h / 7d)
+      GET  /api/workbuddy → workbuddy picks
       POST /api/crawl   → spawn `radar.py crawl` in background
-      POST /api/install → clone+symlink a skill (validated)
-      GET  /*           → static files from OUT/
+      POST /api/install → clone+symlink a skill
+      POST /api/install-cli → wrap a CLI as slash command
+      POST /api/local/origin → tag a command/agent/plugin with GitHub URL
+      POST /api/local/replace → replace an installed skill with a stronger one
     """
     socketserver.ThreadingTCPServer.allow_reuse_address = True
-    # ponytail: serve OUT/ via chdir so SimpleHTTPRequestHandler resolves correctly
-    os.chdir(OUT)
 
-    class Handler(http.server.SimpleHTTPRequestHandler):
+    class Handler(http.server.BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):
             sys.stderr.write(f"  [{self.command}] {self.path}\n")
 
@@ -1335,29 +1495,33 @@ def serve(port=8765):
 
         def do_GET(self):
             if self.path == "/api/data":
-                latest = DATA / "latest.json"
-                if latest.exists():
-                    with open(latest, "rb") as f:
-                        body = f.read()
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.send_header("Content-Length", str(len(body)))
-                    self.send_header("Access-Control-Allow-Origin", "*")
-                    self.send_header("Cache-Control", "no-store")
-                    self.end_headers()
-                    self.wfile.write(body)
-                else:
-                    self._json({"error": "no data yet — run ./radar.py crawl"}, status=503)
-                return
+                try:
+                    conn = db.connect()
+                    try:
+                        hot = db.query_hot_now(conn, limit=40)
+                        cats = db.query_categories(conn)
+                    finally:
+                        conn.close()
+                except Exception as e:
+                    return self._json({"error": f"db read failed: {e}"}, status=503)
+                # ponytail: per-request annotation — the DB doesn't know what's installed locally
+                segs = _installed_segments(detect_local_skills())
+                _annotate_local_installed(hot, segs)
+                _annotate_local_installed(cats, segs)
+                return self._json({"hot_now": hot, "categories": cats, "fetched_at": datetime.datetime.now().isoformat()})
             if self.path == "/api/local":
                 local = detect_local_skills()
                 clis = detect_cli_tools()
+                repos_idx = _load_repo_index()
+                replacements = find_skill_replacements(local, repos_idx)
                 return self._json({
                     "skills": local["skills"],
                     "commands": local["commands"],
                     "agents": local["agents"],
                     "plugins": local["plugins"],
                     "clis": clis,
+                    "groups": group_capabilities_by_origin(local),
+                    "replacements": replacements,
                     "counts": {
                         "skills": len(local["skills"]),
                         "commands": len(local["commands"]),
@@ -1370,8 +1534,17 @@ def serve(port=8765):
                         len(local["agents"]) + len(local["plugins"]) + len(clis)
                     ),
                 })
+            if self.path == "/api/workbuddy":
+                picks_path = DATA / "workbuddy_picks.json"
+                picks = []
+                if picks_path.exists():
+                    try:
+                        picks = json.loads(picks_path.read_text())
+                    except (OSError, ValueError):
+                        picks = []
+                return self._json({"picks": picks, "count": len(picks)})
             if self.path.startswith("/api/top"):
-                # ponytail: client-paginate over the bundled top_5k_plus list — 0 extra endpoints
+                # ponytail: server-paginate from PG (was: read latest.json + slice client-side)
                 parsed = urllib.parse.urlparse(self.path)
                 qs = urllib.parse.parse_qs(parsed.query)
                 try:
@@ -1383,37 +1556,62 @@ def serve(port=8765):
                 except ValueError:
                     size = 12
                 sort = qs.get("sort", ["stars"])[0]
-
-                latest_path = DATA / "latest.json"
-                if not latest_path.exists():
-                    return self._json({"error": "no data yet — run ./radar.py crawl"}, status=503)
                 try:
-                    snap = json.loads(latest_path.read_text())
-                except (OSError, ValueError):
-                    return self._json({"error": "corrupt latest.json"}, status=500)
-
-                repos = list((snap.get("top_5k_plus") or {}).get("repos") or [])
-                if sort == "name":
-                    repos = sorted(repos, key=lambda r: r["name"].lower())
-                elif sort == "recent":
-                    repos = sorted(repos, key=lambda r: r.get("pushed", ""), reverse=True)
-                # default: stars desc (crawler already sorts)
-
-                total = len(repos)
-                pages = max(1, (total + size - 1) // size)
-                page = min(page, pages)
-                start = (page - 1) * size
-                return self._json({
-                    "repos": repos[start:start + size],
-                    "page": page,
-                    "size": size,
-                    "total": total,
-                    "pages": pages,
-                    "sort": sort,
-                })
-            return super().do_GET()
+                    conn = db.connect()
+                    try:
+                        data = db.query_top_5k(conn, page=page, size=size, sort=sort)
+                    finally:
+                        conn.close()
+                except Exception as e:
+                    return self._json({"error": f"db read failed: {e}"}, status=503)
+                _annotate_local_installed(data.get("repos"), _installed_segments(detect_local_skills()))
+                return self._json(data)
+            if self.path.startswith("/api/gain"):
+                parsed = urllib.parse.urlparse(self.path)
+                qs = urllib.parse.parse_qs(parsed.query)
+                try:
+                    min_delta = min(10000, max(0, int(qs.get("min_delta", ["100"])[0])))
+                except ValueError:
+                    min_delta = 100
+                try:
+                    page = max(1, int(qs.get("page", ["1"])[0]))
+                except ValueError:
+                    page = 1
+                try:
+                    size = min(48, max(1, int(qs.get("size", ["24"])[0])))
+                except ValueError:
+                    size = 24
+                # ponytail: only 24h window — data source is repos.stars_today (from github.com/trending)
+                prev_ago, recent_ago = "20 hours", "4 hours"
+                try:
+                    conn = db.connect()
+                    try:
+                        data = db.query_gain(conn, prev_ago=prev_ago, recent_ago=recent_ago,
+                                              min_delta=min_delta, page=page, size=size)
+                    finally:
+                        conn.close()
+                except Exception as e:
+                    return self._json({"error": f"db read failed: {e}"}, status=503)
+                _annotate_local_installed(data.get("gainers"), _installed_segments(detect_local_skills()))
+                data["range"] = "24h"
+                return self._json(data)
+            # ponytail: pure API server — UI lives at :5173 (Vite). Anything else is 404.
+            self.send_error(404)
 
         def do_POST(self):
+            if self.path == "/api/local/replace":
+                try:
+                    body = self._read_body()
+                    old_name = body.get("old", "").strip()
+                    new_name = body.get("new", "").strip()
+                    new_url = body.get("url", "").strip()
+                    if not old_name or not new_name:
+                        raise ValueError("old and new are required")
+                    result = replace_skill(old_name, new_name, new_url)
+                    self._json({"ok": True, "result": result, "message": f"已用 {new_name} 替换 {old_name}"})
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=400)
+                return
             if self.path == "/api/install":
                 try:
                     body = self._read_body()
@@ -1431,6 +1629,19 @@ def serve(port=8765):
                     command = body.get("command", "").strip()
                     path = install_cli_wrapper(name, command)
                     self._json({"ok": True, "message": f"已创建 /{name} 命令", "path": path})
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=400)
+                return
+            if self.path == "/api/local/origin":
+                try:
+                    body = self._read_body()
+                    kind = body.get("kind", "").strip()
+                    name = body.get("name", "").strip()
+                    url = body.get("url", "").strip()
+                    desc_zh = body.get("desc_zh", "").strip()
+                    desc_en = body.get("desc_en", "").strip()
+                    entry = set_capability_origin(kind, name, url, desc_zh, desc_en)
+                    self._json({"ok": True, "entry": entry})
                 except Exception as e:
                     self._json({"ok": False, "error": str(e)}, status=400)
                 return
@@ -1455,20 +1666,11 @@ def serve(port=8765):
             print("\n[serve] stopped")
 
 
-def all_in_one():
-    """crawl → render → open browser → keep serving."""
-    crawl()
-    render()
-    webbrowser.open(f"file://{(OUT / 'index.html').resolve()}")
-
-
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "today"
     if cmd == "crawl": crawl()
-    elif cmd == "render": render()
     elif cmd == "serve": serve(int(sys.argv[2]) if len(sys.argv) > 2 else 8765)
     elif cmd == "today": today()
-    elif cmd == "all": all_in_one()
     else:
         print(__doc__)
         sys.exit(1)

@@ -1,0 +1,71 @@
+- generic [ref=f3e2]:
+  - banner [ref=f3e9]:
+    - generic [ref=f3e10]:
+      - generic [ref=f3e11]:
+        - heading "Lodestone" [level=1] [ref=f3e16]
+        - generic [ref=f3e17]:
+          - button "刷新" [ref=f3e18] [cursor=pointer]
+          - button "⭐ 1k+ 主流" [ref=f3e26] [cursor=pointer]
+          - button "🚀 今日星增" [ref=f3e31] [cursor=pointer]
+      - paragraph [ref=f3e37]: GitHub AI 项目的每日精选
+      - generic [ref=f3e38]:
+        - textbox "搜索项目名、描述、用途…" [active] [ref=f3e44]
+        - button "🔥 Trending" [ref=f3e45] [cursor=pointer]
+  - navigation [ref=f3e47]:
+    - generic [ref=f3e48]:
+      - link [ref=f3e49] [cursor=pointer]:
+        - /url: "#local"
+      - link [ref=f3e53] [cursor=pointer]:
+        - /url: "#hot"
+      - link [ref=f3e57] [cursor=pointer]:
+        - /url: "#workbuddy"
+  - main [ref=f3e61]:
+    - generic [ref=f3e62]:
+      - paragraph [ref=f3e69]:
+        - text: 正在从
+        - code [ref=f3e70]: /api/data
+        - text: 加载…
+      - paragraph [ref=f3e71]:
+        - text: 若无数据，运行
+        - code [ref=f3e72]: ./radar.py crawl
+      - button "手动重试" [ref=f3e73] [cursor=pointer]
+    - generic [ref=f3e75]:
+      - generic [ref=f3e76]: 本机能力 · 共 0 项
+      - paragraph [ref=f3e80]:
+        - text: 扫描
+        - code [ref=f3e81]: "~/.claude/{skills,commands,agents,plugins}"
+        - text: +
+        - code [ref=f3e82]: ~/.codex/skills
+      - generic [ref=f3e83]:
+        - link "0 Skills 任务型能力 ↓ 查看" [ref=f3e84] [cursor=pointer]:
+          - /url: "#cap-skills"
+          - generic [ref=f3e88]: "0"
+          - generic [ref=f3e89]: Skills
+          - generic [ref=f3e90]: 任务型能力
+          - generic [ref=f3e91]: ↓ 查看
+        - link "0 Templates 0 个来源 ↓ 查看" [ref=f3e92] [cursor=pointer]:
+          - /url: "#cap-sources"
+          - generic [ref=f3e94]: "0"
+          - generic [ref=f3e95]: Templates
+          - generic [ref=f3e96]: 0 个来源
+          - generic [ref=f3e97]: ↓ 查看
+    - generic [ref=f3e98]:
+      - generic [ref=f3e99]:
+        - text: WorkBuddy 生态 · 0 个精选
+        - generic [ref=f3e103]: — 腾讯 AI 桌面代理好用的插件/工具
+      - paragraph [ref=f3e104]:
+        - text: 数据源混合：
+        - code [ref=f3e105]: codebuddy.cn/work
+        - text: 官方市场 + CSDN 实战博客
+        - link "↗ 打开官网" [ref=f3e106] [cursor=pointer]:
+          - /url: https://codebuddy.cn/work
+    - generic [ref=f3e107]:
+      - generic [ref=f3e108]: 🔥 Top 24 · 全站最热
+      - paragraph [ref=f3e109]: 按 ⭐ 排序，今日 GitHub 上最火的 AI 项目
+      - paragraph [ref=f3e110]: 没有匹配的项目
+    - generic [ref=f3e111]:
+      - generic [ref=f3e112]:
+        - text: Vue 3 + Vite + Element Plus 模式 · 数据源
+        - code [ref=f3e113]: /api/data
+        - text: · 自动 30s 轮询
+      - generic [ref=f3e114]: 支持挂 cron / launchd 每日自动刷新（修改数据 → UI 自动更新）

@@ -1,11 +1,12 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   Search, ExternalLink, X, Bot, Brain, MessageSquareText,
   Code2, Workflow, Image, Dumbbell, BarChart3, Bookmark, Star,
   Flame, Sparkles, Download, RefreshCw, Folder, Terminal,
-  Users, Plug, Hash, AtSign, ArrowLeft,
+  Users, Plug, Hash, AtSign, ArrowLeft, TrendingUp,
+  Monitor, Globe, Activity,
 } from 'lucide-vue-next'
 
 // ponytail: data layer is /api/* — Vue 3 is presentation only. No JSON import, no build-time snapshot.
@@ -15,12 +16,25 @@ const localCmds = ref({})
 const localAgents = ref({})
 const localPlugins = ref([])
 const localClis = ref({})
+const localGroups = ref([])      // ponytail: [{url, slug, name, label, counts, items}, ...]
+const localReplacements = ref([]) // ponytail: [{installed, recommended, alternatives_count}] — skill only
+const workbuddyPicks = ref([])   // ponytail: curated list of useful WorkBuddy plugins/tools
+// ponytail: tiny category label map — category keys use hyphens (workbuddy_picks.json),
+// Vue would coerce the prop to underscored identifier if extracted inline.
+const WORKBUDDY_CAT_LABELS = { 'agent-platform': '平台', 'marketplace': '市场', 'doc': '文档', 'automation': '自动化', 'design': '设计', 'data': '数据' }
+// HMR nudge 2026-07-21 13:43 — force full template re-render so workbuddy section renders fresh
 const localTotal = ref(0)
 const showAllAgents = ref(false)
 const q = ref('')
-const view = ref(window.location.search.includes('page=top') ? 'top' : 'main')
+// ponytail: trending-only filter — repo must have appeared in github.com/trending?since=daily
+// in the last crawl AND passed is_ai_relevant(). Same predicate as the 🔥 Trending badge
+// shown on cards, so toggling this never disagrees with what users already see.
+const trendingOnly = ref(false)
+const _q = window.location.search
+const view = ref(_q.includes('page=top') ? 'top' : _q.includes('page=gain') ? 'gain' : 'main')
 window.addEventListener('popstate', () => {
-  view.value = window.location.search.includes('page=top') ? 'top' : 'main'
+  const q = window.location.search
+  view.value = q.includes('page=top') ? 'top' : q.includes('page=gain') ? 'gain' : 'main'
 })
 
 // ponytail: /top view state — fetcher + paginator. Refresh on view enter (skip if cached)
@@ -48,6 +62,38 @@ watch([view, topSort], () => {
   if (view.value === 'top' && !topData.value) loadTop(1)
 }, { immediate: true })
 
+// ponytail: /gain view — 24h star gainers only (sourced from repos.stars_today, scraped from github.com/trending)
+const gainMinDelta = 50
+const gainPage = ref(1)
+const gainSize = ref(24)
+const gainData = ref(null)
+const gainLoading = ref(false)
+
+async function loadGain() {
+  gainLoading.value = true
+  try {
+    const r = await fetch(
+      `/api/gain?min_delta=${gainMinDelta}&page=${gainPage.value}&size=${gainSize.value}`
+    )
+    gainData.value = await r.json()
+  } catch (e) {
+    console.error('Failed to load /gain:', e)
+    gainData.value = null
+  } finally {
+    gainLoading.value = false
+  }
+}
+
+function changeGainPage(p) {
+  gainPage.value = p
+  loadGain()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+watch(view, () => {
+  if (view.value === 'gain' && !gainData.value) loadGain()
+}, { immediate: true })
+
 async function changeSort(s) {
   topSort.value = s
   await loadTop(1)
@@ -69,19 +115,111 @@ const activeSection = ref('hot')
 const selected = ref(null)
 const drawerOpen = ref(false)
 const refreshing = ref(false)
-const crawling = ref(false)
+
+// ponytail: capability-origin modal state — let user tag commands/agents/plugins with GitHub URL
+const capOpen = ref(false)
+const capKind = ref('')          // 'commands' | 'agents' | 'plugins'
+const capName = ref('')          // file stem for commands/agents; "name@marketplace" for plugins
+const capUrl = ref('')
+const capDescZh = ref('')
+const capDescEn = ref('')
+const capPath = ref('')          // display only: file path or install_path
+const capSaving = ref(false)
+
+// ponytail: group drill-in modal — show all items inside a source group
+const groupModalOpen = ref(false)
+const groupModalSlug = ref('')
+const groupModalUrl = ref('')
+const groupModalItems = ref([])
+
+// ponytail: replacement confirm modal — installed skill has a stronger alternative
+const replaceOpen = ref(false)
+const replaceOld = ref(null)    // {name, url, stars}
+const replaceNew = ref(null)    // {name, url, stars, desc_zh, desc_en}
+const replaceMode = ref('alongside')  // 'replace' | 'alongside' — AI-chosen action
+const replaceBusy = ref(false)
+const alongsideBusy = ref(false)
+function replacementFor(skillName) {
+  return localReplacements.value.find(r => r.installed.name === skillName) || null
+}
+function openReplaceConfirm(installedName) {
+  const r = replacementFor(installedName)
+  if (!r) return
+  replaceOld.value = r.installed
+  replaceNew.value = r.recommended
+  replaceMode.value = r.mode || 'alongside'
+  replaceOpen.value = true
+}
+async function confirmReplace() {
+  if (!replaceOld.value || !replaceNew.value) return
+  replaceBusy.value = true
+  try {
+    const res = await fetch('/api/local/replace', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ old: replaceOld.value.name, new: replaceNew.value.name, url: replaceNew.value.url }),
+    })
+    const d = await res.json()
+    if (d.ok) {
+      ElMessage.success(`已用 ${replaceNew.value.name} 替换 ${replaceOld.value.name}`)
+      replaceOpen.value = false
+      await fetchAll()
+    } else {
+      ElMessage.error(d.error || '替换失败')
+    }
+  } catch (e) {
+    ElMessage.error('请求失败：' + e.message)
+  } finally {
+    replaceBusy.value = false
+  }
+}
+// ponytail: alongside-install — same modal, but only install the recommended skill
+// without uninstalling the existing one. Useful when the user wants both: keep their
+// current setup AND try the alternative. Reuses installSkill() payload.
+async function confirmInstallAlongside() {
+  if (!replaceNew.value) return
+  alongsideBusy.value = true
+  try {
+    const res = await fetch('/api/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: replaceNew.value.name, url: replaceNew.value.url }),
+    })
+    const d = await res.json()
+    if (d.ok) {
+      ElMessage.success(`已并存安装 ${replaceNew.value.name}（${replaceOld.value?.name ?? ''} 保留）`)
+      replaceOpen.value = false
+      await fetchAll()
+    } else {
+      ElMessage.error(d.error || '安装失败')
+    }
+  } catch (e) {
+    ElMessage.error('请求失败：' + e.message)
+  } finally {
+    alongsideBusy.value = false
+  }
+}
+// ponytail: dialog reload trigger 2026-07-21
+function openGroupModal(group) {
+  groupModalSlug.value = group.slug || '未分类'
+  groupModalUrl.value = group.url || ''
+  groupModalItems.value = group.items || []
+  groupModalOpen.value = true
+}
 
 const CAT_ICONS = {
   agent: Bot, memory: Brain, llm: MessageSquareText, devtool: Code2,
   workflow: Workflow, multimodal: Image, finetune: Dumbbell,
   eval: BarChart3, awesome: Bookmark,
+  ide: Monitor, gateway: Globe, observability: Activity,
 }
 
 async function fetchAll() {
   try {
-    const [dataResp, localResp] = await Promise.all([
+    const [dataResp, localResp, wbResp] = await Promise.all([
       fetch('/api/data'),
       fetch('/api/local'),
+      fetch('/api/workbuddy'),
     ])
     if (dataResp.ok) snap.value = await dataResp.json()
     if (localResp.ok) {
@@ -91,7 +229,13 @@ async function fetchAll() {
       localAgents.value = d.agents || {}
       localPlugins.value = d.plugins || []
       localClis.value = d.clis || {}
+      localGroups.value = d.groups || []
+      localReplacements.value = d.replacements || []
       localTotal.value = d.total || 0
+    }
+    if (wbResp.ok) {
+      const d = await wbResp.json()
+      workbuddyPicks.value = d.picks || []
     }
   } catch (e) {
     console.error('fetchAll failed:', e)
@@ -100,13 +244,6 @@ async function fetchAll() {
 
 async function refreshAll() {
   refreshing.value = true
-  await fetchAll()
-  refreshing.value = false
-  ElMessage.success('数据已刷新')
-}
-
-async function triggerCrawl() {
-  crawling.value = true
   ElMessage.info('正在爬取 GitHub，预计 1-2 分钟…完成后自动刷新')
   try {
     await fetch('/api/crawl', { method: 'POST' })
@@ -123,11 +260,11 @@ async function triggerCrawl() {
       }
     }
     await fetchAll()
-    ElMessage.success('GitHub 数据已更新')
+    ElMessage.success('已刷新')
   } catch (e) {
-    ElMessage.error('爬取失败：' + e.message)
+    ElMessage.error('刷新失败：' + e.message)
   } finally {
-    crawling.value = false
+    refreshing.value = false
   }
 }
 
@@ -173,9 +310,55 @@ async function wrapCli(name) {
   }
 }
 
+// ponytail: open the edit-origin modal pre-filled from current meta
+function openCapability(kind, name, meta) {
+  capKind.value = kind
+  capName.value = name
+  capUrl.value = meta?.url || ''
+  capDescZh.value = meta?.desc_zh || ''
+  capDescEn.value = meta?.desc_en || ''
+  capPath.value = meta?.path || meta?.install_path || ''
+  capOpen.value = true
+}
+
+async function saveCapabilityOrigin() {
+  capSaving.value = true
+  try {
+    const r = await fetch('/api/local/origin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        kind: capKind.value,
+        name: capName.value,
+        url: capUrl.value,
+        desc_zh: capDescZh.value,
+        desc_en: capDescEn.value,
+      }),
+    })
+    const d = await r.json()
+    if (d.ok) {
+      ElMessage.success(capUrl.value ? '已保存 GitHub 出处' : '已清除出处')
+      capOpen.value = false
+      await fetchAll()
+    } else {
+      ElMessage.error(d.error || '保存失败')
+    }
+  } catch (e) {
+    ElMessage.error('请求失败：' + e.message)
+  } finally {
+    capSaving.value = false
+  }
+}
+
 // ponytail: facts is the evidence-based line; plain is older topic-only fallback
 const whyFor = r => r.facts || r.plain || ''
 
+const hasData = computed(() => Boolean(snap.value && Array.isArray(snap.value.hot_now)))
+const totalRepos = computed(() => {
+  if (!snap.value) return 0
+  return (snap.value.hot_now?.length || 0) +
+    (snap.value.categories?.reduce((n, c) => n + (c.repos?.length || 0), 0) || 0)
+})
 const installedCount = computed(() => localTotal.value)
 const cmdCount = computed(() => Object.keys(localCmds.value).length)
 const agentCount = computed(() => Object.keys(localAgents.value).length)
@@ -205,24 +388,70 @@ const recommendedSkills = computed(() => {
 
 const filteredHot = computed(() => {
   if (!snap.value) return []
-  if (!q.value.trim()) return snap.value.hot_now
-  const t = q.value.toLowerCase()
-  return snap.value.hot_now.filter(r =>
-    Object.values(r).some(v => String(v).toLowerCase().includes(t))
-  )
+  return _qFilter(snap.value.hot_now)
 })
 
 const filteredCats = computed(() => {
   if (!snap.value) return []
   if (!q.value.trim()) return snap.value.categories
-  const t = q.value.toLowerCase()
   return snap.value.categories.map(cat => ({
     ...cat,
-    repos: cat.repos.filter(r =>
-      Object.values(r).some(v => String(v).toLowerCase().includes(t))
-    )
+    repos: _qFilter(cat.repos),
   })).filter(cat => cat.repos.length > 0)
 })
+
+// ponytail: rank-aware search — name match wins over description, description over topics.
+// Returns {item, score} so callers can sort by relevance. Empty query returns inputs unchanged.
+function _qRanked(rows) {
+  const raw = q.value.trim()
+  if (!raw || !rows) return (rows || []).map(r => ({ item: r, score: 0, hits: [] }))
+  const t = raw.toLowerCase()
+  const tokens = t.split(/\s+/).filter(Boolean)
+  const out = []
+  for (const r of rows) {
+    let score = 0
+    let hits = []
+    const name = String(r.name || '').toLowerCase()
+    const descZh = String(r.desc_zh || '').toLowerCase()
+    const desc = String(r.description || r.desc || '').toLowerCase()
+    const topics = (r.topics || []).map(x => String(x).toLowerCase())
+    // ponytail: word-boundary substring — token must be at start of word or after a
+    // non-alphanumeric char. Two-char tokens also require a non-alphanumeric char (or end)
+    // AFTER them, since 'pi' inside 'pipeline' / 'pii-detection' / 'Pipedream' would
+    // otherwise drown the user in noise. Three+ char tokens are specific enough that
+    // 'graph' inside 'graphrag' is a legitimate user search we keep.
+    // Single-char tokens fall back to plain includes (regex word-boundary rejects 'pi'
+    // the project name itself).
+    const wb = (tok, hay) => {
+      if (tok.length < 2) return hay.includes(tok)
+      const escaped = tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const right = tok.length === 2 ? '([^a-z0-9]|$)' : ''
+      const re = new RegExp(`(^|[^a-z0-9])${escaped}${right}`, 'i')
+      return re.test(hay)
+    }
+    for (const tok of tokens) {
+      // name match is a strong signal — name is the primary identifier
+      if (wb(tok, name)) { score += 10; hits.push('name'); continue }
+      // description match in either language — desc_zh is what most users see
+      if (wb(tok, descZh)) { score += 5; hits.push('desc_zh'); continue }
+      if (wb(tok, desc)) { score += 5; hits.push('description'); continue }
+      // topic match is weakest — many repos share topics like 'agent', 'llm'
+      if (topics.some(tp => wb(tok, tp))) { score += 2; hits.push('topics'); continue }
+      // ponytail: require ALL tokens to match somewhere — AND semantics, not OR
+      score = 0; hits = []; break
+    }
+    if (score > 0) out.push({ item: r, score, hits })
+  }
+  // ponytail: sort strongest match first, then by stars as tiebreaker
+  out.sort((a, b) => b.score - a.score || (b.item.stars || 0) - (a.item.stars || 0))
+  return out
+}
+
+function _qFilter(rows) {
+  let out = _qRanked(rows).map(x => x.item)
+  if (trendingOnly.value) out = out.filter(r => r.trending)
+  return out
+}
 
 function openRepo(r) {
   selected.value = r
@@ -250,6 +479,12 @@ function goToMain() {
   view.value = 'main'
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
+function goToGain() {
+  history.pushState({}, '', '?page=gain')
+  view.value = 'gain'
+  if (!gainData.value) loadGain()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
 let pollTimer = null
 onMounted(async () => {
@@ -269,7 +504,8 @@ onUnmounted(() => pollTimer && clearInterval(pollTimer))
 
 const navTabs = computed(() => [
   { id: 'local', label: '本机能力', icon: Folder },
-  { id: 'hot', label: '今日最热', icon: Flame },
+  { id: 'hot', label: '全站最热', icon: Flame },
+  { id: 'workbuddy', label: 'WorkBuddy', icon: Sparkles },
   ...(snap.value?.categories || []).map(c => ({
     id: 'cat-' + c.id,
     label: c.name.split('(')[0].split('&')[0].trim(),
@@ -299,14 +535,14 @@ const navTabs = computed(() => [
             <h1 class="text-5xl md:text-6xl font-black tracking-tight gradient-text">Lodestone</h1>
           </div>
           <div class="flex gap-2 flex-wrap">
-            <el-button :icon="RefreshCw" :loading="refreshing" @click="refreshAll" plain>
+            <el-button type="primary" :icon="RefreshCw" :loading="refreshing" @click="refreshAll" plain>
               刷新
             </el-button>
-            <el-button type="primary" :icon="Download" :loading="crawling" @click="triggerCrawl" plain>
-              重新爬取
-            </el-button>
             <el-button :icon="Sparkles" @click="goToTop" plain>
-              🌟 5k+ 顶级
+              ⭐ 1k+ 主流
+            </el-button>
+            <el-button :icon="TrendingUp" @click="goToGain" plain>
+              🚀 今日星增
             </el-button>
           </div>
         </div>
@@ -317,11 +553,11 @@ const navTabs = computed(() => [
           <div class="stat-tile">
             <el-icon :size="20" color="#34d399"><Folder /></el-icon>
             <div class="stat-number">{{ installedCount }}</div>
-            <div class="stat-label">本机 Skills</div>
+            <div class="stat-label">本机能力</div>
           </div>
           <div class="stat-tile">
             <el-icon :size="20" color="#fbbf24"><Flame /></el-icon>
-            <div class="stat-number">{{ snap.total_unique }}</div>
+            <div class="stat-number">{{ totalRepos }}</div>
             <div class="stat-label">今日 Repos</div>
           </div>
           <div class="stat-tile">
@@ -338,15 +574,30 @@ const navTabs = computed(() => [
         <div v-if="snap" class="mt-3 text-xs text-white/40 font-mono">
           🕒 数据更新于 {{ snap.fetched_at.slice(0, 16).replace('T', ' ') }}
         </div>
-        <div class="relative mt-8 max-w-xl">
-          <el-icon class="absolute left-3 top-1/2 -translate-y-1/2 text-white/40"><Search /></el-icon>
-          <input
-            v-model="q"
-            type="text"
-            placeholder="搜索项目名、描述、用途…"
-            class="w-full pl-10 pr-4 py-3 rounded-full bg-white/5 border border-white/10 text-white placeholder-white/40 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition"
-            autofocus
-          />
+        <div class="relative mt-8 flex items-center gap-3 max-w-2xl flex-wrap">
+          <div class="relative flex-1 min-w-[260px]">
+            <el-icon class="absolute left-3 top-1/2 -translate-y-1/2 text-white/40"><Search /></el-icon>
+            <input
+              v-model="q"
+              type="text"
+              placeholder="搜索项目名、描述、用途…"
+              class="w-full pl-10 pr-4 py-3 rounded-full bg-white/5 border border-white/10 text-white placeholder-white/40 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition"
+              autofocus
+            />
+          </div>
+          <button
+            @click="trendingOnly = !trendingOnly"
+            :class="[
+              'shrink-0 inline-flex items-center gap-1.5 px-4 py-3 rounded-full text-sm font-semibold transition border',
+              trendingOnly
+                ? 'bg-gradient-to-r from-orange-500/30 to-amber-500/30 border-orange-400/60 text-orange-100 shadow-lg shadow-orange-500/10'
+                : 'bg-white/5 border-white/10 text-white/60 hover:border-orange-400/40 hover:text-orange-200'
+            ]"
+            :title="trendingOnly ? '点击显示全部' : '只显示 GitHub Trending 当日榜上有名的（爬取时已筛 AI 相关）'"
+          >
+            <span>🔥 Trending</span>
+            <span v-if="trendingOnly" class="text-[10px] opacity-70">仅</span>
+          </button>
         </div>
       </div>
     </header>
@@ -368,7 +619,13 @@ const navTabs = computed(() => [
     </nav>
 
     <!-- Main -->
-    <main v-if="view === 'main' && snap" class="max-w-7xl mx-auto px-6 md:px-12 py-12">
+    <main v-if="view === 'main'" class="max-w-7xl mx-auto px-6 md:px-12 py-12">
+      <div v-if="!hasData" class="py-20 text-center text-white/60">
+        <el-icon :size="32" class="mb-4 text-purple-400 animate-spin"><RefreshCw /></el-icon>
+        <p>正在从 <code class="text-purple-300">/api/data</code> 加载…</p>
+        <p class="text-sm mt-2 text-white/40">若无数据，运行 <code class="text-purple-300">./radar.py crawl</code></p>
+        <el-button size="small" plain class="mt-4" @click="fetchAll">手动重试</el-button>
+      </div>
 
       <!-- 本机能力总览 -->
       <section id="local" class="scroll-mt-24 mb-16">
@@ -378,8 +635,8 @@ const navTabs = computed(() => [
         </div>
         <p class="text-white/50 text-sm mb-5">扫描 <code class="text-emerald-300">~/.claude/{skills,commands,agents,plugins}</code> + <code class="text-emerald-300">~/.codex/skills</code></p>
 
-        <!-- 计数 chip 行 -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <!-- 计数 chip 行 — 5 大类各自一张卡 -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
           <a href="#cap-skills" class="system-cap-card group">
             <el-icon :size="24" color="#34d399"><Folder /></el-icon>
             <div class="system-cap-num">{{ Object.keys(localSkills).length }}</div>
@@ -387,184 +644,173 @@ const navTabs = computed(() => [
             <div class="system-cap-sub">任务型能力</div>
             <span class="system-cap-link">↓ 查看</span>
           </a>
-          <a href="#cap-commands" class="system-cap-card group">
-            <el-icon :size="24" color="#a78bfa"><Hash /></el-icon>
+          <a href="#cap-sources" class="system-cap-card group">
+            <el-icon :size="24" color="#fb923c"><Terminal /></el-icon>
             <div class="system-cap-num">{{ cmdCount }}</div>
             <div class="system-cap-label">Commands</div>
-            <div class="system-cap-sub">/ 斜杠命令</div>
+            <div class="system-cap-sub">斜杠指令</div>
             <span class="system-cap-link">↓ 查看</span>
           </a>
-          <a href="#cap-agents" class="system-cap-card group">
-            <el-icon :size="24" color="#22d3ee"><Users /></el-icon>
+          <a href="#cap-sources" class="system-cap-card group">
+            <el-icon :size="24" color="#22d3ee"><Bot /></el-icon>
             <div class="system-cap-num">{{ agentCount }}</div>
             <div class="system-cap-label">Agents</div>
-            <div class="system-cap-sub">Subagent 模板</div>
+            <div class="system-cap-sub">子代理</div>
             <span class="system-cap-link">↓ 查看</span>
           </a>
-          <a href="#cap-plugins" class="system-cap-card group">
+          <a href="#cap-sources" class="system-cap-card group">
             <el-icon :size="24" color="#fbbf24"><Plug /></el-icon>
             <div class="system-cap-num">{{ pluginCount }}</div>
             <div class="system-cap-label">Plugins</div>
-            <div class="system-cap-sub">Marketplace 扩展</div>
+            <div class="system-cap-sub">市场插件</div>
+            <span class="system-cap-link">↓ 查看</span>
+          </a>
+          <a href="#cap-sources" class="system-cap-card group">
+            <el-icon :size="24" color="#94a3b8"><Terminal /></el-icon>
+            <div class="system-cap-num">{{ cliCount }}</div>
+            <div class="system-cap-label">CLIs</div>
+            <div class="system-cap-sub">已检测</div>
             <span class="system-cap-link">↓ 查看</span>
           </a>
         </div>
 
-        <!-- Skills -->
-        <div v-if="Object.keys(localSkills).length > 0" id="cap-skills" class="scroll-mt-24 mb-8">
+        <!-- 本机能力 · 按来源分组（skills + commands + agents + plugins 合并） -->
+        <div v-if="localGroups.length > 0" id="cap-sources" class="scroll-mt-24 mb-8">
           <div class="flex items-center gap-2 mb-3">
-            <el-icon color="#34d399"><Folder /></el-icon>
-            <h3 class="text-lg font-bold text-white/90">Skills <span class="text-white/40 text-sm font-normal">— 任务型能力 (Claude / Codex 调用)</span></h3>
+            <el-icon color="#a78bfa"><Layers /></el-icon>
+            <h3 class="text-lg font-bold text-white/90">
+              本机能力来源 <span class="text-white/40 text-sm font-normal">— Skills · Commands · Agents · Plugins 按出处分组</span>
+            </h3>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div
-              v-for="(meta, name) in localSkills"
-              :key="name"
-              class="capability-card group"
+              v-for="g in localGroups"
+              :key="g.url || g.name"
+              class="capability-card group cursor-pointer"
+              @click="openGroupModal(g)"
             >
               <div class="flex items-start justify-between gap-3 mb-2">
-                <h3 class="capability-name" :title="name">{{ name }}</h3>
-                <div class="flex flex-col items-end gap-1 shrink-0">
-                  <span v-if="meta.stars > 0" class="text-amber-400 font-mono text-xs whitespace-nowrap">⭐ {{ starsFmt(meta.stars) }}</span>
-                  <el-button
-                    v-if="meta.url"
-                    size="small"
-                    :icon="ExternalLink"
-                    @click.stop="openUrl(meta.url)"
-                    plain
-                    class="!text-xs !px-2 !py-0.5"
-                  >↗ GitHub</el-button>
-                </div>
+                <h3 class="capability-name font-mono break-all">{{ g.slug || g.name }}</h3>
+                <a
+                  v-if="g.url"
+                  :href="g.url"
+                  target="_blank"
+                  rel="noopener"
+                  @click.stop
+                  class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-200 border border-emerald-400/40 hover:bg-emerald-500/30 transition shrink-0"
+                  title="打开 GitHub 仓库"
+                >↗ GitHub</a>
               </div>
-              <div class="flex gap-1 mb-2">
-                <span v-if="meta.claude" class="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-200 border border-orange-400/30">Claude</span>
-                <span v-if="meta.codex" class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-200 border border-blue-400/30">Codex</span>
-                <span v-if="meta.source === 'skillmd'" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-300 border border-slate-400/30" title="无来源链接 — 仅本地 SKILL.md">本地</span>
-                <span v-if="meta.source === 'none'" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-400 border border-slate-400/30">未知</span>
-              </div>
-              <p v-if="meta.desc_zh" class="capability-desc">{{ meta.desc_zh }}</p>
-              <p v-else-if="meta.desc_en" class="capability-desc capability-desc-en">🌐 {{ meta.desc_en }}</p>
-              <p v-else class="capability-desc capability-desc-empty">本地安装 · 无介绍</p>
-              <div v-if="meta.topics && meta.topics.length" class="flex gap-1 flex-wrap mt-2">
-                <span v-for="t in meta.topics.slice(0, 4)" :key="t" class="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-white/60 font-mono">#{{ t }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Commands -->
-        <div v-if="cmdCount > 0" id="cap-commands" class="scroll-mt-24 mb-8">
-          <div class="flex items-center gap-2 mb-3">
-            <el-icon color="#a78bfa"><Hash /></el-icon>
-            <h3 class="text-lg font-bold text-white/90">Commands <span class="text-white/40 text-sm font-normal">— /斜杠命令 (输入 / 触发)</span></h3>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <code
-              v-for="(_meta, name) in localCmds"
-              :key="name"
-              class="px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-400/30 text-purple-200 font-mono text-sm hover:bg-purple-500/20 transition cursor-pointer"
-              :title="`/${name} · ~/.claude/commands/${name}.md`"
-            >/{{ name }}</code>
-          </div>
-        </div>
-
-        <!-- Agents -->
-        <div v-if="agentCount > 0" id="cap-agents" class="scroll-mt-24 mb-8">
-          <div class="flex items-center gap-2 mb-3">
-            <el-icon color="#22d3ee"><Users /></el-icon>
-            <h3 class="text-lg font-bold text-white/90">
-              Agents · {{ agentCount }}
-              <span class="text-white/40 text-sm font-normal ml-2">— Subagent 模板（点击展开）</span>
-            </h3>
-            <button
-              class="ml-auto text-xs text-cyan-300 hover:text-cyan-200"
-              @click="showAllAgents = !showAllAgents"
-            >{{ showAllAgents ? '收起' : `展开全部 ${agentCount}` }}</button>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <code
-              v-for="(_meta, name) in (showAllAgents ? localAgents : Object.fromEntries(Object.entries(localAgents).slice(0, 30)))"
-              :key="name"
-              class="px-2.5 py-1 rounded-md bg-cyan-500/10 border border-cyan-400/30 text-cyan-200 font-mono text-[11px] hover:bg-cyan-500/20 transition cursor-pointer"
-              :title="`${name} · ~/.claude/agents/${name}.md`"
-            >{{ name }}</code>
-            <span v-if="!showAllAgents && agentCount > 30" class="text-white/40 text-xs px-2 py-1">+{{ agentCount - 30 }} more</span>
-          </div>
-        </div>
-
-        <!-- CLI 工具 (PATH 中已装的命令) -->
-        <div v-if="cliCount > 0" class="mb-8">
-          <div class="flex items-center gap-2 mb-3">
-            <el-icon color="#94a3b8"><Terminal /></el-icon>
-            <h3 class="text-lg font-bold text-white/90">
-              CLI 工具 · {{ cliCount }}
-              <span class="text-white/40 text-sm font-normal ml-2">— PATH 中可直接调用</span>
-            </h3>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            <div
-              v-for="(meta, name) in localClis"
-              :key="name"
-              class="rounded-lg border border-slate-400/20 bg-slate-500/5 backdrop-blur px-3 py-2 hover:border-slate-400/50 transition"
-            >
-              <div class="flex items-center justify-between gap-2">
-                <div class="font-mono text-sm font-bold text-slate-200 truncate flex-1" :title="meta.path">{{ name }}</div>
-                <button
-                  v-if="!localCmds[name]"
-                  class="text-[10px] px-2 py-0.5 rounded bg-slate-400/20 border border-slate-400/40 text-slate-200 hover:bg-slate-400/30 transition shrink-0"
-                  @click="wrapCli(name)"
-                  :title="`创建 /${name} 斜杠命令包装 ${name}`"
-                >📋 包成 /{{ name }}</button>
-                <span v-else class="installed-badge text-[10px]">✓ /{{ name }}</span>
-              </div>
-              <div class="text-[11px] text-white/50 truncate font-mono mt-1" :title="meta.version">{{ meta.version || '—' }}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Plugins -->
-        <div v-if="pluginCount > 0" id="cap-plugins" class="scroll-mt-24 mb-8">
-          <div class="flex items-center gap-2 mb-3">
-            <el-icon color="#fbbf24"><Plug /></el-icon>
-            <h3 class="text-lg font-bold text-white/90">Plugins <span class="text-white/40 text-sm font-normal">— 来自 marketplace 的扩展</span></h3>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            <div
-              v-for="p in localPlugins"
-              :key="p.name + '@' + p.marketplace"
-              class="rounded-lg border border-amber-400/20 bg-amber-500/5 backdrop-blur px-3 py-2 hover:border-amber-400/50 transition"
-            >
-              <div class="font-mono text-sm font-bold text-amber-200 truncate" :title="p.name">{{ p.name }}</div>
-              <div class="flex items-center justify-between text-[11px] mt-1">
-                <span class="text-white/50">{{ p.marketplace }}</span>
-                <span class="text-amber-300/80 font-mono">v{{ p.version }}</span>
+              <div class="flex gap-1 flex-wrap">
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-400/30 font-mono">
+                  {{ g.items.length }} 项
+                </span>
+                <span v-if="g.counts.skills" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 font-mono">
+                  {{ g.counts.skills }} 技能
+                </span>
+                <span v-if="g.counts.commands" class="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-200 border border-orange-400/30 font-mono">
+                  /{{ g.counts.commands }} 命令
+                </span>
+                <span v-if="g.counts.agents" class="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-200 border border-cyan-400/30 font-mono">
+                  {{ g.counts.agents }} 代理
+                </span>
+                <span v-if="g.counts.plugins" class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 border border-amber-400/30 font-mono">
+                  {{ g.counts.plugins }} 插件
+                </span>
               </div>
             </div>
           </div>
         </div>
 
+        <!-- CLI 工具 / Plugins / Skills 单独展示已移除 — 全部并入上面"本机能力来源"按 GitHub 仓库分组 -->
         <!-- 未安装推荐 (only for skills, since commands/agents/plugins aren't from GitHub) -->
         <div v-if="recommendedSkills.length > 0">
           <div class="text-sm font-semibold text-white/70 mb-3 mt-2">🔥 没装但很值得装的 Skills</div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             <div
               v-for="r in recommendedSkills"
               :key="r.name"
-              class="rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur p-4 hover:border-purple-400/50 transition group"
+              class="repo-card"
+              @click="openRepo(r)"
             >
               <div class="flex items-start justify-between gap-2 mb-2">
-                <h3 class="font-bold text-base leading-tight cursor-pointer hover:text-purple-300" @click="openRepo(r)">{{ r.name }}</h3>
-                <span class="text-amber-400 font-mono text-sm whitespace-nowrap">⭐ {{ starsFmt(r.stars) }}</span>
+                <h3 class="font-bold text-base leading-tight flex-1 min-w-0 break-all">{{ r.name }}</h3>
+                <span v-if="r.trending" class="top-card-trending-badge shrink-0">🔥 Trending</span>
+                <span class="text-amber-400 font-mono text-sm whitespace-nowrap shrink-0">⭐ {{ starsFmt(r.stars) }}</span>
               </div>
-              <div class="text-xs text-purple-300 leading-snug mb-3 line-clamp-2" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+              <div class="text-sm font-medium text-purple-300 leading-snug mb-2">
                 💡 {{ whyFor(r) }}
               </div>
-              <div class="flex gap-2">
-                <el-button type="primary" size="small" :icon="Download" @click="installSkill(r)" plain>
+              <p class="text-sm text-white/65 leading-relaxed mb-3" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+                {{ (r.desc_zh || r.desc || '').slice(0, 140) }}
+              </p>
+              <div class="flex items-center justify-between flex-wrap gap-1">
+                <div class="flex gap-1 flex-wrap">
+                  <el-tag
+                    v-for="t in (r.topics || []).slice(0, 3)"
+                    :key="t"
+                    size="small"
+                    effect="plain"
+                    class="!text-xs"
+                  >{{ t }}</el-tag>
+                </div>
+                <span class="text-xs text-cyan-400 font-mono">{{ r.lang }}</span>
+              </div>
+              <div class="flex gap-2 mt-3">
+                <el-button type="primary" size="small" :icon="Download" @click.stop="installSkill(r)" plain>
                   一键安装
                 </el-button>
-                <el-button size="small" @click="openRepo(r)" plain>详情</el-button>
+                <el-button size="small" @click.stop="openRepo(r)" plain>详情</el-button>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- WorkBuddy 精选插件/工具 — anchor 锚点 section -->
+      <section id="workbuddy" class="scroll-mt-24 mb-16">
+        <div class="section-title">
+          <el-icon color="#a78bfa"><Sparkles /></el-icon>
+          WorkBuddy 生态 · {{ workbuddyPicks.length }} 个精选
+          <span class="text-white/40 text-sm font-normal ml-2">— 腾讯 AI 桌面代理好用的插件/工具</span>
+        </div>
+        <p class="text-white/50 text-sm mb-5">
+          数据源混合：<code class="text-purple-300">codebuddy.cn/work</code> 官方市场 + CSDN 实战博客
+          <a href="https://codebuddy.cn/work" target="_blank" rel="noopener" class="ml-2 text-purple-300 hover:text-purple-200 text-xs">↗ 打开官网</a>
+        </p>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div
+            v-for="p in workbuddyPicks"
+            :key="p.name"
+            class="repo-card hover:!border-purple-400/40 transition relative"
+          >
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <h3 class="font-bold text-base leading-tight flex-1 min-w-0 break-all">{{ p.name }}</h3>
+              <span
+                class="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded shrink-0"
+                :class="{
+                  'bg-purple-500/20 text-purple-200 border border-purple-400/30': p.category === 'agent-platform' || p.category === 'marketplace',
+                  'bg-blue-500/20 text-blue-200 border border-blue-400/30': p.category === 'doc',
+                  'bg-cyan-500/20 text-cyan-200 border border-cyan-400/30': p.category === 'automation',
+                  'bg-pink-500/20 text-pink-200 border border-pink-400/30': p.category === 'design',
+                  'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30': p.category === 'data',
+                }"
+              >{{ WORKBUDDY_CAT_LABELS[p.category] || p.category }}</span>
+            </div>
+            <p class="text-sm text-white/75 leading-relaxed mb-2" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+              {{ p.tagline }}
+            </p>
+            <div class="text-xs text-purple-300/90 leading-snug mb-2">💡 {{ p.why }}</div>
+            <div class="text-[11px] text-white/50 leading-snug mb-3 pt-2 border-t border-white/5">📦 {{ p.install }}</div>
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <div class="flex gap-1 flex-wrap">
+                <span
+                  v-for="t in (p.tags || []).slice(0, 4)"
+                  :key="t"
+                  class="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-white/60 font-mono"
+                >#{{ t }}</span>
+              </div>
+              <a :href="p.url" target="_blank" rel="noopener" @click.stop class="text-[10px] px-2 py-1 rounded bg-purple-500/20 text-purple-200 border border-purple-400/40 hover:bg-purple-500/30 transition shrink-0">↗ 详情</a>
             </div>
           </div>
         </div>
@@ -574,37 +820,44 @@ const navTabs = computed(() => [
       <section id="hot" class="scroll-mt-24 mb-16">
         <div class="section-title">🔥 Top 24 · 全站最热</div>
         <p class="text-white/50 text-sm mb-5">按 ⭐ 排序，今日 GitHub 上最火的 AI 项目</p>
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           <div
             v-for="(r, i) in filteredHot.slice(0, 24)"
             :key="r.name"
-            class="hot-card"
+            class="repo-card relative"
             :class="{ 'is-installed': r.local_installed }"
             @click="openRepo(r)"
           >
-            <div class="flex items-center justify-between mb-1">
-              <span class="text-xl font-black text-purple-300">#{{ i + 1 }}</span>
-              <span v-if="r.local_installed" class="installed-badge">✓ 已装</span>
-              <span v-else class="text-amber-400 font-mono text-xs">⭐ {{ starsFmt(r.stars) }}</span>
+            <span class="absolute top-2 left-2 text-xs font-black text-purple-300/80 font-mono">#{{ i + 1 }}</span>
+            <div class="flex items-start justify-between gap-2 mb-2 pl-7">
+              <h3 class="font-bold text-base leading-tight flex-1 min-w-0 break-all">{{ r.name }}</h3>
+              <span v-if="r.trending" class="top-card-trending-badge shrink-0">🔥 Trending</span>
+              <span v-if="r.local_installed" class="installed-badge shrink-0">✓ 已装</span>
+              <span v-else class="text-amber-400 font-mono text-sm whitespace-nowrap shrink-0">⭐ {{ starsFmt(r.stars) }}</span>
             </div>
-            <h3 class="font-bold text-sm leading-tight mb-1 truncate">{{ r.name }}</h3>
-            <p class="text-xs text-white/60 line-clamp-2 leading-snug mb-2" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{{ whyFor(r) }}</p>
-            <div class="flex items-center justify-between">
+            <div class="text-sm font-medium text-purple-300 leading-snug mb-2 pl-7">
+              💡 {{ whyFor(r) }}
+            </div>
+            <p class="text-sm text-white/65 leading-relaxed mb-3" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+              {{ (r.desc_zh || r.desc || '').slice(0, 140) }}
+            </p>
+            <div class="flex items-center justify-between flex-wrap gap-1">
               <div class="flex gap-1 flex-wrap">
                 <el-tag
-                  v-for="c in (r.categories || []).slice(0, 2)"
-                  :key="c"
+                  v-for="t in (r.topics || []).slice(0, 3)"
+                  :key="t"
                   size="small"
-                  type="primary"
                   effect="plain"
                   class="!text-xs"
-                >{{ c }}</el-tag>
+                >{{ t }}</el-tag>
               </div>
-              <span class="text-xs text-white/40 font-mono">{{ r.lang }}</span>
+              <span class="text-xs text-cyan-400 font-mono">{{ r.lang }}</span>
             </div>
           </div>
         </div>
-        <p v-if="filteredHot.length === 0" class="text-center text-white/40 py-12">没有匹配的项目</p>
+        <p v-if="filteredHot.length === 0" class="text-center text-white/40 py-12">
+          {{ trendingOnly ? '本次爬取没有 AI 相关 Trending 项目 — 关掉 🔥 仅看 Trending' : '没有匹配的项目' }}
+        </p>
       </section>
 
       <!-- Categories -->
@@ -636,6 +889,7 @@ const navTabs = computed(() => [
           >
             <div class="flex items-start justify-between gap-2 mb-2">
               <h3 class="font-bold text-base leading-tight flex-1 min-w-0 break-all">{{ r.name }}</h3>
+              <span v-if="r.trending" class="top-card-trending-badge shrink-0">🔥 Trending</span>
               <span v-if="r.local_installed" class="installed-badge shrink-0">✓ 已装</span>
               <span v-else class="text-amber-400 font-mono text-sm whitespace-nowrap shrink-0">⭐ {{ starsFmt(r.stars) }}</span>
             </div>
@@ -667,7 +921,7 @@ const navTabs = computed(() => [
       </footer>
     </main>
 
-    <!-- /top view: 5k+ star AI repos grid with pagination + sort -->
+    <!-- /top view: 1k+ star AI repos grid with pagination + sort -->
     <section v-if="view === 'top'" class="px-6 md:px-12 pt-12 pb-16 relative">
       <div class="max-w-7xl mx-auto">
         <!-- Top bar: back + sort -->
@@ -676,7 +930,7 @@ const navTabs = computed(() => [
             <el-button :icon="ArrowLeft" @click="goToMain" plain>返回主页</el-button>
             <div class="flex items-center gap-2">
               <el-icon :size="28" color="#fbbf24"><Sparkles /></el-icon>
-              <h1 class="text-3xl md:text-4xl font-black gradient-text">5k+ 顶级 AI 项目</h1>
+              <h1 class="text-3xl md:text-4xl font-black gradient-text">1k+ 主流 AI 项目</h1>
             </div>
           </div>
           <div class="flex items-center gap-2 text-sm">
@@ -709,43 +963,50 @@ const navTabs = computed(() => [
 
         <!-- Empty -->
         <div v-else-if="!topData || !topData.repos?.length" class="text-center py-20 text-white/40">
-          暂未发现 5k+ 星的 AI 项目。运行
+          暂未发现 1k+ 星的 AI 项目。运行
           <code class="px-2 py-0.5 rounded bg-white/10 font-mono text-xs">python3 radar.py --crawl</code>
           即可生成。
         </div>
 
+        <!-- q-filtered empty (DB has rows but none match current query) -->
+        <div v-else-if="!_qFilter(topData.repos).length" class="text-center py-20 text-white/40">
+          {{ trendingOnly ? '1k+ 项目里没有 Trending — 关掉 🔥 试试' : `没有匹配 \`${q}\` 的 1k+ 项目` }}
+        </div>
+
         <!-- Cards grid -->
         <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          <a
-            v-for="r in topData.repos"
+          <div
+            v-for="r in _qFilter(topData.repos)"
             :key="r.name"
-            :href="r.url"
-            target="_blank"
-            rel="noopener"
-            class="top-card group"
+            class="repo-card"
+            :class="{ 'is-installed': r.local_installed }"
+            @click="openRepo(r)"
           >
-            <div class="flex items-start justify-between gap-3 mb-2">
-              <h3 class="top-card-name">{{ r.name }}</h3>
-              <span class="top-card-stars">⭐ {{ starsFmt(r.stars) }}</span>
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <h3 class="font-bold text-base leading-tight flex-1 min-w-0 break-all">{{ r.name }}</h3>
+              <span v-if="r.trending" class="top-card-trending-badge shrink-0">🔥 Trending</span>
+              <span v-if="r.local_installed" class="installed-badge shrink-0">✓ 已装</span>
+              <span v-else class="text-amber-400 font-mono text-sm whitespace-nowrap shrink-0">⭐ {{ starsFmt(r.stars) }}</span>
             </div>
-            <p class="top-card-desc">
-              {{ (r.desc_zh || r.desc || '（暂无描述）').slice(0, 160) }}
+            <div class="text-sm font-medium text-purple-300 leading-snug mb-2">
+              💡 {{ whyFor(r) }}
+            </div>
+            <p class="text-sm text-white/65 leading-relaxed mb-3" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+              {{ (r.desc_zh || r.desc || '').slice(0, 140) }}
             </p>
-            <div v-if="r.lang || (r.topics && r.topics.length)" class="top-card-meta">
-              <span v-if="r.lang" class="top-card-lang">📚 {{ r.lang }}</span>
-              <span v-if="r.topics && r.topics.length" class="top-card-topics">
-                🏷 {{ r.topics.slice(0, 3).join(' · ') }}
-              </span>
+            <div class="flex items-center justify-between flex-wrap gap-1">
+              <div class="flex gap-1 flex-wrap">
+                <el-tag
+                  v-for="t in (r.topics || []).slice(0, 3)"
+                  :key="t"
+                  size="small"
+                  effect="plain"
+                  class="!text-xs"
+                >{{ t }}</el-tag>
+              </div>
+              <span class="text-xs text-cyan-400 font-mono">{{ r.lang }}</span>
             </div>
-            <div class="top-card-actions">
-              <span class="top-card-link">↗ GitHub</span>
-              <span
-                v-if="localSkills[r.name.split('/')[-1]] || localSkills[r.name]"
-                class="top-card-installed"
-              >✓ 已安装</span>
-              <span v-else-if="!r.local_installed" class="top-card-install-hint">+ 一键安装</span>
-            </div>
-          </a>
+          </div>
         </div>
 
         <!-- Pagination -->
@@ -776,11 +1037,108 @@ const navTabs = computed(() => [
       </div>
     </section>
 
-    <main v-else-if="view === 'main'" class="max-w-7xl mx-auto px-6 py-32 text-center text-white/60">
-      <el-icon :size="48" class="mb-4 text-purple-400 animate-spin"><RefreshCw /></el-icon>
-      <p>正在从 <code class="text-purple-300">/api/data</code> 加载…</p>
-      <p class="text-sm mt-2 text-white/40">若无数据，运行 <code class="text-purple-300">./radar.py crawl</code></p>
-    </main>
+    <!-- /gain view: repos with star delta ≥ gainMinDelta; 24h window only -->
+    <section v-else-if="view === 'gain'" class="px-6 md:px-12 pt-12 pb-16 relative">
+      <div class="max-w-7xl mx-auto">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-6">
+          <div>
+            <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight flex items-center gap-3">
+              <el-icon :size="32" color="#34d399"><TrendingUp /></el-icon>
+              今日星增
+            </h1>
+            <p class="text-sm text-white/50 mt-2">
+              <template v-if="gainData?.total > 0">
+                共 <span class="text-emerald-300 font-bold">{{ gainData.total }}</span> 个 AI 项目
+                24h 增长 ≥ <span class="text-emerald-300 font-bold">+{{ gainMinDelta }}</span> 星
+                <span v-if="gainData.pages > 1"> · 第 {{ gainData.page }} / {{ gainData.pages }} 页</span>
+                · 来自 GitHub Trending
+              </template>
+              <template v-else>
+                阈值 ≥ +{{ gainMinDelta }} 星的 AI 项目（24h 窗口）
+              </template>
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <el-button :icon="ArrowLeft" @click="goToMain" plain>返回主页</el-button>
+            <el-button :icon="RefreshCw" :loading="gainLoading" @click="loadGain" plain>刷新</el-button>
+          </div>
+        </div>
+
+        <div v-if="gainData && _qFilter(gainData.gainers).length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div
+            v-for="(r, i) in _qFilter(gainData.gainers)"
+            :key="r.name"
+            class="repo-card relative"
+            :class="{ 'is-installed': r.local_installed }"
+            @click="openRepo(r)"
+          >
+            <span class="absolute top-2 left-2 text-xs font-black text-emerald-300/80 font-mono">#{{ i + 1 }}</span>
+            <div class="flex items-start justify-between gap-2 mb-2 pl-7">
+              <h3 class="font-bold text-base leading-tight flex-1 min-w-0 break-all">{{ r.name }}</h3>
+              <div class="flex flex-col items-end gap-1 shrink-0">
+                <span :class="['gain-delta', r.cold_start ? 'cold' : (r.delta_24h <= 0 ? 'zero' : '')]">
+                  {{ r.cold_start ? '· 新' : '+' + r.delta_24h }}
+                </span>
+                <span class="text-amber-400 font-mono text-sm whitespace-nowrap">⭐ {{ r.stars.toLocaleString() }}</span>
+              </div>
+            </div>
+            <div class="text-sm font-medium text-purple-300 leading-snug mb-2 pl-7">
+              💡 {{ whyFor(r) }}
+            </div>
+            <p class="text-sm text-white/65 leading-relaxed mb-3" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+              {{ (r.desc_zh || r.description || '').slice(0, 140) }}
+            </p>
+            <div class="flex items-center justify-between flex-wrap gap-1">
+              <div class="flex gap-1 flex-wrap">
+                <el-tag
+                  v-for="t in (r.topics || []).slice(0, 3)"
+                  :key="t"
+                  size="small"
+                  effect="plain"
+                  class="!text-xs"
+                >{{ t }}</el-tag>
+              </div>
+              <span class="text-xs text-cyan-400 font-mono">{{ r.lang }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="gainLoading" class="text-center py-20 text-white/40">
+          <el-icon :size="32" class="mb-3 animate-spin text-purple-400"><RefreshCw /></el-icon>
+          <p>正在从 <code class="text-purple-300">/api/gain</code> 加载…</p>
+        </div>
+
+        <div v-else class="text-center py-20 text-white/40">
+          <template v-if="q.trim() && gainData && !_qFilter(gainData.gainers).length">
+            <p>没有匹配 <code class="text-purple-300">{{ q }}</code> 的星增项目</p>
+          </template>
+          <template v-else-if="gainData && gainData.total === 0">
+            <p>今天没有增幅 ≥ +{{ gainMinDelta }} 星的 AI 项目。</p>
+            <p class="text-sm mt-2 text-white/30">
+              说明：≥+{{ gainMinDelta }}/天 是真正的"爆款"信号，普通活跃项目达不到这个量级。
+            </p>
+            <p class="text-sm mt-1 text-white/30">
+              数据来源是 <code class="text-purple-300">github.com/trending</code>，运行 <code class="text-purple-300">./radar.py crawl</code> 重新拉取。
+            </p>
+          </template>
+          <template v-else>
+            <p>暂无星增数据 — 运行 <code class="text-purple-300">./radar.py crawl</code> 拉取首次 trending 数据。</p>
+          </template>
+        </div>
+
+        <div v-if="gainData && gainData.pages > 1" class="flex justify-center mt-10">
+          <el-pagination
+            v-model:current-page="gainPage"
+            :page-size="gainSize"
+            :total="gainData.total"
+            :pager-count="7"
+            layout="prev, pager, next, jumper, total"
+            background
+            @current-change="changeGainPage"
+          />
+        </div>
+      </div>
+    </section>
 
     <!-- Repo detail drawer -->
     <el-drawer
@@ -853,6 +1211,226 @@ const navTabs = computed(() => [
         </div>
       </div>
     </el-drawer>
+
+    <!-- Capability origin modal: tag a command/agent/plugin with its GitHub URL -->
+    <el-dialog
+      v-model="capOpen"
+      title="设置 GitHub 出处"
+      width="540px"
+      class="!bg-[#15131f]"
+      :close-on-click-modal="false"
+    >
+      <div v-if="capOpen" class="space-y-3">
+        <div class="text-sm text-white/60">
+          <span class="text-white/40">类型：</span>
+          <span class="font-mono text-cyan-300">{{ capKind }}</span>
+          <span class="text-white/40 ml-3">名称：</span>
+          <span class="font-mono text-emerald-300">{{ capName }}</span>
+        </div>
+        <div v-if="capPath" class="text-xs text-white/40 font-mono break-all">
+          📁 {{ capPath }}
+        </div>
+        <div>
+          <label class="text-xs text-white/60 mb-1 block">GitHub URL <span class="text-white/30">（留空 = 清除出处）</span></label>
+          <el-input
+            v-model="capUrl"
+            placeholder="https://github.com/owner/repo"
+            clearable
+          />
+        </div>
+        <div>
+          <label class="text-xs text-white/60 mb-1 block">中文说明 <span class="text-white/30">（可选）</span></label>
+          <el-input
+            v-model="capDescZh"
+            type="textarea"
+            :rows="2"
+            placeholder="一句话说明这个 command/agent/plugin 干什么的"
+          />
+        </div>
+        <div>
+          <label class="text-xs text-white/60 mb-1 block">English desc <span class="text-white/30">（可选）</span></label>
+          <el-input
+            v-model="capDescEn"
+            type="textarea"
+            :rows="2"
+            placeholder="Original English description (used as fallback when zh is empty)"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="capOpen = false">取消</el-button>
+        <el-button type="primary" :loading="capSaving" @click="saveCapabilityOrigin">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ponytail: group drill-in modal — list every item inside a source group with its description -->
+    <el-dialog
+      v-model="groupModalOpen"
+      :title="`${groupModalSlug} · ${groupModalItems.length} 项`"
+      width="820px"
+      class="!bg-[#15131f]"
+      top="6vh"
+    >
+      <div v-if="groupModalUrl" class="mb-4 flex items-center gap-3 flex-wrap">
+        <a :href="groupModalUrl" target="_blank" rel="noopener" class="text-emerald-300 hover:text-emerald-200 text-sm font-mono break-all">
+          ↗ {{ groupModalUrl }}
+        </a>
+        <span class="text-xs text-white/40">{{ groupModalItems.length }} 项已安装</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[68vh] overflow-y-auto pr-2">
+        <div
+          v-for="(it, i) in groupModalItems"
+          :key="i"
+          class="repo-card !p-3 hover:!border-purple-400/40 transition"
+          @click.stop
+        >
+          <div class="flex items-start justify-between gap-2 mb-2">
+            <div class="flex items-baseline gap-2 min-w-0 flex-1">
+              <span
+                class="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded shrink-0"
+                :class="{
+                  'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30': it.type === 'skills',
+                  'bg-orange-500/20 text-orange-200 border border-orange-400/30': it.type === 'commands',
+                  'bg-cyan-500/20 text-cyan-200 border border-cyan-400/30': it.type === 'agents',
+                  'bg-amber-500/20 text-amber-200 border border-amber-400/30': it.type === 'plugins',
+                }"
+              >{{ it.type === 'skills' ? 'SKILL' : it.type === 'commands' ? 'CMD' : it.type === 'agents' ? 'AGENT' : 'PLUGIN' }}</span>
+              <h3 class="font-bold text-base leading-tight font-mono break-all min-w-0">
+                {{ it.type === 'commands' ? '/' + it.name : it.name }}
+              </h3>
+            </div>
+            <span v-if="it.stars" class="text-amber-400 font-mono text-xs whitespace-nowrap shrink-0">⭐ {{ starsFmt(it.stars) }}</span>
+          </div>
+          <div v-if="it.type === 'skills' && replacementFor(it.name)" class="mb-2">
+            <button
+              class="w-full text-left p-2 rounded-lg bg-gradient-to-r from-orange-500/15 to-amber-500/15 border border-orange-400/40 hover:border-orange-300/70 transition group/rep"
+              @click.stop="openReplaceConfirm(it.name)"
+              :title="`点击查看 ${replacementFor(it.name).recommended.name} 的详情并替换`"
+            >
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <span class="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-orange-500/30 text-orange-100 border border-orange-300/40">
+                  🔥 找到更优替代
+                </span>
+                <span class="text-[10px] text-orange-200/70 group-hover/rep:text-orange-100">查看 / 选择 →</span>
+              </div>
+              <div class="flex items-baseline gap-2 text-sm">
+                <span class="font-mono font-bold text-orange-100 break-all">{{ replacementFor(it.name).recommended.name }}</span>
+                <span class="text-amber-300 font-mono text-xs shrink-0">⭐ {{ starsFmt(replacementFor(it.name).recommended.stars) }}</span>
+              </div>
+              <div class="text-[11px] text-white/60 mt-1 leading-snug">
+                {{ replacementFor(it.name).recommended.reasons.join(' · ') }}
+              </div>
+            </button>
+          </div>
+          <p v-if="it.desc_zh" class="text-sm text-white/75 leading-relaxed mb-2" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">
+            {{ it.desc_zh }}
+          </p>
+          <p v-else-if="it.desc_en" class="text-sm text-white/55 leading-relaxed mb-2" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">
+            🌐 {{ it.desc_en }}
+          </p>
+          <p v-else class="text-sm text-white/30 italic mb-2">本地安装 · 无描述</p>
+          <div class="flex items-center justify-between gap-2 flex-wrap mt-2 pt-2 border-t border-white/5">
+            <div class="flex gap-1 flex-wrap min-w-0">
+              <el-tag
+                v-for="t in (it.topics || []).slice(0, 3)"
+                :key="t"
+                size="small"
+                effect="plain"
+                class="!text-[10px] !px-1.5 !py-0"
+              >{{ t }}</el-tag>
+              <span v-if="it.path" class="text-[10px] text-white/30 font-mono truncate" :title="it.path">
+                📁 {{ it.path.split('/').slice(-2).join('/') }}
+              </span>
+            </div>
+            <div class="flex gap-1 shrink-0">
+              <el-button
+                v-if="it.path && it.type !== 'plugins'"
+                size="small"
+                @click.stop="openUrl('file://' + it.path)"
+                plain
+                class="!text-[10px] !px-2 !py-0.5"
+                title="打开本地文件"
+              >📄 源文件</el-button>
+              <el-button
+                size="small"
+                @click.stop="openUrl(it.url || groupModalUrl)"
+                plain
+                class="!text-[10px] !px-2 !py-0.5"
+              >↗ GitHub</el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="groupModalOpen = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ponytail: replacement confirm modal — only ONE action button shown, AI-chosen -->
+    <el-dialog
+      v-model="replaceOpen"
+      :title="replaceMode === 'replace' ? '🔥 替换为更优替代？' : '💡 推荐：并存安装'"
+      width="540px"
+      class="!bg-[#15131f]"
+      top="18vh"
+    >
+      <div v-if="replaceOld && replaceNew" class="space-y-4">
+        <div class="rounded-lg bg-white/5 border border-white/10 p-3">
+          <div class="text-xs text-white/40 mb-1">当前已装</div>
+          <div class="flex items-baseline gap-2">
+            <span class="font-mono font-bold text-white/90 break-all">{{ replaceOld.name }}</span>
+            <span v-if="replaceOld.stars" class="text-amber-400 font-mono text-xs shrink-0">⭐ {{ starsFmt(replaceOld.stars) }}</span>
+          </div>
+          <a v-if="replaceOld.url" :href="replaceOld.url" target="_blank" rel="noopener" class="text-[11px] text-white/40 font-mono break-all hover:text-emerald-300">↗ {{ replaceOld.url }}</a>
+        </div>
+
+        <div class="text-center text-orange-300 text-2xl">↓</div>
+
+        <div class="rounded-lg bg-gradient-to-br from-orange-500/15 to-amber-500/15 border border-orange-400/40 p-3">
+          <div class="text-xs text-orange-200/80 mb-1 font-bold">推荐{{ replaceMode === 'replace' ? '替换为' : '并存安装' }}</div>
+          <div class="flex items-baseline gap-2 mb-1">
+            <span class="font-mono font-bold text-orange-100 break-all">{{ replaceNew.name }}</span>
+            <span class="text-amber-300 font-mono text-xs shrink-0">⭐ {{ starsFmt(replaceNew.stars) }}</span>
+          </div>
+          <p v-if="replaceNew.desc_zh" class="text-sm text-white/75 leading-relaxed mb-2">{{ replaceNew.desc_zh }}</p>
+          <p v-else-if="replaceNew.desc_en" class="text-sm text-white/55 leading-relaxed mb-2">🌐 {{ replaceNew.desc_en }}</p>
+          <div v-if="replaceNew.reasons" class="space-y-1 mt-2">
+            <div v-for="rs in replaceNew.reasons" :key="rs" class="text-[11px] text-white/70">• {{ rs }}</div>
+          </div>
+          <a :href="replaceNew.url" target="_blank" rel="noopener" class="text-[11px] text-emerald-300 font-mono break-all hover:text-emerald-200 block mt-2">↗ {{ replaceNew.url }}</a>
+        </div>
+
+        <!-- ponytail: context banner explains WHY we picked this mode -->
+        <div v-if="replaceMode === 'replace'" class="rounded-lg bg-amber-500/10 border border-amber-400/30 p-3 text-sm text-amber-100 leading-relaxed">
+          ⚠️ 同为 <code class="font-mono text-amber-200">{{ replaceOld.best_category || '?' }}</code> 领域、共享 ≥2 个 vertical anchor，
+          <code class="font-mono text-amber-200">{{ replaceNew.name }}</code> 在同类中明显更强，<b>建议直接替换</b>。
+          替换 = 卸载 <code class="font-mono text-amber-200">{{ replaceOld.name }}</code> + 安装 <code class="font-mono text-amber-200">{{ replaceNew.name }}</code>
+        </div>
+        <div v-else class="rounded-lg bg-cyan-500/10 border border-cyan-400/30 p-3 text-sm text-cyan-100 leading-relaxed">
+          💡 只共享 {{ replaceNew.anchors?.length || 1 }} 个 vertical anchor 或不在同一领域，<b>建议并存</b>——保留
+          <code class="font-mono text-cyan-200">{{ replaceOld.name }}</code> 同时试用
+          <code class="font-mono text-cyan-200">{{ replaceNew.name }}</code>，确认更优后再替换。
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="replaceOpen = false">取消</el-button>
+        <el-button
+          v-if="replaceMode === 'replace'"
+          type="warning"
+          :loading="replaceBusy"
+          @click="confirmReplace"
+        >确认替换</el-button>
+        <el-button
+          v-else
+          type="success"
+          :loading="alongsideBusy"
+          @click="confirmInstallAlongside"
+        >
+          + 并存安装
+          <span class="text-[10px] text-white/60 ml-1">保留旧的</span>
+        </el-button>
+      </template>
+    </el-dialog>
 
   </el-config-provider>
 </template>
@@ -970,3 +1548,4 @@ const navTabs = computed(() => [
 .el-drawer__body { padding: 0; background: #15131f; }
 .el-drawer { background: #15131f !important; }
 </style>
+

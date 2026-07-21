@@ -1,0 +1,33 @@
+- generic [ref=f7e2]:
+  - banner [ref=f7e9]:
+    - generic [ref=f7e10]:
+      - generic [ref=f7e11]:
+        - heading "Lodestone" [level=1] [ref=f7e16]
+        - generic [ref=f7e17]:
+          - button "刷新" [ref=f7e18] [cursor=pointer]
+          - button "⭐ 1k+ 主流" [ref=f7e26] [cursor=pointer]
+          - button "🚀 今日星增" [ref=f7e31] [cursor=pointer]
+      - paragraph [ref=f7e37]: GitHub AI 项目的每日精选
+      - generic [ref=f7e38]:
+        - textbox "搜索项目名、描述、用途…" [active] [ref=f7e44]
+        - button "🔥 Trending" [ref=f7e45] [cursor=pointer]
+  - navigation [ref=f7e47]:
+    - generic [ref=f7e48]:
+      - link [ref=f7e49] [cursor=pointer]:
+        - /url: "#local"
+      - link [ref=f7e53] [cursor=pointer]:
+        - /url: "#hot"
+      - link [ref=f7e57] [cursor=pointer]:
+        - /url: "#workbuddy"
+  - generic [ref=f7e62]:
+    - generic [ref=f7e63]:
+      - generic [ref=f7e64]:
+        - heading [level=1] [ref=f7e65]
+        - paragraph [ref=f7e70]: 阈值 ≥ +50 星的 AI 项目（24h 窗口）
+      - generic [ref=f7e71]:
+        - button "返回主页" [ref=f7e72] [cursor=pointer]
+        - button "刷新" [disabled]
+    - paragraph [ref=f7e84]:
+      - text: 正在从
+      - code [ref=f7e85]: /api/gain
+      - text: 加载…
