@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   Search, ExternalLink, X, Bot, Brain, MessageSquareText,
@@ -16,6 +16,7 @@ const localCmds = ref({})
 const localAgents = ref({})
 const localPlugins = ref([])
 const localClis = ref({})
+const localMcp = ref([])         // ponytail: mcp_servers (context7 / chrome-devtools-mcp)
 const localGroups = ref([])      // ponytail: [{url, slug, name, label, counts, items}, ...]
 const localReplacements = ref([]) // ponytail: [{installed, recommended, alternatives_count}] — skill only
 const workbuddyPicks = ref([])   // ponytail: curated list of useful WorkBuddy plugins/tools
@@ -32,6 +33,8 @@ const q = ref('')
 const trendingOnly = ref(false)
 const _q = window.location.search
 const view = ref(_q.includes('page=top') ? 'top' : _q.includes('page=gain') ? 'gain' : 'main')
+// ponytail: per-category "show all" toggle so 30+ repos don't get clipped to 18 in view=main
+const catShowAll = reactive({})
 window.addEventListener('popstate', () => {
   const q = window.location.search
   view.value = q.includes('page=top') ? 'top' : q.includes('page=gain') ? 'gain' : 'main'
@@ -229,6 +232,7 @@ async function fetchAll() {
       localAgents.value = d.agents || {}
       localPlugins.value = d.plugins || []
       localClis.value = d.clis || {}
+      localMcp.value = d.mcp_servers || []
       localGroups.value = d.groups || []
       localReplacements.value = d.replacements || []
       localTotal.value = d.total || 0
@@ -363,15 +367,34 @@ const installedCount = computed(() => localTotal.value)
 const cmdCount = computed(() => Object.keys(localCmds.value).length)
 const agentCount = computed(() => Object.keys(localAgents.value).length)
 const pluginCount = computed(() => localPlugins.value.length)
-const cliCount = computed(() => Object.keys(localClis.value).length)
+const cliCount = computed(() =>
+  Object.values(localClis.value).reduce((n, arr) => n + (arr?.length || 0), 0)
+    + localMcp.value.length
+)
 const recommendedSkills = computed(() => {
   if (!snap.value) return []
-  const installedSet = new Set(Object.keys(localSkills.value))
+  // ponytail: build installedSet from ALL local capabilities (skills + plugins + mcp + clis),
+  // not just localSkills — otherwise ECC (a plugin) gets recommended as "not installed"
+  const installedSet = new Set()
+  for (const k of Object.keys(localSkills.value)) installedSet.add(k.toLowerCase())
+  for (const p of (localPlugins.value || [])) {
+    installedSet.add((p.name || '').toLowerCase())
+    installedSet.add((p.marketplace || '').toLowerCase())
+  }
+  for (const m of (localMcp.value || [])) installedSet.add(m.toLowerCase())
+  for (const items of Object.values(localClis.value || {})) {
+    if (Array.isArray(items)) for (const it of items) installedSet.add((it || '').toLowerCase())
+    if (typeof items === 'object' && items) for (const it of Object.keys(items)) installedSet.add(it.toLowerCase())
+  }
   const seen = new Set()
   const out = []
   for (const cat of snap.value.categories) {
     for (const r of cat.repos) {
-      if (r.local_installed || installedSet.has(r.name.split('/').pop())) continue
+      if (r.local_installed) continue
+      // ponytail: skip if repo name or last segment matches ANY installed capability
+      const seg = r.name.split('/').pop().toLowerCase()
+      const full = r.name.toLowerCase()
+      if (installedSet.has(seg) || installedSet.has(full)) continue
       if (seen.has(r.name)) continue
       // ponytail: only recommend repos that look like skills — agent/mcp/awesome categories
       const cats = r.categories || []
@@ -665,11 +688,11 @@ const navTabs = computed(() => [
             <div class="system-cap-sub">市场插件</div>
             <span class="system-cap-link">↓ 查看</span>
           </a>
-          <a href="#cap-sources" class="system-cap-card group">
+          <a href="#cap-clis" class="system-cap-card group">
             <el-icon :size="24" color="#94a3b8"><Terminal /></el-icon>
             <div class="system-cap-num">{{ cliCount }}</div>
             <div class="system-cap-label">CLIs</div>
-            <div class="system-cap-sub">已检测</div>
+            <div class="system-cap-sub">brew/uv/cargo/MCP</div>
             <span class="system-cap-link">↓ 查看</span>
           </a>
         </div>
@@ -718,6 +741,62 @@ const navTabs = computed(() => [
                   {{ g.counts.plugins }} 插件
                 </span>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ponytail: 本机 CLI 集成 — 显示对本机集成有用的 4 个工具 (rtk / context7 / graphify / code-review-graph) -->
+        <div
+          v-if="localClis.rtk || localMcp.includes('context7') || (localClis.uv && localClis.uv.includes('graphifyy')) || (localClis.uv && localClis.uv.includes('code-review-graph'))"
+          id="cap-clis"
+          class="scroll-mt-24 mb-8"
+        >
+          <div class="flex items-center gap-2 mb-3">
+            <el-icon color="#94a3b8"><Terminal /></el-icon>
+            <h3 class="text-lg font-bold text-white/90">
+              本机 CLI 集成 <span class="text-white/40 text-sm font-normal">— 4 个 Claude Code 集成工具</span>
+            </h3>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            <!-- rtk (brew) -->
+            <div v-if="localClis.rtk" class="capability-card">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="capability-name font-mono">rtk</span>
+                <span class="text-xs px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded">brew</span>
+              </div>
+              <div class="text-xs text-white/40 mb-1">{{ localClis.rtk.version }}</div>
+              <a href="https://github.com/rtk-ai/rtk" target="_blank" rel="noopener"
+                 class="text-xs text-emerald-400 hover:text-emerald-300 font-mono">github.com/rtk-ai/rtk →</a>
+            </div>
+            <!-- context7 (MCP) -->
+            <div v-if="localMcp.includes('context7')" class="capability-card">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="capability-name font-mono">context7</span>
+                <span class="text-xs px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded">mcp</span>
+              </div>
+              <div class="text-xs text-white/40 mb-1">实时文档查询</div>
+              <a href="https://github.com/upstash/context7" target="_blank" rel="noopener"
+                 class="text-xs text-emerald-400 hover:text-emerald-300 font-mono">github.com/upstash/context7 →</a>
+            </div>
+            <!-- graphify (uv) -->
+            <div v-if="localClis.uv && localClis.uv.includes('graphifyy')" class="capability-card">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="capability-name font-mono">graphify</span>
+                <span class="text-xs px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded">uv</span>
+              </div>
+              <div class="text-xs text-white/40 mb-1">代码图谱 / MCP</div>
+              <a href="https://github.com/Graphify-Labs/graphify" target="_blank" rel="noopener"
+                 class="text-xs text-emerald-400 hover:text-emerald-300 font-mono">github.com/Graphify-Labs/graphify →</a>
+            </div>
+            <!-- code-review-graph (uv) -->
+            <div v-if="localClis.uv && localClis.uv.includes('code-review-graph')" class="capability-card">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="capability-name font-mono">code-review-graph</span>
+                <span class="text-xs px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded">uv</span>
+              </div>
+              <div class="text-xs text-white/40 mb-1">CRG 代码审查图谱</div>
+              <a href="https://github.com/tirth8205/code-review-graph" target="_blank" rel="noopener"
+                 class="text-xs text-emerald-400 hover:text-emerald-300 font-mono">github.com/tirth8205/code-review-graph →</a>
             </div>
           </div>
         </div>
@@ -831,9 +910,11 @@ const navTabs = computed(() => [
             <span class="absolute top-2 left-2 text-xs font-black text-purple-300/80 font-mono">#{{ i + 1 }}</span>
             <div class="flex items-start justify-between gap-2 mb-2 pl-7">
               <h3 class="font-bold text-base leading-tight flex-1 min-w-0 break-all">{{ r.name }}</h3>
-              <span v-if="r.trending" class="top-card-trending-badge shrink-0">🔥 Trending</span>
-              <span v-if="r.local_installed" class="installed-badge shrink-0">✓ 已装</span>
-              <span v-else class="text-amber-400 font-mono text-sm whitespace-nowrap shrink-0">⭐ {{ starsFmt(r.stars) }}</span>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <span v-if="r.trending" class="top-card-trending-badge">🔥 Trending</span>
+                <span v-if="r.local_installed" class="installed-badge">✓ 已装</span>
+                <span class="text-amber-400 font-mono text-sm whitespace-nowrap">⭐ {{ starsFmt(r.stars) }}</span>
+              </div>
             </div>
             <div class="text-sm font-medium text-purple-300 leading-snug mb-2 pl-7">
               💡 {{ whyFor(r) }}
@@ -879,38 +960,52 @@ const navTabs = computed(() => [
           </div>
           <span class="font-mono text-sm text-white/40">{{ cat.repos.length }} 个项目</span>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          <div
-            v-for="r in cat.repos.slice(0, 18)"
-            :key="r.name"
-            class="repo-card"
-            :class="{ 'is-installed': r.local_installed }"
-            @click="openRepo(r)"
-          >
-            <div class="flex items-start justify-between gap-2 mb-2">
-              <h3 class="font-bold text-base leading-tight flex-1 min-w-0 break-all">{{ r.name }}</h3>
-              <span v-if="r.trending" class="top-card-trending-badge shrink-0">🔥 Trending</span>
-              <span v-if="r.local_installed" class="installed-badge shrink-0">✓ 已装</span>
-              <span v-else class="text-amber-400 font-mono text-sm whitespace-nowrap shrink-0">⭐ {{ starsFmt(r.stars) }}</span>
-            </div>
-            <div class="text-sm font-medium text-purple-300 leading-snug mb-2">
-              💡 {{ whyFor(r) }}
-            </div>
-            <p class="text-sm text-white/65 leading-relaxed mb-3" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
-              {{ (r.desc_zh || r.desc || '').slice(0, 140) }}
-            </p>
-            <div class="flex items-center justify-between flex-wrap gap-1">
-              <div class="flex gap-1 flex-wrap">
-                <el-tag
-                  v-for="t in (r.topics || []).slice(0, 3)"
-                  :key="t"
-                  size="small"
-                  effect="plain"
-                  class="!text-xs"
-                >{{ t }}</el-tag>
+        <div v-if="cat.repos.length === 0" class="text-center py-12 text-white/40 bg-white/2 rounded-lg border border-dashed border-white/10">
+          <el-icon :size="28" class="mb-2 text-white/30"><Search /></el-icon>
+          <p>该分类暂无 AI 项目</p>
+          <p class="text-xs mt-1 text-white/30">GitHub API 限流或 topic 匹配空. 1 小时后重跑 <code class="text-purple-300/80">radar.py crawl</code></p>
+        </div>
+        <div v-else>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div
+              v-for="r in cat.repos.slice(0, catShowAll[cat.id] ? cat.repos.length : 30)"
+              :key="r.name"
+              class="repo-card"
+              :class="{ 'is-installed': r.local_installed }"
+              @click="openRepo(r)"
+            >
+              <div class="flex items-start justify-between gap-2 mb-2">
+                <h3 class="font-bold text-base leading-tight flex-1 min-w-0 break-all">{{ r.name }}</h3>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span v-if="r.trending" class="top-card-trending-badge">🔥 Trending</span>
+                  <span v-if="r.local_installed" class="installed-badge">✓ 已装</span>
+                  <span class="text-amber-400 font-mono text-sm whitespace-nowrap">⭐ {{ starsFmt(r.stars) }}</span>
+                </div>
               </div>
-              <span class="text-xs text-cyan-400 font-mono">{{ r.lang }}</span>
+              <div class="text-sm font-medium text-purple-300 leading-snug mb-2">
+                💡 {{ whyFor(r) }}
+              </div>
+              <p class="text-sm text-white/65 leading-relaxed mb-3" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+                {{ (r.desc_zh || r.desc || '').slice(0, 140) }}
+              </p>
+              <div class="flex items-center justify-between flex-wrap gap-1">
+                <div class="flex gap-1 flex-wrap">
+                  <el-tag
+                    v-for="t in (r.topics || []).slice(0, 3)"
+                    :key="t"
+                    size="small"
+                    effect="plain"
+                    class="!text-xs"
+                  >{{ t }}</el-tag>
+                </div>
+                <span class="text-xs text-cyan-400 font-mono">{{ r.lang }}</span>
+              </div>
             </div>
+          </div>
+          <div v-if="cat.repos.length > 30" class="text-center mt-4">
+            <el-button size="small" plain @click="catShowAll[cat.id] = !catShowAll[cat.id]">
+              {{ catShowAll[cat.id] ? `收起 (显示 ${cat.repos.length} 个)` : `显示全部 (${cat.repos.length} 个)` }}
+            </el-button>
           </div>
         </div>
       </section>
@@ -984,9 +1079,11 @@ const navTabs = computed(() => [
           >
             <div class="flex items-start justify-between gap-2 mb-2">
               <h3 class="font-bold text-base leading-tight flex-1 min-w-0 break-all">{{ r.name }}</h3>
-              <span v-if="r.trending" class="top-card-trending-badge shrink-0">🔥 Trending</span>
-              <span v-if="r.local_installed" class="installed-badge shrink-0">✓ 已装</span>
-              <span v-else class="text-amber-400 font-mono text-sm whitespace-nowrap shrink-0">⭐ {{ starsFmt(r.stars) }}</span>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <span v-if="r.trending" class="top-card-trending-badge">🔥 Trending</span>
+                <span v-if="r.local_installed" class="installed-badge">✓ 已装</span>
+                <span class="text-amber-400 font-mono text-sm whitespace-nowrap">⭐ {{ starsFmt(r.stars) }}</span>
+              </div>
             </div>
             <div class="text-sm font-medium text-purple-300 leading-snug mb-2">
               💡 {{ whyFor(r) }}
@@ -1076,8 +1173,12 @@ const navTabs = computed(() => [
             <div class="flex items-start justify-between gap-2 mb-2 pl-7">
               <h3 class="font-bold text-base leading-tight flex-1 min-w-0 break-all">{{ r.name }}</h3>
               <div class="flex flex-col items-end gap-1 shrink-0">
-                <span :class="['gain-delta', r.cold_start ? 'cold' : (r.delta_24h <= 0 ? 'zero' : '')]">
-                  {{ r.cold_start ? '· 新' : '+' + r.delta_24h }}
+                <span :class="['gain-delta', r.cold_start ? 'cold' : (r.delta_24h && r.delta_24h <= 0 ? 'zero' : '')]">
+                  <template v-if="r.cold_start">· 新</template>
+                  <template v-else-if="r.delta_24h != null">+{{ r.delta_24h }}</template>
+                  <template v-else-if="r.stars_today != null">+{{ r.stars_today }}</template>
+                  <template v-else-if="r.recent_activity">🔥 近期活跃</template>
+                  <template v-else>—</template>
                 </span>
                 <span class="text-amber-400 font-mono text-sm whitespace-nowrap">⭐ {{ r.stars.toLocaleString() }}</span>
               </div>
@@ -1113,10 +1214,19 @@ const navTabs = computed(() => [
             <p>没有匹配 <code class="text-purple-300">{{ q }}</code> 的星增项目</p>
           </template>
           <template v-else-if="gainData && gainData.total === 0">
-            <p>今天没有增幅 ≥ +{{ gainMinDelta }} 星的 AI 项目。</p>
-            <p class="text-sm mt-2 text-white/30">
-              说明：≥+{{ gainMinDelta }}/天 是真正的"爆款"信号，普通活跃项目达不到这个量级。
-            </p>
+            <template v-if="gainData.note">
+              <el-icon :size="32" class="mb-3 text-amber-400/70"><InfoFilled /></el-icon>
+              <p>{{ gainData.note }}</p>
+              <p class="text-sm mt-2 text-white/40">
+                数据源 <code class="text-purple-300">github.com/trending</code> 需要走 Python urllib 抓取, JS-only 渲染时拿不到.
+              </p>
+            </template>
+            <template v-else>
+              <p>今天没有增幅 ≥ +{{ gainMinDelta }} 星的 AI 项目。</p>
+              <p class="text-sm mt-2 text-white/30">
+                说明：≥+{{ gainMinDelta }}/天 是真正的"爆款"信号，普通活跃项目达不到这个量级。
+              </p>
+            </template>
             <p class="text-sm mt-1 text-white/30">
               数据来源是 <code class="text-purple-300">github.com/trending</code>，运行 <code class="text-purple-300">./radar.py crawl</code> 重新拉取。
             </p>
@@ -1497,7 +1607,7 @@ const navTabs = computed(() => [
   color: transparent;
 }
 
-/* ponytail: installed badge */
+/* ponytail: installed badge — bigger and more obvious than v1 */
 .installed-badge {
   display: inline-flex;
   align-items: center;
@@ -1511,11 +1621,12 @@ const navTabs = computed(() => [
   font-weight: 600;
   letter-spacing: 0.02em;
 }
-
 /* ponytail: dim installed cards slightly so they recede */
 .repo-card.is-installed, .hot-card.is-installed {
-  opacity: 0.72;
-  border-color: rgba(52, 211, 153, 0.18);
+  opacity: 0.92;
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(16, 185, 129, 0.04);
+  position: relative;
 }
 
 /* ponytail: nav-tab styling */
@@ -1548,4 +1659,3 @@ const navTabs = computed(() => [
 .el-drawer__body { padding: 0; background: #15131f; }
 .el-drawer { background: #15131f !important; }
 </style>
-

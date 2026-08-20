@@ -1,0 +1,11 @@
+# lodestone Python deps — everything else is stdlib.
+#
+# --- Postgres mode (recommended: history + 24h star gain + pagination) ---
+pg8000>=1.30
+
+# --- Optional stronger scrapers for github.com/trending (any subset; auto-detected) ---
+# Without these, radar falls back to plain urllib — still works, just less robust
+# on JS-heavy or bot-checked pages. Adapters ported from the youzi skill.
+# crawl4ai>=0.5            # then run: crawl4ai-setup
+# playwright>=1.45         # then run: playwright install chromium
+# firecrawl: no pip needed — set FIRECRAWL_API_KEY in .env, or install the firecrawl CLI

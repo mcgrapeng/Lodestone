@@ -51,5 +51,8 @@ CREATE TABLE IF NOT EXISTS crawl_log (
   finished_at   TIMESTAMPTZ,
   repos_seen    INT,
   repos_added   INT,
-  repos_updated INT
+  repos_updated INT,
+  queries_failed INT DEFAULT 0    -- GitHub queries that errored/timed out this run (data-quality signal)
 );
+
+ALTER TABLE crawl_log ADD COLUMN IF NOT EXISTS queries_failed INT DEFAULT 0;

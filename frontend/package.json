@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Vue 3 SPA for Lodestone — reads data/latest.json from parent dir",
+  "description": "Vue 3 SPA for Lodestone — reads /api/* from the Python server (radar.py serve)",
   "scripts": {
     "dev": "node dev.cjs",
     "vite-only": "vite",

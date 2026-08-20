@@ -1,11 +1,12 @@
 """Repo-level CRUD + queries. All callers pass a pg8000 connection."""
+
 from typing import Iterable
 
 # ponytail: int IDs serve double duty as default sort column for /api/top
 _TOP_SORT_SQL = {
-    "stars":  "stars DESC",
+    "stars": "stars DESC",
     "recent": "pushed_at DESC NULLS LAST, stars DESC",
-    "name":   "name ASC",
+    "name": "name ASC",
 }
 
 
@@ -34,16 +35,25 @@ def upsert_repos(conn, repos: Iterable[dict]):
     """Bulk upsert into repos. ON CONFLICT (name) updates mutable fields only.
     Note: 'trending' is NOT set here — caller manages it via set_trending() after crawl.
     Note: 'stars_today' is updated ONLY when the caller supplies it (trending scrape) — non-trending repos
-    keep their previous value, so we don't accidentally null it out on a normal category crawl."""
+    keep their previous value, so we don't accidentally null it out on a normal category crawl.
+    Returns (inserted, updated) with REAL counts — we check which names already exist first
+    (ponytail: pg8000 executemany rowcount can't distinguish insert vs update)."""
     repos = list(repos)
     if not repos:
         return 0, 0
     cur = conn.cursor()
+    names = [r["name"] for r in repos]
+    cur.execute("SELECT name FROM repos WHERE name = ANY(%s)", (names,))
+    existing = {row[0] for row in cur.fetchall()}
     rows = [
         (
-            r["name"], r.get("full_name") or r["name"], r["url"],
-            r.get("description") or r.get("desc"), r.get("desc_zh"),
-            int(r.get("stars") or 0), int(r.get("forks") or 0),
+            r["name"],
+            r.get("full_name") or r["name"],
+            r["url"],
+            r.get("description") or r.get("desc"),
+            r.get("desc_zh"),
+            int(r.get("stars") or 0),
+            int(r.get("forks") or 0),
             r.get("lang") or None,
             list(r.get("topics") or []),
             r.get("best_category") or None,
@@ -54,7 +64,8 @@ def upsert_repos(conn, repos: Iterable[dict]):
         )
         for r in repos
     ]
-    cur.executemany("""
+    cur.executemany(
+        """
         INSERT INTO repos (name, full_name, url, description, desc_zh,
                            stars, forks, lang, topics, best_category,
                            pushed_at, updated_at, is_ai_relevant, stars_today)
@@ -72,10 +83,11 @@ def upsert_repos(conn, repos: Iterable[dict]):
           best_category = EXCLUDED.best_category,
           stars_today   = COALESCE(EXCLUDED.stars_today, repos.stars_today),
           last_seen_at  = NOW()
-    """, rows)
-    inserted = len(rows)
-    updated = max(0, (cur.rowcount or 0) - inserted) if cur.rowcount else 0
-    return inserted, updated
+    """,
+        rows,
+    )
+    inserted = sum(1 for n in names if n not in existing)
+    return inserted, len(rows) - inserted
 
 
 def set_trending(conn, names: Iterable[str]):
@@ -104,11 +116,14 @@ def snapshot_stars(conn, repo_names: list[str]):
     if not repo_names:
         return 0
     cur = conn.cursor()
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO repo_stars_history (repo_name, stars)
         SELECT name, stars FROM repos WHERE name = ANY(%s)
         ON CONFLICT DO NOTHING
-    """, (repo_names,))
+    """,
+        (repo_names,),
+    )
     return cur.rowcount or 0
 
 
@@ -124,30 +139,40 @@ def query_top_5k(conn, page: int = 1, size: int = 12, sort: str = "stars"):
     cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM repos WHERE is_ai_relevant AND stars >= 1000")
     total = cur.fetchone()[0]
-    cur.execute(f"""
+    cur.execute(
+        f"""
         SELECT name, url, description, desc_zh, stars, forks, lang, topics,
                pushed_at, updated_at, trending
         FROM repos
         WHERE is_ai_relevant AND stars >= 1000
         ORDER BY {sort_sql}
         LIMIT %s OFFSET %s
-    """, (size, offset))
+    """,
+        (size, offset),
+    )
     repos = [d | {"local_installed": False} for d in _dicts(cur)]
     return {
-        "repos": repos, "total": total, "page": page,
-        "size": size, "pages": max(1, (total + size - 1) // size), "sort": sort,
+        "repos": repos,
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": max(1, (total + size - 1) // size),
+        "sort": sort,
     }
 
 
 def query_hot_now(conn, limit: int = 40):
     """Top AI repos by stars overall."""
     cur = conn.cursor()
-    cur.execute("""
+    cur.execute(
+        """
         SELECT name, url, description, desc_zh, stars, forks, lang, topics,
                pushed_at, updated_at, trending
         FROM repos WHERE is_ai_relevant
         ORDER BY stars DESC LIMIT %s
-    """, (limit,))
+    """,
+        (limit,),
+    )
     return [d | {"local_installed": False} for d in _dicts(cur)]
 
 
@@ -157,6 +182,7 @@ def query_categories(conn):
     cat_meta = {}
     try:
         from radar import CATEGORIES  # late import to avoid circular
+
         cat_meta = {c["id"]: (c["name"], c["desc"]) for c in CATEGORIES}
     except Exception:
         pass
@@ -173,14 +199,25 @@ def query_categories(conn):
         d["local_installed"] = False
         grouped.setdefault(cid, []).append(d)
     return [
-        {"id": cid, "name": cat_meta.get(cid, cid)[0], "desc": cat_meta.get(cid, "")[1],
-         "count": len(rs), "repos": rs}
+        {
+            "id": cid,
+            "name": cat_meta.get(cid, cid)[0],
+            "desc": cat_meta.get(cid, "")[1],
+            "count": len(rs),
+            "repos": rs,
+        }
         for cid, rs in grouped.items()
     ]
 
 
-def query_gain(conn, prev_ago: str, recent_ago: str, min_delta: int = 100,
-               page: int = 1, size: int = 24):
+def query_gain(
+    conn,
+    prev_ago: str,
+    recent_ago: str,
+    min_delta: int = 100,
+    page: int = 1,
+    size: int = 24,
+):
     """24h star gainers. Primary source: `repos.stars_today` (populated from github.com/trending
     "X stars today" — the literal 24h delta). Falls back to repo_stars_history delta when ≥20h of
     snapshots exist. Both sources agree on the meaning, so we union them and dedupe on repo name
@@ -188,14 +225,20 @@ def query_gain(conn, prev_ago: str, recent_ago: str, min_delta: int = 100,
     Returns {gainers, total, page, size, pages, min_delta}."""
     # ponytail: validate intervals client-side to avoid SQL injection via the %s interpolation
     import re
-    if not re.match(r"^\d+ (hour|day|week|minute)s?(\s\d+ (hour|day|week|minute)s?)*$", prev_ago):
+
+    if not re.match(
+        r"^\d+ (hour|day|week|minute)s?(\s\d+ (hour|day|week|minute)s?)*$", prev_ago
+    ):
         raise ValueError(f"invalid prev_ago: {prev_ago!r}")
-    if not re.match(r"^\d+ (hour|day|week|minute)s?(\s\d+ (hour|day|week|minute)s?)*$", recent_ago):
+    if not re.match(
+        r"^\d+ (hour|day|week|minute)s?(\s\d+ (hour|day|week|minute)s?)*$", recent_ago
+    ):
         raise ValueError(f"invalid recent_ago: {recent_ago!r}")
 
     offset = max(0, (page - 1) * size)
     cur = conn.cursor()
-    cur.execute(f"""
+    cur.execute(
+        f"""
         WITH trending_gain AS (
             SELECT name, stars_today AS delta_24h, FALSE AS cold_start
             FROM repos
@@ -236,7 +279,9 @@ def query_gain(conn, prev_ago: str, recent_ago: str, min_delta: int = 100,
         FROM ranked
         ORDER BY delta_24h DESC, stars DESC
         LIMIT %s OFFSET %s
-    """, (min_delta, min_delta, size, offset))
+    """,
+        (min_delta, min_delta, size, offset),
+    )
     rows = _dicts(cur)
     total = rows[0]["total"] if rows else 0
     for d in rows:

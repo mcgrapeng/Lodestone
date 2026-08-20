@@ -60,7 +60,7 @@ echo "  Claude Code → 直接说：「刷一下 AI 雷达」「最近有什么 
 echo "  Codex CLI   → 直接说：「刷一下 AI 雷达」「最近有什么 AI 项目」"
 echo ""
 echo "手动调用："
-echo "  $HERE/radar.py all      # 一次性刷新"
+echo "  $HERE/radar.py crawl    # 爬取 + 入库（约 5-8 分钟）"
 echo "  $HERE/radar.py today    # 终端看 Top 15"
 echo ""
 echo "卸载："
