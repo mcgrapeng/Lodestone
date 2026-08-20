@@ -364,6 +364,46 @@ const totalRepos = computed(() => {
     (snap.value.categories?.reduce((n, c) => n + (c.repos?.length || 0), 0) || 0)
 })
 const installedCount = computed(() => localTotal.value)
+// ponytail: "✨ 新发现" — pushed within last 14d OR first_seen_at within 7d (PG only).
+// Works in both PG and JSON modes; richer signal in PG. Lets the hero counter + repo
+// badges light up for genuinely fresh projects instead of long-established ones.
+function isFresh(r) {
+  if (!r) return false
+  if (r.first_seen_at) {
+    const fs = new Date(r.first_seen_at).getTime()
+    if (!Number.isNaN(fs) && Date.now() - fs < 7 * 86400_000) return true
+  }
+  const p = r.pushed_at || r.pushed
+  if (p) {
+    const t = new Date(p).getTime()
+    if (!Number.isNaN(t) && Date.now() - t < 14 * 86400_000) return true
+  }
+  return false
+}
+const freshCount = computed(() => {
+  if (!snap.value) return 0
+  const seen = new Set()
+  let n = 0
+  for (const r of snap.value.hot_now || []) {
+    if (isFresh(r) && !seen.has(r.name)) { seen.add(r.name); n++ }
+  }
+  for (const cat of snap.value.categories || []) {
+    for (const r of cat.repos || []) {
+      if (isFresh(r) && !seen.has(r.name)) { seen.add(r.name); n++ }
+    }
+  }
+  return n
+})
+// ponytail: ⭐ total stars across all repos — big round number for the hero.
+const totalStars = computed(() => {
+  if (!snap.value) return 0
+  let s = 0
+  for (const r of snap.value.hot_now || []) s += r.stars || 0
+  for (const cat of snap.value.categories || []) {
+    for (const r of cat.repos || []) s += r.stars || 0
+  }
+  return s
+})
 const cmdCount = computed(() => Object.keys(localCmds.value).length)
 const agentCount = computed(() => Object.keys(localAgents.value).length)
 const pluginCount = computed(() => localPlugins.value.length)
@@ -556,6 +596,9 @@ const navTabs = computed(() => [
           <div class="flex items-center gap-3">
             <el-icon :size="32" color="#a78bfa"><Sparkles /></el-icon>
             <h1 class="text-5xl md:text-6xl font-black tracking-tight gradient-text">Lodestone</h1>
+            <span class="text-sm font-semibold text-white/50 border border-white/15 rounded-full px-3 py-1 hidden md:inline-block">
+              GitHub + HuggingFace 双源
+            </span>
           </div>
           <div class="flex gap-2 flex-wrap">
             <el-button type="primary" :icon="RefreshCw" :loading="refreshing" @click="refreshAll" plain>
@@ -569,19 +612,26 @@ const navTabs = computed(() => [
             </el-button>
           </div>
         </div>
-        <p class="text-lg text-white/60 max-w-2xl">
-          GitHub AI 项目的每日精选
+        <p class="hero-subtitle">
+          专门发现 <strong>主流 AI 工具</strong> 的双源聚合平台 · GitHub Topics + HuggingFace Trending
+          双源抓取 · <strong>{{ snap?.categories?.length || 16 }} 个分类</strong> 覆盖 Skills / Plugins /
+          Agent / RAG / IDE / Gateway / 可观测性…
         </p>
-        <div v-if="snap" class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 max-w-3xl">
+        <div v-if="snap" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mt-6 max-w-4xl">
+          <div class="stat-tile stat-tile-primary">
+            <el-icon :size="20" color="#a78bfa"><Sparkles /></el-icon>
+            <div class="stat-number">{{ totalRepos }}</div>
+            <div class="stat-label">AI 项目池</div>
+          </div>
           <div class="stat-tile">
             <el-icon :size="20" color="#34d399"><Folder /></el-icon>
             <div class="stat-number">{{ installedCount }}</div>
             <div class="stat-label">本机能力</div>
           </div>
-          <div class="stat-tile">
-            <el-icon :size="20" color="#fbbf24"><Flame /></el-icon>
-            <div class="stat-number">{{ totalRepos }}</div>
-            <div class="stat-label">今日 Repos</div>
+          <div class="stat-tile" v-if="freshCount > 0">
+            <el-icon :size="20" color="#fb923c"><Sparkles /></el-icon>
+            <div class="stat-number">{{ freshCount }}</div>
+            <div class="stat-label">✨ 新发现</div>
           </div>
           <div class="stat-tile">
             <el-icon :size="20" color="#a78bfa"><Bookmark /></el-icon>
@@ -589,9 +639,9 @@ const navTabs = computed(() => [
             <div class="stat-label">分类</div>
           </div>
           <div class="stat-tile">
-            <el-icon :size="20" color="#94a3b8"><Terminal /></el-icon>
-            <div class="stat-number">{{ cliCount }}</div>
-            <div class="stat-label">CLI 工具</div>
+            <el-icon :size="20" color="#fbbf24"><Star /></el-icon>
+            <div class="stat-number">{{ totalStars >= 1000 ? Math.round(totalStars/1000) + 'k' : totalStars }}</div>
+            <div class="stat-label">总星数</div>
           </div>
         </div>
         <div v-if="snap" class="mt-3 text-xs text-white/40 font-mono">
@@ -846,6 +896,7 @@ const navTabs = computed(() => [
         </div>
       </section>
 
+      <div class="section-divider"></div>
       <!-- WorkBuddy 精选插件/工具 — anchor 锚点 section -->
       <section id="workbuddy" class="scroll-mt-24 mb-16">
         <div class="section-title">
@@ -896,6 +947,7 @@ const navTabs = computed(() => [
       </section>
 
       <!-- Hot Now -->
+      <div class="section-divider"></div>
       <section id="hot" class="scroll-mt-24 mb-16">
         <div class="section-title">🔥 Top 24 · 全站最热</div>
         <p class="text-white/50 text-sm mb-5">按 ⭐ 排序，今日 GitHub 上最火的 AI 项目</p>
@@ -912,6 +964,7 @@ const navTabs = computed(() => [
               <h3 class="font-bold text-base leading-tight flex-1 min-w-0 break-all">{{ r.name }}</h3>
               <div class="flex items-center gap-1.5 shrink-0">
                 <span v-if="r.trending" class="top-card-trending-badge">🔥 Trending</span>
+                <span v-if="isFresh(r)" class="fresh-badge">✨ 新</span>
                 <span v-if="r.local_installed" class="installed-badge">✓ 已装</span>
                 <span class="text-amber-400 font-mono text-sm whitespace-nowrap">⭐ {{ starsFmt(r.stars) }}</span>
               </div>
@@ -978,6 +1031,7 @@ const navTabs = computed(() => [
                 <h3 class="font-bold text-base leading-tight flex-1 min-w-0 break-all">{{ r.name }}</h3>
                 <div class="flex items-center gap-1.5 shrink-0">
                   <span v-if="r.trending" class="top-card-trending-badge">🔥 Trending</span>
+                  <span v-if="isFresh(r)" class="fresh-badge">✨ 新</span>
                   <span v-if="r.local_installed" class="installed-badge">✓ 已装</span>
                   <span class="text-amber-400 font-mono text-sm whitespace-nowrap">⭐ {{ starsFmt(r.stars) }}</span>
                 </div>
@@ -1294,6 +1348,8 @@ const navTabs = computed(() => [
 
         <div class="flex items-center gap-3 flex-wrap pt-4 border-t border-white/5">
           <span class="text-amber-400 font-mono font-bold">⭐ {{ selected.stars.toLocaleString() }}</span>
+          <span v-if="selected.stars_today" class="gain-delta">+{{ selected.stars_today }} 今日</span>
+          <span v-if="isFresh(selected)" class="fresh-badge">✨ 新发现</span>
           <el-tag size="small" effect="plain">{{ selected.lang }}</el-tag>
           <div class="flex flex-wrap gap-1">
             <el-tag
@@ -1620,6 +1676,25 @@ const navTabs = computed(() => [
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
+}
+/* ponytail: ✨ 新发现 badge — orange→pink gradient, animated, stands out vs emerald installed */
+.fresh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.22), rgba(236, 72, 153, 0.22));
+  border: 1px solid rgba(251, 146, 60, 0.5);
+  color: #fed7aa;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  animation: fresh-pulse 2.4s ease-in-out infinite;
+}
+@keyframes fresh-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 146, 60, 0.4); }
+  50% { box-shadow: 0 0 12px 2px rgba(251, 146, 60, 0.2); }
 }
 /* ponytail: dim installed cards slightly so they recede */
 .repo-card.is-installed, .hot-card.is-installed {

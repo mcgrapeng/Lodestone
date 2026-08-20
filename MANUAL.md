@@ -1,6 +1,6 @@
 # Lodestone · 使用手册
 
-> 每日 GitHub AI 热门仓库自动雷达 · 已为 AI 应用工程师分类整理 · 中文友好
+> **GitHub + HuggingFace 双源 AI 工具发现平台** · 专门发现主流 AI 工具
 
 ---
 
@@ -8,9 +8,16 @@
 
 **Lodestone** 是一个 Python stdlib 为主的轻量级爬虫 + Vue 3 SPA，专注一件事：
 
-> 每天抓 GitHub 上围绕 **AI 应用开发** 场景最热门、最活跃的仓库（skills / plugins /
-> Agent / RAG / IDE / Gateway / 可观测性…），按用途分 12 类，自动翻译成中文，
-> 提供终端、JSON API、可视化仪表盘三种消费方式。
+> 每天抓 **GitHub + HuggingFace** 上围绕 **AI 应用开发** 场景最热门、最活跃的项目
+> （skills / plugins / Agent / RAG / IDE / Gateway / MCP / Voice AI / 可观测性…），
+> 按用途分 **16 类**，自动翻译成中文，提供终端、JSON API、可视化仪表盘三种消费方式。
+
+**双数据源**：
+- **GitHub** — 12 个细分类别（Agent · RAG · LLM · CodeGen · Workflow · Multimodal ·
+  Fine-tune · Eval · IDE · Gateway · Observability · Awesome & Plugins）+ 3 个新类别
+  （**MCP** · **Voice/Realtime** · **Browser Use）**，加上 Trending daily/weekly 与 5K+ 广域补捞
+- **HuggingFace** — `sort=likes7d` API 抓取社区精选 trendingScore Top 30 Spaces
+  （MiniMaxAI/MiniMax-Music3、agent-memory-leaderboard 等真实 AI 应用 demo）
 
 底层集成了 `firecrawl` · `crawl4ai` · `playwright` 三个主流爬虫引擎，按 **并行**
 方式运行（不只是按顺序降级）— 三个引擎同时开跑，谁先抓到非空 HTML 不再是赢家，

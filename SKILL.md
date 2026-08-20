@@ -1,12 +1,12 @@
 ---
 name: lodestone
-description: 当用户想了解 GitHub 上最新的 AI 热门项目/工具/Skills（如 superpowers、agent-memory、LangChain 等）时触发。自动爬取 GitHub AI 趋势，按用途分类（Agent/RAG/代码生成/微调等），生成中文仪表盘。触发短语：「看看最新AI项目」「AI radar」「GitHub AI趋势」「刷一下AI雷达」「最近有什么火的AI项目」。
+description: 当用户想了解 GitHub + HuggingFace 上最新的 AI 工具/Skills/项目（如 superpowers、agent-memory、LangChain、Coze 等）时触发。Lodestone 是专门发现主流 AI 工具的双源聚合平台 — 自动爬取 GitHub AI 趋势与 HuggingFace Trending Spaces，按 16 个用途分类（Agent/RAG/代码生成/MCP/Voice 等），生成中文仪表盘。触发短语：「看看最新AI项目」「AI radar」「GitHub AI趋势」「刷一下AI雷达」「最近有什么火的AI项目」。
 allowed-tools: Bash, Read, Write, Edit
 ---
 
-# Lodestone · GitHub AI 趋势雷达
+# Lodestone · GitHub + HuggingFace 双源 AI 工具发现平台
 
-每日 GitHub AI 热门仓库自动雷达 · 已为 AI 应用工程师分类整理 · 中文友好
+每日 GitHub AI 热门仓库 + HuggingFace Trending Spaces 自动聚合 · 已为 AI 应用工程师分类整理 · 中文友好
 
 > **跨平台**：本 skill 同时兼容 **Claude Code** (`~/.claude/skills/`) 和 **Codex CLI** (`~/.codex/skills/`)。`SKILL.md` 格式两边相同，通过 `./install.sh` 一次安装双端可用。
 

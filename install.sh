@@ -17,7 +17,7 @@ warn() { printf "  \033[33m!\033[0m %s\n" "$*"; }
 fail() { printf "  \033[31m✗\033[0m %s\n" "$*"; exit 1; }
 
 echo ""
-echo "⚡ Lodestone · 安装到 Claude Code + Codex CLI"
+echo "⚡ Lodestone · GitHub + HuggingFace 双源 AI 工具发现平台"
 echo "   源目录: $HERE"
 echo ""
 

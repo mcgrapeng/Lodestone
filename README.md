@@ -1,8 +1,11 @@
 # ⚡ Lodestone
 
-爬取 GitHub AI 热门仓库，按用途分成 12 类，围绕 AI 应用开发生态（Skills / Plugins / Agent / RAG / IDE / Gateway / 可观测…）。
+**GitHub + HuggingFace 双源 AI 工具发现平台** — 围绕 AI 应用开发生态
+（Skills / Plugins / Agent / RAG / IDE / Gateway / 可观测…），按 16 个用途分类，
+每日自动聚合主流与新兴的 AI 项目，自动翻译为中文。
 
-Python 数据层（`radar.py` + `db/`）+ Vue 3 SPA 前端。可作为 **Claude Code** 与 **Codex CLI** 的 skill 安装。
+Python 数据层（`radar.py` + `db/`）+ Vue 3 SPA 前端。可作为 **Claude Code** 与
+**Codex CLI** 的 skill 安装。
 
 ---
 
@@ -125,9 +128,9 @@ npm run dev        # → http://localhost:5173
 
 ---
 
-## 12 个分类
+## 16 个分类
 
-分类在 `radar.py` 顶部的 `CATEGORIES` 列表中定义，每类对应一组 GitHub 查询：
+分类在 `radar.py` 顶部的 `CATEGORIES` 列表中定义，每类对应一组 GitHub 查询（`huggingface` 例外，走 HF 公共 API）：
 
 1. 🤖 AI Agent & Skills
 2. 🧠 RAG / Memory / Vector
@@ -141,8 +144,12 @@ npm run dev        # → http://localhost:5173
 10. 🌐 LLM Gateway & Router
 11. 🔍 LLM 可观测 & Tracing
 12. ⭐ Awesome Lists & Plugins（含 Claude 插件市场生态）
+13. 🔌 MCP Servers & Clients（Model Context Protocol 生态）
+14. 🎙 Voice AI / Realtime（LiveKit / Pipecat / Vocode 系）
+15. 🖥 Browser Use / Computer Use（浏览器自动化 + Computer-Use agent）
+16. 🤗 🤗 HuggingFace 热门（社区精选 trendingScore 排行）
 
-另有 `TOP_5K_QUERIES`（90 条广域补捞）+ `MANUAL_SEED_REPOS`（人工保底）+ GitHub Trending daily/weekly（新星捕捉），三层 AI 相关性过滤（HARD topic / 文本提示 / 噪音黑名单）。
+另有 `TOP_5K_QUERIES`（90 条广域补捞）+ `MANUAL_SEED_REPOS`（人工保底）+ GitHub Trending daily/weekly（新星捕捉），三层 AI 相关性过滤（HARD topic / 文本提示 / 噪音黑名单）。**双数据源**：GitHub Topics + HuggingFace Spaces Trending。
 
 ---
 

@@ -142,7 +142,7 @@ def query_top_5k(conn, page: int = 1, size: int = 12, sort: str = "stars"):
     cur.execute(
         f"""
         SELECT name, url, description, desc_zh, stars, forks, lang, topics,
-               pushed_at, updated_at, trending
+               pushed_at, updated_at, trending, first_seen_at, stars_today
         FROM repos
         WHERE is_ai_relevant AND stars >= 1000
         ORDER BY {sort_sql}
@@ -167,7 +167,7 @@ def query_hot_now(conn, limit: int = 40):
     cur.execute(
         """
         SELECT name, url, description, desc_zh, stars, forks, lang, topics,
-               pushed_at, updated_at, trending
+               pushed_at, updated_at, trending, first_seen_at, stars_today
         FROM repos WHERE is_ai_relevant
         ORDER BY stars DESC LIMIT %s
     """,
@@ -188,7 +188,7 @@ def query_categories(conn):
         pass
     cur.execute("""
         SELECT best_category, name, url, description, desc_zh, stars, forks,
-               lang, topics, pushed_at, updated_at, trending
+               lang, topics, pushed_at, updated_at, trending, first_seen_at, stars_today
         FROM repos
         WHERE is_ai_relevant AND best_category IS NOT NULL
         ORDER BY best_category, stars DESC

@@ -177,6 +177,54 @@ CATEGORIES = [
             "claude plugins in:name,description stars:>100",
         ],
     },
+    {
+        "id": "mcp",
+        "name": "MCP Servers & Clients",
+        "desc": "Model Context Protocol — Claude/工具生态互联协议、服务端与客户端实现",
+        "queries": [
+            "topic:mcp-server stars:>100",
+            "topic:mcp-servers stars:>100",
+            "topic:model-context-protocol stars:>100",
+            "mcp-server in:name,description stars:>100",
+            "model context protocol in:name,description stars:>100",
+            "mcp client in:name,description stars:>100",
+        ],
+    },
+    {
+        "id": "voice",
+        "name": "Voice AI / Realtime",
+        "desc": "语音对话、实时音视频、TTS/ASR、低延迟多模态应用（LiveKit / Pipecat / Vocode 系）",
+        "queries": [
+            "topic:livekit stars:>200",
+            "topic:pipecat stars:>100",
+            "topic:vocode stars:>100",
+            "topic:realtime-ai stars:>100",
+            "voice-agent in:name,description stars:>200",
+            "realtime-voice in:name,description stars:>100",
+        ],
+    },
+    {
+        "id": "browser",
+        "name": "Browser Use / Computer Use",
+        "desc": "让 LLM 操作浏览器与桌面：浏览器自动化、视觉抓取、Computer-Use agent",
+        "queries": [
+            "topic:browser-use stars:>200",
+            "topic:browser-automation stars:>500",
+            "topic:computer-use stars:>100",
+            "browser-use in:name,description stars:>200",
+            "stagehand in:name stars:>500",
+            "playwright-mcp in:name,description stars:>100",
+        ],
+    },
+    {
+        # ponytail: HuggingFace Trending Spaces — JSON API (huggingface.co/api/spaces?sort=trending).
+        # Sources are populated by `fetch_huggingface_trending()` below, NOT GitHub queries;
+        # queries list is kept empty so the standard loop skips it.
+        "id": "huggingface",
+        "name": "🤗 HuggingFace 热门",
+        "desc": "HuggingFace Trending Spaces — 社区里最热门的 AI 应用 demo / agent / 工具",
+        "queries": [],  # populated by fetch_huggingface_trending()
+    },
 ]
 
 # ponytail: 5k+ pass — broad queries to catch mainstream AI tools not in category queries
@@ -1624,6 +1672,86 @@ def gh_fetch_repo(full_name):
     }
 
 
+def fetch_huggingface_trending(max_items: int = 30) -> list:
+    """HuggingFace Trending Spaces — JSON API (no auth). Returns repo-shaped dicts so the
+    rest of the pipeline (translation, upsert, hot_now) works without special-casing.
+
+    ponytail: HF's public API has no literal "trending" sort, but `sort=likes7d` returns
+    `trendingScore` (their internal 7-day pop score). We surface that as `stars` so the
+    rest of the UI / sorting treats HF spaces uniformly. `likes` becomes total likes (lifetime).
+
+    Source: https://huggingface.co/api/spaces?sort=likes7d&limit=N (public JSON).
+    Falls back to system `curl` when Python's SSL certs are missing (macOS Python builds
+    commonly lack the cert chain). Returns [] on any error — HF down shouldn't block
+    the GitHub crawl."""
+    url = f"https://huggingface.co/api/spaces?sort=likes7d&limit={max_items}"
+    data = None
+    # ponytail: try Python urllib first (zero deps)
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "lodestone/1.0"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read())
+    except Exception as e:
+        # ponytail: macOS Python often lacks system certs — fall back to system `curl`
+        # which uses the OS keychain. Public JSON API, no secrets at risk.
+        try:
+            out = subprocess.run(
+                # ponytail: `-q` skips ~/.curlrc (which appends "HTTP %{http_code}…" that
+                # would break json.loads on the captured stdout). Public API, no auth.
+                ["curl", "-q", "-sS", "--max-time", "20", "-A", "lodestone/1.0", url],
+                capture_output=True,
+                text=True,
+                timeout=25,
+            )
+            if out.returncode == 0 and out.stdout.strip():
+                data = json.loads(out.stdout)
+            else:
+                print(
+                    f"  [warn] HF trending (curl) failed: {out.stderr.strip()[:120] or e}",
+                    file=sys.stderr,
+                )
+                return []
+        except Exception as e2:
+            print(
+                f"  [warn] HF trending fetch failed: {e}; curl: {e2}", file=sys.stderr
+            )
+            return []
+    out = []
+    # ponytail: HF API returns a list on success, a dict ({"error": "..."}) on rate-limit
+    # / auth errors. Be defensive — only iterate if it's actually a list.
+    items = data if isinstance(data, list) else []
+    for s in items[:max_items]:
+        sid = s.get("id") or ""
+        if "/" not in sid:
+            continue
+        likes = int(s.get("likes") or 0)
+        trend = int(s.get("trendingScore") or 0)
+        # ponytail: trendingScore is what makes "trending" — surface as stars (UI badge
+        # reads "⭐ N") and keep likes in topics as a secondary signal.
+        out.append(
+            {
+                "name": sid,
+                "full_name": sid,
+                "url": f"https://huggingface.co/spaces/{sid}",
+                "description": (s.get("description") or "").strip()[:500],
+                "desc": (s.get("description") or "").strip()[:500],
+                "stars": trend,  # 7-day trending score (UI displays as ⭐)
+                "forks": 0,
+                "lang": "python",  # most HF spaces are Gradio/Streamlit on Python
+                "topics": ["huggingface", "space", *(s.get("tags") or [])][:6],
+                "updated": (s.get("lastModified") or "")[:10],
+                "pushed": (s.get("lastModified") or "")[:10],
+                "score": trend,
+                "best_category": "huggingface",
+                "is_ai_relevant": True,  # HF trending is already AI-curated by the community
+                "source": "huggingface_trending",
+                "hf_likes": likes,  # kept for the drawer
+            }
+        )
+    print(f"  ✓ HuggingFace: {len(out)} trending spaces", file=sys.stderr)
+    return out
+
+
 def fetch_recent_active_repos(max_repos: int = 30, days_back: int = 7) -> list:
     """Fallback for github.com/trending scrape — use gh search API by recent push + AI topics.
     ponytail: github.com/trending HTML is JS-rendered, urllib can't see the repo list. Use the
@@ -1856,13 +1984,20 @@ def _crawl_inner():
     for cat in CATEGORIES:
         seen = set()
         repos = []
-        for q in cat["queries"]:
-            _search_pace()  # rate limit: 30 search req/min — adaptive sleep between ALL search calls
-            for r in gh_search(q):
-                if r["name"] in seen:
-                    continue
-                seen.add(r["name"])
-                repos.append(r)
+        # ponytail: empty `queries` = non-GitHub source category (e.g. HuggingFace). Skip the
+        # gh_search loop and call the dedicated fetcher instead. Keeps the rest of the pipeline
+        # (translation, hot_now, upsert, JSON snapshot) working uniformly.
+        if not cat["queries"]:
+            if cat["id"] == "huggingface":
+                repos = fetch_huggingface_trending(max_items=30)
+        else:
+            for q in cat["queries"]:
+                _search_pace()  # rate limit: 30 search req/min — adaptive sleep between ALL search calls
+                for r in gh_search(q):
+                    if r["name"] in seen:
+                        continue
+                    seen.add(r["name"])
+                    repos.append(r)
         # sort by stars desc
         repos.sort(key=lambda x: x["stars"], reverse=True)
         repos = repos[:30]
@@ -1921,6 +2056,9 @@ def _crawl_inner():
     print(
         f"  ✓ trending: {len(trending_daily)} daily + {len(trending_weekly)} weekly → {len(trending)} unique → {len(trending_ai)} AI-relevant → merged into 5k+ pool"
     )
+    # ponytail: keep trending SEPARATELY so the 300-row TOP_5K_LIMIT truncation below can't
+    # drop their stars_today. Trending repos are low-star by definition (the whole point is
+    # "new today" / "rising this week") — they'd otherwise be at the bottom of the 300-row slice.
     top_5k_sorted = sorted(
         top_5k_repos.values(), key=lambda x: x.get("stars", 0), reverse=True
     )[:TOP_5K_LIMIT]
@@ -1941,6 +2079,13 @@ def _crawl_inner():
     for r in top_5k_sorted:
         r["best_category"] = None  # 5k+ doesn't belong to a single category
         to_persist.append(r)
+    # ponytail: trending repos get stars_today which is the entire signal for /api/gain.
+    # The TOP_5K_LIMIT=300 truncation above drops low-star trending repos — re-add them
+    # so the stars_today field always reaches the DB / JSON snapshot.
+    for r in trending_ai:
+        if r["name"] not in {p["name"] for p in to_persist}:
+            r["best_category"] = None
+            to_persist.append(r)
     seen = set()
     deduped = []
     for r in to_persist:
@@ -2016,6 +2161,13 @@ def _crawl_inner():
         "total_unique": len(deduped),
         "hot_now": sorted(deduped, key=lambda r: r.get("stars", 0), reverse=True)[:40],
         "categories": cat_results,
+        # ponytail: stars_today carried over from trending scrape — /api/gain uses this when
+        # no PG; previously empty because the field lived only on PG rows, not JSON snapshots.
+        "stars_today": {
+            r["name"]: r["stars_today"]
+            for r in trending
+            if r.get("stars_today") is not None
+        },
     }
     latest_file = DATA / "latest.json"
     latest_file.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2))
@@ -2460,46 +2612,66 @@ def serve(port=8765):
                             f"  [warn] /api/gain db read failed: {e}; falling back to latest.json",
                             file=sys.stderr,
                         )
-                # ponytail: fallback — compute gainers from latest.json stars_today (when GitHub trending HTML
-                # wasn't scraped, use stars as a proxy so the tab isn't empty)
+                # ponytail: fallback — compute gainers from latest.json stars_today.
+                # Primary source: the top-level `stars_today` map (carried over from trending
+                # scrape; populated even when category repos don't carry the field).
+                # Secondary source: any per-repo `stars_today` on hot_now / category entries.
+                # Tertiary fallback: recent_activity (pushed_at <7d proxy) so the tab is
+                # never empty when there's at least fresh data.
                 latest = DATA / "latest.json"
                 if latest.exists():
                     snap = json.loads(latest.read_text())
+                    today_map = dict(snap.get("stars_today") or {})
                     all_repos = list(snap.get("hot_now") or []) + [
                         r
                         for c in (snap.get("categories") or [])
                         for r in c.get("repos") or []
                     ]
-                    by_name = {}
-                    has_today = False
+                    # ponytail: index all repos by name so we can backfill desc/topics/etc
+                    # for the trending repos that are only in today_map (not in any category).
+                    by_name: dict = {}
                     for r in all_repos:
                         n = r.get("name")
                         if not n:
                             continue
-                        st = r.get("stars_today") or 0
-                        if st > 0:
-                            has_today = True
-                            if n not in by_name or st > by_name[n].get(
-                                "stars_today", 0
-                            ):
-                                by_name[n] = r
-                    if not has_today:
-                        # ponytail: fall back to recent_active (pushed_at <7 days) as a softer proxy
-                        # for 24h gainers. NOT a true daily delta but still useful.
+                        if n not in by_name or r.get("stars", 0) > by_name[n].get(
+                            "stars", 0
+                        ):
+                            by_name[n] = r
+                    # ponytail: build gainers — every name with a positive stars_today wins.
+                    gainers = []
+                    for n, st in today_map.items():
+                        if st <= 0:
+                            continue
+                        rec = by_name.get(n) or {
+                            "name": n,
+                            "stars": 0,
+                            "topics": [],
+                            "description": "",
+                            "desc_zh": "",
+                            "lang": "—",
+                        }
+                        gainers.append(
+                            {
+                                **rec,
+                                "stars_today": st,
+                                "delta_24h": st,
+                                "source": "json_snapshot",
+                            }
+                        )
+                    # ponytail: rank by delta desc, filter to AI-relevant / has topics.
+                    # Fallback to recent_activity if today_map is empty.
+                    if not gainers:
                         cutoff = (
                             datetime.date.today() - datetime.timedelta(days=7)
                         ).isoformat()
                         for r in all_repos:
-                            n = r.get("name")
-                            if not n or n in by_name:
-                                continue
                             pushed = r.get("pushed", "")
                             if pushed and pushed[:10] >= cutoff:
-                                # ponytail: synthetic recent_activity score — push recency + stars
-                                # lower score = more recent. 估算"近 7 天活跃程度".
-                                r["recent_activity"] = r.get("stars", 0)
-                                by_name[n] = r
-                        if not by_name:
+                                rec = dict(r)
+                                rec["recent_activity"] = r.get("stars", 0)
+                                gainers.append(rec)
+                        if not gainers:
                             return self._json(
                                 {
                                     "gainers": [],
@@ -2512,12 +2684,11 @@ def serve(port=8765):
                                     "action": "crawl",
                                 }
                             )
-                    gainers = sorted(
-                        by_name.values(),
+                    # ponytail: rank by delta desc, paginate, annotate local-installed
+                    gainers.sort(
                         key=lambda r: -(
-                            (r.get("stars_today") or 0)
-                            + (r.get("recent_activity") or 0)
-                        ),
+                            (r.get("delta_24h") or 0) + (r.get("recent_activity") or 0)
+                        )
                     )
                     total = len(gainers)
                     start = (page - 1) * size
