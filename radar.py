@@ -225,6 +225,34 @@ CATEGORIES = [
         "desc": "HuggingFace Trending Spaces — 社区里最热门的 AI 应用 demo / agent / 工具",
         "queries": [],  # populated by fetch_huggingface_trending()
     },
+    {
+        "id": "security",
+        "name": "AI 安全 & 隐私",
+        "desc": "Prompt injection 防御、LLM 红队 / Jailbreak 检测、PII 脱敏、模型水印、对齐研究",
+        "queries": [
+            "topic:prompt-injection stars:>100",
+            "topic:llm-security stars:>100",
+            "topic:ai-safety stars:>200",
+            "topic:red-team stars:>100",
+            "topic:ai-alignment stars:>200",
+            "prompt injection in:name,description stars:>100",
+            "jailbreak in:name,description stars:>100",
+        ],
+    },
+    {
+        "id": "robotics",
+        "name": "机器人 / Embodied AI",
+        "desc": "具身智能、机器人控制、sim-to-real、Open X-Embodiment、机器人学习框架",
+        "queries": [
+            "topic:embodied-ai stars:>200",
+            "topic:robotics stars:>500",
+            "topic:robot-learning stars:>200",
+            "topic:sim-to-real stars:>100",
+            "topic:open-x-embodiment stars:>50",
+            "humanoid in:name,description stars:>200",
+            "manipulation in:name,description stars:>200",
+        ],
+    },
 ]
 
 # ponytail: 5k+ pass — broad queries to catch mainstream AI tools not in category queries

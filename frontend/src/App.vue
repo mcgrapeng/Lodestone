@@ -6,7 +6,7 @@ import {
   Code2, Workflow, Image, Dumbbell, BarChart3, Bookmark, Star,
   Flame, Sparkles, Download, RefreshCw, Folder, Terminal,
   Users, Plug, Hash, AtSign, ArrowLeft, TrendingUp,
-  Monitor, Globe, Activity,
+  Monitor, Globe, Activity, Shield,
 } from 'lucide-vue-next'
 
 // ponytail: data layer is /api/* — Vue 3 is presentation only. No JSON import, no build-time snapshot.
@@ -215,6 +215,8 @@ const CAT_ICONS = {
   workflow: Workflow, multimodal: Image, finetune: Dumbbell,
   eval: BarChart3, awesome: Bookmark,
   ide: Monitor, gateway: Globe, observability: Activity,
+  mcp: Plug, voice: MessageSquareText, browser: Monitor,
+  huggingface: Sparkles, security: Shield, robotics: Bot,
 }
 
 async function fetchAll() {
@@ -403,6 +405,49 @@ const totalStars = computed(() => {
     for (const r of cat.repos || []) s += r.stars || 0
   }
   return s
+})
+// ponytail: 🚀 今日星增 — count of repos with stars_today > 0 from any source.
+// Computed from snap directly so the hero tile reflects the same data the /gain tab
+// shows. If this is > 0 but the user hasn't navigated to /gain, the tile shows
+// the count + invites them in (link → goToGain).
+const gainCount = computed(() => {
+  if (!snap.value) return 0
+  const seen = new Set()
+  let n = 0
+  for (const r of snap.value.hot_now || []) {
+    if (r.stars_today && r.stars_today > 0 && !seen.has(r.name)) {
+      seen.add(r.name); n++
+    }
+  }
+  for (const cat of snap.value.categories || []) {
+    for (const r of cat.repos || []) {
+      if (r.stars_today && r.stars_today > 0 && !seen.has(r.name)) {
+        seen.add(r.name); n++
+      }
+    }
+  }
+  return n
+})
+// ponytail: top 5 gainers for the main-page preview (max delta first).
+const topGainers = computed(() => {
+  if (!snap.value) return []
+  const seen = new Set()
+  const all = []
+  for (const r of snap.value.hot_now || []) {
+    if (r.stars_today && r.stars_today > 0 && !seen.has(r.name)) {
+      seen.add(r.name)
+      all.push(r)
+    }
+  }
+  for (const cat of snap.value.categories || []) {
+    for (const r of cat.repos || []) {
+      if (r.stars_today && r.stars_today > 0 && !seen.has(r.name)) {
+        seen.add(r.name)
+        all.push(r)
+      }
+    }
+  }
+  return all.sort((a, b) => (b.stars_today || 0) - (a.stars_today || 0)).slice(0, 5)
 })
 const cmdCount = computed(() => Object.keys(localCmds.value).length)
 const agentCount = computed(() => Object.keys(localAgents.value).length)
@@ -617,12 +662,24 @@ const navTabs = computed(() => [
           双源抓取 · <strong>{{ snap?.categories?.length || 16 }} 个分类</strong> 覆盖 Skills / Plugins /
           Agent / RAG / IDE / Gateway / 可观测性…
         </p>
-        <div v-if="snap" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mt-6 max-w-4xl">
+        <div v-if="snap" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mt-6 max-w-4xl">
           <div class="stat-tile stat-tile-primary">
             <el-icon :size="20" color="#a78bfa"><Sparkles /></el-icon>
             <div class="stat-number">{{ totalRepos }}</div>
             <div class="stat-label">AI 项目池</div>
           </div>
+          <button
+            @click="goToGain"
+            class="stat-tile text-left cursor-pointer hover:!border-emerald-400/60"
+            :class="{ 'stat-tile-gain': gainCount > 0 }"
+            :title="gainCount > 0 ? '点击查看完整今日星增榜单' : '今日尚无 24h 增长数据 — 等下次 crawl'"
+          >
+            <el-icon :size="20" :color="gainCount > 0 ? '#34d399' : '#94a3b8'"><TrendingUp /></el-icon>
+            <div class="stat-number" :class="{ 'opacity-60': gainCount === 0 }">
+              {{ gainCount }}
+            </div>
+            <div class="stat-label">🚀 今日星增</div>
+          </button>
           <div class="stat-tile">
             <el-icon :size="20" color="#34d399"><Folder /></el-icon>
             <div class="stat-number">{{ installedCount }}</div>
@@ -948,6 +1005,53 @@ const navTabs = computed(() => [
 
       <!-- Hot Now -->
       <div class="section-divider"></div>
+
+      <!-- 今日星增 Top 5 — 当 gainCount > 0 时出现在 Hot Now 之前，醒目 -->
+      <section v-if="topGainers.length > 0" id="gain-preview" class="scroll-mt-24 mb-12">
+        <div class="flex items-end justify-between mb-5 flex-wrap gap-3">
+          <div>
+            <div class="flex items-center gap-2 mb-2">
+              <el-icon :size="28" color="#34d399"><TrendingUp /></el-icon>
+              <h2 class="text-3xl font-bold tracking-tight gradient-text">🚀 今日星增 · Top {{ topGainers.length }}</h2>
+            </div>
+            <p class="text-white/60 max-w-2xl">GitHub Trending 抓取的 24h 真实增长 · 由并行 firecrawl+crawl4ai+playwright 三引擎共同提供</p>
+          </div>
+          <el-button type="success" plain :icon="TrendingUp" @click="goToGain">
+            完整榜单 ({{ gainCount }}) →
+          </el-button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div
+            v-for="(r, i) in topGainers"
+            :key="r.name"
+            class="gain-preview-card relative cursor-pointer"
+            :class="{ 'is-installed': r.local_installed }"
+            @click="openRepo(r)"
+          >
+            <span class="absolute top-2 left-2 text-xs font-black text-emerald-300/80 font-mono">#{{ i + 1 }}</span>
+            <h3 class="font-bold text-sm leading-tight mt-4 mb-2 break-all pl-7">{{ r.name }}</h3>
+            <div class="flex items-baseline justify-between mb-2">
+              <span class="gain-delta">+{{ r.stars_today }} ⭐</span>
+              <span class="text-xs text-amber-400 font-mono">总 {{ starsFmt(r.stars) }}</span>
+            </div>
+            <p v-if="r.desc_zh || r.description" class="text-xs text-white/55 leading-snug" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+              {{ (r.desc_zh || r.description || '').slice(0, 90) }}
+            </p>
+            <div class="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+              <div class="flex gap-1 flex-wrap">
+                <span
+                  v-for="t in (r.topics || []).slice(0, 2)"
+                  :key="t"
+                  class="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-white/60 font-mono"
+                >#{{ t }}</span>
+              </div>
+              <span class="text-[10px] text-cyan-400 font-mono">{{ r.lang }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="section-divider"></div>
       <section id="hot" class="scroll-mt-24 mb-16">
         <div class="section-title">🔥 Top 24 · 全站最热</div>
         <p class="text-white/50 text-sm mb-5">按 ⭐ 排序，今日 GitHub 上最火的 AI 项目</p>
@@ -1003,20 +1107,28 @@ const navTabs = computed(() => [
       >
         <div class="flex items-end justify-between mb-5 flex-wrap gap-3">
           <div>
-            <div class="flex items-center gap-2 mb-2">
-              <el-icon :size="28" color="#a78bfa">
-                <component :is="CAT_ICONS[cat.id] || Star" />
-              </el-icon>
+            <div class="flex items-center gap-3 mb-2">
+              <span class="cat-icon-box">
+                <el-icon :size="22" color="#a78bfa">
+                  <component :is="CAT_ICONS[cat.id] || Star" />
+                </el-icon>
+              </span>
               <h2 class="text-3xl font-bold tracking-tight">{{ cat.name }}</h2>
+              <span class="cat-count-chip">{{ cat.repos.length }}</span>
             </div>
             <p class="text-white/60 max-w-2xl">{{ cat.desc_zh || cat.desc }}</p>
           </div>
-          <span class="font-mono text-sm text-white/40">{{ cat.repos.length }} 个项目</span>
+          <el-button size="small" plain @click="catShowAll[cat.id] = !catShowAll[cat.id]" v-if="cat.repos.length > 30">
+            {{ catShowAll[cat.id] ? `收起` : `查看全部 (${cat.repos.length})` }}
+          </el-button>
         </div>
-        <div v-if="cat.repos.length === 0" class="text-center py-12 text-white/40 bg-white/2 rounded-lg border border-dashed border-white/10">
-          <el-icon :size="28" class="mb-2 text-white/30"><Search /></el-icon>
-          <p>该分类暂无 AI 项目</p>
-          <p class="text-xs mt-1 text-white/30">GitHub API 限流或 topic 匹配空. 1 小时后重跑 <code class="text-purple-300/80">radar.py crawl</code></p>
+        <div v-if="cat.repos.length === 0" class="cat-empty-state">
+          <el-icon :size="36" class="mb-3 text-white/30"><Search /></el-icon>
+          <p class="text-base">该分类暂无 AI 项目</p>
+          <p class="text-xs mt-2 text-white/30 max-w-md mx-auto leading-relaxed">
+            GitHub API 限流或 topic 匹配空。1 小时后重跑 <code class="text-purple-300/80">radar.py crawl</code> 或在
+            <code class="text-purple-300/80">radar.py</code> 的 <code class="text-purple-300/80">CATEGORIES</code> 调整该类的查询
+          </p>
         </div>
         <div v-else>
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1055,11 +1167,6 @@ const navTabs = computed(() => [
                 <span class="text-xs text-cyan-400 font-mono">{{ r.lang }}</span>
               </div>
             </div>
-          </div>
-          <div v-if="cat.repos.length > 30" class="text-center mt-4">
-            <el-button size="small" plain @click="catShowAll[cat.id] = !catShowAll[cat.id]">
-              {{ catShowAll[cat.id] ? `收起 (显示 ${cat.repos.length} 个)` : `显示全部 (${cat.repos.length} 个)` }}
-            </el-button>
           </div>
         </div>
       </section>
@@ -1269,21 +1376,22 @@ const navTabs = computed(() => [
           </template>
           <template v-else-if="gainData && gainData.total === 0">
             <template v-if="gainData.note">
-              <el-icon :size="32" class="mb-3 text-amber-400/70"><InfoFilled /></el-icon>
-              <p>{{ gainData.note }}</p>
-              <p class="text-sm mt-2 text-white/40">
-                数据源 <code class="text-purple-300">github.com/trending</code> 需要走 Python urllib 抓取, JS-only 渲染时拿不到.
+              <el-icon :size="40" class="mb-4 text-amber-400/70"><InfoFilled /></el-icon>
+              <p class="text-base">{{ gainData.note }}</p>
+              <p class="text-sm mt-3 text-white/40 max-w-md mx-auto leading-relaxed">
+                数据源 <code class="text-purple-300">github.com/trending</code> 需要走 Python urllib + 可选浏览器引擎并行抓取。装上任意一个爬虫后重跑 <code class="text-purple-300">./radar.py crawl</code> 即可看到星增数据。
               </p>
+              <el-button type="primary" plain class="mt-5" :icon="RefreshCw" @click="refreshAll">
+                现在就触发一次 crawl
+              </el-button>
             </template>
             <template v-else>
-              <p>今天没有增幅 ≥ +{{ gainMinDelta }} 星的 AI 项目。</p>
-              <p class="text-sm mt-2 text-white/30">
-                说明：≥+{{ gainMinDelta }}/天 是真正的"爆款"信号，普通活跃项目达不到这个量级。
+              <el-icon :size="40" class="mb-4 text-white/30"><TrendingUp /></el-icon>
+              <p class="text-base">今天没有增幅 ≥ +{{ gainMinDelta }} 星的 AI 项目。</p>
+              <p class="text-sm mt-3 text-white/40 max-w-md mx-auto leading-relaxed">
+                说明：≥ +{{ gainMinDelta }}/天 是真正的"爆款"信号，普通活跃项目达不到这个量级。试试降低阈值: <code class="text-purple-300">?min_delta=20</code>
               </p>
             </template>
-            <p class="text-sm mt-1 text-white/30">
-              数据来源是 <code class="text-purple-300">github.com/trending</code>，运行 <code class="text-purple-300">./radar.py crawl</code> 重新拉取。
-            </p>
           </template>
           <template v-else>
             <p>暂无星增数据 — 运行 <code class="text-purple-300">./radar.py crawl</code> 拉取首次 trending 数据。</p>
