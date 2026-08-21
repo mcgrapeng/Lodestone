@@ -21,5 +21,12 @@ pg8000>=1.30
 # --- Content extraction ---
 # trafilatura>=1.6         # best-in-class main-content extraction (README, docs)
 #
+# --- Chinese-site-friendly browser (国内站点如掘金/CSDN/知乎 优化) ---
+# DrissionPage>=4.0        # Chromium + requests dual-mode; auto-escalates to Chromium
+#
+# --- Social-media-aware web fetcher (B站/小红书/Twitter/Reddit/YouTube/...) ---
+# agent-reach              # 19 个 channel 的智能 URL 路由; 备用走 Jina Reader 免费 API
+# pip install agent-reach && agent-reach install --env=auto
+#
 # --- Remote API ---
 # firecrawl: no pip needed — set FIRECRAWL_API_KEY in .env, or install the firecrawl CLI
