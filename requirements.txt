@@ -3,9 +3,23 @@
 # --- Postgres mode (recommended: history + 24h star gain + pagination) ---
 pg8000>=1.30
 
-# --- Optional stronger scrapers for github.com/trending (any subset; auto-detected) ---
+# --- Stronger scrapers for github.com/trending (any subset; auto-detected) ---
 # Without these, radar falls back to plain urllib — still works, just less robust
-# on JS-heavy or bot-checked pages. Adapters ported from the youzi skill.
+# on JS-heavy or bot-checked pages. Adapters ported from the youzi skill;
+# 5 additional mainstream crawlers wired into the parallel orchestrator.
+#
+# --- Browser engines ---
 # crawl4ai>=0.5            # then run: crawl4ai-setup
 # playwright>=1.45         # then run: playwright install chromium
+# playwright-stealth>=2.0  # anti-bot-detection patches; requires playwright + chromium
+#
+# --- HTTP clients (lightweight, parallel-friendly) ---
+# httpx>=0.27              # modern async HTTP/2 client, faster than urllib
+# cloudscraper>=1.2.70     # Cloudflare "Checking your browser..." bypass
+# beautifulsoup4>=4.12     # robust HTML parsing when regex fails
+#
+# --- Content extraction ---
+# trafilatura>=1.6         # best-in-class main-content extraction (README, docs)
+#
+# --- Remote API ---
 # firecrawl: no pip needed — set FIRECRAWL_API_KEY in .env, or install the firecrawl CLI

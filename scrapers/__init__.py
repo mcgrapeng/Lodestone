@@ -30,7 +30,16 @@ import asyncio
 import inspect
 import sys
 
-_ENGINE_ORDER = ("firecrawl", "crawl4ai", "playwright")
+_ENGINE_ORDER = (
+    "firecrawl",
+    "crawl4ai",
+    "playwright",
+    "playwright_stealth",
+    "cloudscraper",
+    "httpx",
+    "trafilatura",
+    "beautifulsoup",
+)
 _PRIORITY = {name: i for i, name in enumerate(_ENGINE_ORDER)}
 
 
