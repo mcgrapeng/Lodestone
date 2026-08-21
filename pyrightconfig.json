@@ -1,0 +1,24 @@
+{
+  "include": [
+    "radar.py",
+    "db",
+    "scrapers",
+    "frontend/src"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "data",
+    "frontend/node_modules",
+    "frontend/dist"
+  ],
+  "reportMissingImports": "warning",
+  "reportOptionalSubscript": "none",
+  "reportOptionalOperand": "none",
+  "reportOptionalIterable": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportOptionalContains": "none",
+  "reportOptionalNotIterable": "none",
+  "reportAttributeAccessIssue": "warning",
+  "pythonVersion": "3.10",
+  "stubPath": ""
+}

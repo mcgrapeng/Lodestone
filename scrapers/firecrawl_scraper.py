@@ -15,6 +15,8 @@ import os
 import subprocess
 import urllib.request
 
+from .config_loader import get_timeout
+
 
 def is_available() -> bool:
     if os.environ.get("FIRECRAWL_API_KEY"):
@@ -26,10 +28,13 @@ def is_available() -> bool:
         return False
 
 
-async def _async_scrape(url: str, timeout: int = 120) -> dict:
-    """Async-safe core: CLI first (logged-in user), then REST API. timeout = seconds.
+async def _async_scrape(url: str, timeout: int = 60) -> dict:
+    """Async-safe core: CLI first (logged-in user), then REST API.
+    timeout = seconds (0 → load from config.toml [timeouts].firecrawl).
     Pure sync internally (subprocess + urllib); the orchestrator wraps this in
     asyncio.to_thread() so it doesn't block the event loop."""
+    if not timeout:
+        timeout = get_timeout("firecrawl", 120)
     # === CLI ===
     try:
         probe = subprocess.run(["which", "firecrawl"], capture_output=True, timeout=5)
@@ -93,8 +98,11 @@ async def _async_scrape(url: str, timeout: int = 120) -> dict:
     }
 
 
-def scrape(url: str, timeout: int = 120) -> dict:
-    """Sync entry point — wraps the async core via asyncio.run. For CLI / serial use."""
+def scrape(url: str, timeout: int = 60) -> dict:
+    """Sync entry point — wraps the async core via asyncio.run. For CLI / serial use.
+    Pass 0 to load the default from config.toml [timeouts].firecrawl."""
+    if not timeout:
+        timeout = get_timeout("firecrawl", 120)
     try:
         return asyncio.run(_async_scrape(url, timeout))
     except Exception as e:

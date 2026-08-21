@@ -13,6 +13,8 @@ Install: pip install DrissionPage
 
 import asyncio
 
+from .config_loader import get_timeout
+
 
 def is_available() -> bool:
     try:
@@ -26,8 +28,10 @@ def is_available() -> bool:
 async def _async_scrape(url: str, timeout: int = 60) -> dict:
     """Fetch via DrissionPage's dual mode: try SessionPage (requests) and
     escalate to ChromiumPage if the response looks JS-rendered.
-    timeout = seconds.
+    timeout = seconds (0 → load from config.toml [timeouts].drissionpage).
     """
+    if not timeout:
+        timeout = get_timeout("drissionpage", 60)
     try:
         from DrissionPage import SessionPage
 
@@ -70,7 +74,9 @@ async def _async_scrape(url: str, timeout: int = 60) -> dict:
 
 
 def scrape(url: str, timeout: int = 60) -> dict:
-    """Sync entry — wraps the async core via asyncio.run."""
+    """Sync entry — wraps the async core via asyncio.run. Pass 0 to use config default."""
+    if not timeout:
+        timeout = get_timeout("drissionpage", 60)
     try:
         return asyncio.run(_async_scrape(url, timeout))
     except Exception as e:

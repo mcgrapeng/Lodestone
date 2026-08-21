@@ -1,0 +1,94 @@
+# lodestone · 爬虫引擎配置
+# ──────────────────────────────────────────────────────────────────
+# 所有 engine 的超时 / User-Agent / 优先级 / 选择策略都在这里改
+# 不需要改 Python 代码，重启 `./radar.py crawl` 或 dev server 生效
+#
+# Secrets (FIRECRAWL_API_KEY 等) 不在本文件 — 放 .env（已 gitignore）
+# ──────────────────────────────────────────────────────────────────
+
+[orchestrator]
+# 单次 fetch 的整体超时（秒）— 一个 fetch 同时跑所有 engine，最长等这么久
+wall_clock_timeout = 60
+# HTML 选择策略：
+#   "longest"  — 最长 HTML 胜出（默认；engine 互补互补）
+#   "first"    — 第一个非空 HTML 胜出（节省资源）
+selection_strategy = "longest"
+# 低于此长度的响应视为 bot-check 页面（跳过不计分）
+min_html_length = 500
+# Engine 优先级（数组顺序）。相同长度 HTML 按此顺序选优。
+# 注释或删除任一行 → 跳过该 engine。
+priority = [
+    "firecrawl",
+    "crawl4ai",
+    "playwright",
+    "playwright_stealth",
+    "cloudscraper",
+    "httpx",
+    "trafilatura",
+    "beautifulsoup",
+    "drissionpage",
+    "agent_reach",
+]
+
+# ─────────────────────────────────────────
+# 每个 engine 的超时（秒）。None = 用代码里的默认。
+# ─────────────────────────────────────────
+[timeouts]
+firecrawl         = 120
+crawl4ai          = 120
+playwright        = 60
+playwright_stealth = 60
+cloudscraper      = 90
+httpx             = 60
+trafilatura       = 60
+beautifulsoup     = 30
+drissionpage      = 60
+agent_reach       = 60
+
+# ─────────────────────────────────────────
+# User-Agent（每个 engine）。空字符串 = 用代码默认值。
+# ─────────────────────────────────────────
+[user_agents]
+firecrawl         = "Mozilla/5.0 (lodestone/firecrawl)"
+crawl4ai          = "Mozilla/5.0 (lodestone/crawl4ai)"
+playwright        = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+playwright_stealth = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+cloudscraper      = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+httpx             = "Mozilla/5.0 (lodestone/httpx)"
+trafilatura       = "Mozilla/5.0 (lodestone/trafilatura)"
+beautifulsoup     = "Mozilla/5.0 (lodestone/bs4)"
+drissionpage      = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+agent_reach       = "Mozilla/5.0 (lodestone/agent-reach)"
+
+# ─────────────────────────────────────────
+# Playwright 浏览器参数（JSON 数组）
+# ─────────────────────────────────────────
+[playwright]
+browser_args = ["--no-sandbox"]
+# 是否 stealth（playwright_stealth.py 强制 True，不可关）
+headless = true
+
+# ─────────────────────────────────────────
+# cloudscraper 浏览器伪装
+# ─────────────────────────────────────────
+[cloudscraper]
+browser = "chrome"
+platform = "linux"
+desktop = true
+
+# ─────────────────────────────────────────
+# Agent-Reach
+# ─────────────────────────────────────────
+[agent_reach]
+# True = 优先用 Python 库；False = 直接调 Jina Reader API
+prefer_python_lib = true
+# Jina Reader 的 X-Return-Format header 值（markdown | html | text）
+jina_format = "markdown"
+
+# ─────────────────────────────────────────
+# crawl4ai
+# ─────────────────────────────────────────
+[crawl4ai]
+# 是否启用 LLM 提取（需要 ANTHROPIC_API_KEY / OPENAI_API_KEY）
+# 当前 lodestone 不用 LLM 提取，永远 False
+llm_extraction = false

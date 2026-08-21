@@ -10,6 +10,8 @@ Install: pip install trafilatura
 
 import asyncio
 
+from .config_loader import get_timeout
+
 
 def is_available() -> bool:
     try:
@@ -22,13 +24,15 @@ def is_available() -> bool:
 
 async def _async_scrape(url: str, timeout: int = 60) -> dict:
     """Fetch URL via trafilatura (which uses its own session) and extract
-    main content as markdown. Returns dict with markdown + metadata.
+    main content as markdown. timeout = seconds (0 → load from config.toml).
 
     ponytail: trafilatura is sync (uses requests-html under the hood); wrap in
     to_thread so it doesn't block the orchestrator's event loop. The result
     `markdown` is the cleaned main content; UI may surface it as a 'content'
     alternative to raw HTML when the page is JS-rendered.
     """
+    if not timeout:
+        timeout = get_timeout("trafilatura", 60)
     try:
         import trafilatura
 
@@ -76,6 +80,8 @@ async def _async_scrape(url: str, timeout: int = 60) -> dict:
 
 def scrape(url: str, timeout: int = 60) -> dict:
     """Sync entry — wraps the async core via asyncio.run."""
+    if not timeout:
+        timeout = get_timeout("trafilatura", 60)
     try:
         return asyncio.run(_async_scrape(url, timeout))
     except Exception as e:

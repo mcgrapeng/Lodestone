@@ -10,6 +10,8 @@ Exposes both `scrape(url, timeout)` (sync, wraps asyncio.run) and
 
 import asyncio
 
+from .config_loader import get_timeout, get_user_agent, load_config
+
 _UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
@@ -26,16 +28,22 @@ def is_available() -> bool:
 
 
 async def _async_scrape(url: str, timeout: int = 60) -> dict:
-    """Fetch fully-rendered HTML. timeout = seconds."""
+    """Fetch fully-rendered HTML. timeout = seconds (0 → load from config.toml)."""
+    if not timeout:
+        timeout = get_timeout("playwright", 60)
     timeout_ms = timeout * 1000
+    ua = get_user_agent("playwright", _UA)
+    pw_cfg = load_config().get("playwright", {})
+    browser_args = pw_cfg.get("browser_args", ["--no-sandbox"])
+    headless = pw_cfg.get("headless", True)
     try:
         from playwright.async_api import async_playwright
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+            browser = await p.chromium.launch(headless=headless, args=browser_args)
             try:
                 page = await browser.new_page(
-                    user_agent=_UA, viewport={"width": 1920, "height": 1080}
+                    user_agent=ua, viewport={"width": 1920, "height": 1080}
                 )
                 page.set_default_timeout(timeout_ms)
                 await page.goto(url, wait_until="domcontentloaded")
@@ -60,5 +68,8 @@ async def _async_scrape(url: str, timeout: int = 60) -> dict:
 
 
 def scrape(url: str, timeout: int = 60) -> dict:
-    """Sync entry point — wraps the async core via asyncio.run. For CLI / serial use."""
+    """Sync entry point — wraps the async core via asyncio.run. For CLI / serial use.
+    Pass 0 to load the default from config.toml [timeouts].playwright."""
+    if not timeout:
+        timeout = get_timeout("playwright", 60)
     return asyncio.run(_async_scrape(url, timeout))

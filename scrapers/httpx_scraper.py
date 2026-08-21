@@ -11,6 +11,8 @@ Install: pip install httpx
 
 import asyncio
 
+from .config_loader import get_timeout, get_user_agent
+
 
 def is_available() -> bool:
     try:
@@ -22,9 +24,12 @@ def is_available() -> bool:
 
 
 async def _async_scrape(url: str, timeout: int = 60) -> dict:
-    """Async GET via httpx. timeout = seconds. Returns raw text as 'html'
-    (httpx doesn't differentiate — caller decides how to parse).
+    """Async GET via httpx. timeout = seconds (0 → load from config.toml).
+    Returns raw text as 'html' (httpx doesn't differentiate — caller decides how to parse).
     """
+    if not timeout:
+        timeout = get_timeout("httpx", 60)
+    ua = get_user_agent("httpx", "Mozilla/5.0 (lodestone/httpx)")
     try:
         import httpx
 
@@ -33,7 +38,7 @@ async def _async_scrape(url: str, timeout: int = 60) -> dict:
                 http2=False,  # requires h2 package; default off so it stays a zero-dep option
                 follow_redirects=True,
                 timeout=timeout,
-                headers={"User-Agent": "Mozilla/5.0 (lodestone/httpx)"},
+                headers={"User-Agent": ua},
             ) as client
         ):
             r = await client.get(url)
@@ -54,6 +59,8 @@ async def _async_scrape(url: str, timeout: int = 60) -> dict:
 
 def scrape(url: str, timeout: int = 60) -> dict:
     """Sync entry — wraps the async core via asyncio.run."""
+    if not timeout:
+        timeout = get_timeout("httpx", 60)
     try:
         return asyncio.run(_async_scrape(url, timeout))
     except Exception as e:

@@ -30,18 +30,14 @@ import asyncio
 import inspect
 import sys
 
-_ENGINE_ORDER = (
-    "firecrawl",
-    "crawl4ai",
-    "playwright",
-    "playwright_stealth",
-    "cloudscraper",
-    "httpx",
-    "trafilatura",
-    "beautifulsoup",
-    "drissionpage",
-    "agent_reach",
+from .config_loader import (
+    get_priority,
+    get_wall_clock_timeout,
 )
+
+# ponytail: _ENGINE_ORDER is now derived from config.toml (orchestrator.priority).
+# Adapter code reads per-engine timeouts / UAs via config_loader — no hardcoded values.
+_ENGINE_ORDER = tuple(get_priority())
 _PRIORITY = {name: i for i, name in enumerate(_ENGINE_ORDER)}
 
 
@@ -182,7 +178,11 @@ def fetch_html(
     `strategy='parallel'` — every available engine runs concurrently; longest HTML wins.
     Returns (html, engine_name); ("", "none") when all fail."""
     if strategy == "parallel":
-        return fetch_html_parallel(url, timeout=min(timeout, 90))
+        # ponytail: parallel mode uses orchestrator.wall_clock_timeout from
+        # config.toml (default 60s) — caller's `timeout` arg still acts as a
+        # per-call ceiling that never exceeds the config value.
+        cap = min(timeout, get_wall_clock_timeout())
+        return fetch_html_parallel(url, timeout=cap)
     for name, fn in _engines():
         try:
             r = fn(url, timeout=timeout)

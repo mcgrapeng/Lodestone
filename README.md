@@ -44,6 +44,24 @@ pip install playwright && playwright install chromium   # 本地 Chromium 兜底
 # firecrawl：无需 pip —— .env 里设 FIRECRAWL_API_KEY，或已装 firecrawl CLI 即可
 ```
 
+**所有爬虫的配置（timeouts / User-Agent / 优先级 / 选择策略）都在
+`config.toml` 里** —— 改完重启即生效，不需要碰代码。Secret (API key)
+仍然放 `.env`。
+
+```toml
+[orchestrator]
+wall_clock_timeout = 60     # 一次 fetch 的整体超时（秒）
+selection_strategy = "longest"  # "longest" | "first"
+
+[timeouts]   # 每个 engine 的超时（秒）
+firecrawl = 120
+playwright = 60
+trafilatura = 60
+...
+
+[user_agents] # 每个 engine 的 HTTP User-Agent
+```
+
 不装任何爬虫时自动回退 stdlib urllib，功能不中断。
 
 依赖：Python 3.10+、`gh` CLI 已认证（`gh auth status`）、网络可达 github.com + translate.googleapis.com。

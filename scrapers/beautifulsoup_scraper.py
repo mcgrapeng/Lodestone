@@ -12,6 +12,8 @@ Install: pip install beautifulsoup4
 
 import asyncio
 
+from .config_loader import get_timeout, get_user_agent
+
 
 def is_available() -> bool:
     try:
@@ -22,18 +24,19 @@ def is_available() -> bool:
         return False
 
 
-async def _async_scrape(url: str, timeout: int = 30) -> dict:
+async def _async_scrape(url: str, timeout: int = 60) -> dict:
     """Fetch via urllib then parse+reserialize through BeautifulSoup. The
     'html' field is the cleaned HTML — drop-in replacement for the raw
-    GitHub Trending HTML.
+    GitHub Trending HTML. timeout = seconds (0 → load from config.toml).
     """
+    if not timeout:
+        timeout = get_timeout("beautifulsoup", 30)
+    ua = get_user_agent("beautifulsoup", "Mozilla/5.0 (lodestone/bs4)")
     try:
         import urllib.request
 
         def _do():
-            req = urllib.request.Request(
-                url, headers={"User-Agent": "Mozilla/5.0 (lodestone/bs4)"}
-            )
+            req = urllib.request.Request(url, headers={"User-Agent": ua})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 raw = resp.read().decode("utf-8", errors="replace")
             try:
@@ -54,8 +57,10 @@ async def _async_scrape(url: str, timeout: int = 30) -> dict:
         }
 
 
-def scrape(url: str, timeout: int = 30) -> dict:
+def scrape(url: str, timeout: int = 60) -> dict:
     """Sync entry — wraps the async core via asyncio.run."""
+    if not timeout:
+        timeout = get_timeout("beautifulsoup", 30)
     try:
         return asyncio.run(_async_scrape(url, timeout))
     except Exception as e:

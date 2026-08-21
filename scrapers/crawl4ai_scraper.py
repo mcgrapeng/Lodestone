@@ -10,6 +10,8 @@ Exposes both `scrape(url, timeout)` (sync, wraps asyncio.run) and
 
 import asyncio
 
+from .config_loader import get_timeout, get_user_agent
+
 
 def is_available() -> bool:
     try:
@@ -20,14 +22,16 @@ def is_available() -> bool:
         return False
 
 
-async def _async_scrape(url: str, timeout: int = 120) -> dict:
-    """Fetch rendered HTML via headless Chromium. timeout = seconds (per-page budget)."""
+async def _async_scrape(url: str, timeout: int = 60) -> dict:
+    """Fetch rendered HTML via headless Chromium. timeout = seconds (per-page budget).
+    Pass 0 to load the default from config.toml [timeouts].crawl4ai."""
+    if not timeout:
+        timeout = get_timeout("crawl4ai", 120)
+    ua = get_user_agent("crawl4ai", "Mozilla/5.0 (lodestone/crawl4ai)")
     try:
         from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 
-        config = BrowserConfig(
-            headless=True, user_agent="Mozilla/5.0 (lodestone/crawl4ai)"
-        )
+        config = BrowserConfig(headless=True, user_agent=ua)
         # ponytail: page_timeout=ms — honors the per-engine budget in parallel mode so a stuck
         # crawl4ai can't hold the orchestrator past its overall deadline.
         run_cfg = CrawlerRunConfig(page_timeout=timeout * 1000)
@@ -45,6 +49,9 @@ async def _async_scrape(url: str, timeout: int = 120) -> dict:
         }
 
 
-def scrape(url: str, timeout: int = 120) -> dict:
-    """Sync entry point — wraps the async core via asyncio.run. For CLI / serial use."""
+def scrape(url: str, timeout: int = 60) -> dict:
+    """Sync entry point — wraps the async core via asyncio.run. For CLI / serial use.
+    Pass 0 to load the default from config.toml [timeouts].crawl4ai."""
+    if not timeout:
+        timeout = get_timeout("crawl4ai", 120)
     return asyncio.run(_async_scrape(url, timeout))
