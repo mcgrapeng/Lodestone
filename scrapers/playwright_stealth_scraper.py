@@ -49,7 +49,9 @@ async def _async_scrape(url: str, timeout: int = 60) -> dict:
     headless = pw_cfg.get("headless", True)
     try:
         from playwright.async_api import async_playwright
-        from playwright_stealth import stealth_async
+        # ponytail: playwright_stealth v2+ switched from `stealth_async(page)` to
+        # `Stealth().apply_stealth_async(page_or_context)` — older name is gone.
+        from playwright_stealth import Stealth
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(
@@ -64,7 +66,7 @@ async def _async_scrape(url: str, timeout: int = 60) -> dict:
                 )
                 page = await context.new_page()
                 # ponytail: apply stealth patches BEFORE first navigation
-                await stealth_async(page)
+                await Stealth().apply_stealth_async(page)
                 page.set_default_timeout(timeout_ms)
                 await page.goto(url, wait_until="domcontentloaded")
                 try:

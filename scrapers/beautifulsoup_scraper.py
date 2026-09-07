@@ -11,6 +11,7 @@ Install: pip install beautifulsoup4
 """
 
 import asyncio
+import subprocess
 
 from .config_loader import get_timeout, get_user_agent
 
@@ -36,9 +37,26 @@ async def _async_scrape(url: str, timeout: int = 60) -> dict:
         import urllib.request
 
         def _do():
-            req = urllib.request.Request(url, headers={"User-Agent": ua})
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                raw = resp.read().decode("utf-8", errors="replace")
+            # ponytail: macOS Python lacks system certs — try urllib first, then
+            # fall back to system `curl` which uses the OS keychain.
+            raw = ""
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": ua})
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+            except Exception:
+                try:
+                    out = subprocess.run(
+                        ["curl", "-q", "-sSL", "--max-time", str(timeout),
+                         "-A", ua, url],
+                        capture_output=True, text=True, timeout=timeout + 5,
+                    )
+                    if out.returncode == 0 and out.stdout:
+                        raw = out.stdout
+                except Exception:
+                    pass
+            if not raw:
+                return {"success": False, "html": "", "error": "beautifulsoup: fetch failed"}
             try:
                 from bs4 import BeautifulSoup
 

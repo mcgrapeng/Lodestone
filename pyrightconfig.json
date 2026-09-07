@@ -3,6 +3,7 @@
     "radar.py",
     "db",
     "scrapers",
+    "sources",
     "frontend/src"
   ],
   "exclude": [

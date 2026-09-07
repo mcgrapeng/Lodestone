@@ -17,6 +17,7 @@ Agent-Reach setup: agent-reach install --env=auto
 """
 
 import asyncio
+import subprocess
 
 from .config_loader import get_timeout, get_user_agent, load_config
 
@@ -63,19 +64,35 @@ async def _async_scrape(url: str, timeout: int = 60) -> dict:
             except Exception:
                 pass
         # Fallback: Jina Reader directly. Free public API, returns clean markdown.
+        # ponytail: macOS Python SSL cert issue — try urllib first, fall back to curl.
         jina_url = f"https://r.jina.ai/{url}"
-        req = urllib.request.Request(
-            jina_url,
-            headers={
-                "User-Agent": get_user_agent(
-                    "agent_reach", "Mozilla/5.0 (lodestone/agent-reach)"
-                ),
-                "X-Return-Format": jina_format,
-                "X-Timeout": str(timeout),
-            },
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            markdown = resp.read().decode("utf-8", errors="replace")
+        ua = get_user_agent("agent_reach", "Mozilla/5.0 (lodestone/agent-reach)")
+        markdown = ""
+        try:
+            req = urllib.request.Request(
+                jina_url,
+                headers={
+                    "User-Agent": ua,
+                    "X-Return-Format": jina_format,
+                    "X-Timeout": str(timeout),
+                },
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                markdown = resp.read().decode("utf-8", errors="replace")
+        except Exception:
+            try:
+                out = subprocess.run(
+                    ["curl", "-q", "-sSL", "--max-time", str(timeout),
+                     "-A", ua,
+                     "-H", f"X-Return-Format: {jina_format}",
+                     "-H", f"X-Timeout: {timeout}",
+                     jina_url],
+                    capture_output=True, text=True, timeout=timeout + 5,
+                )
+                if out.returncode == 0 and out.stdout:
+                    markdown = out.stdout
+            except Exception:
+                pass
         if markdown:
             return {
                 "success": True,

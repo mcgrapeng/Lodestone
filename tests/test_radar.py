@@ -12,7 +12,11 @@ import radar
 
 
 def test_install_skill_from_github_accepts_owner_repo():
-    """Bug: name='obra/superpowers' was rejected by old alnum-only check."""
+    """Bug: name='obra/superpowers' was rejected by old alnum-only check.
+
+    ponytail: 2026-08 — install_skill_from_github now returns a dict
+    {targets, cache_path} instead of a single path string.
+    """
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         cache = tmp / "cache"
@@ -26,10 +30,13 @@ def test_install_skill_from_github_accepts_owner_repo():
                 # Pre-create the cache target so the function skips git clone
                 target = cache / "superpowers"
                 target.mkdir(parents=True)
-                path = radar.install_skill_from_github(
+                result = radar.install_skill_from_github(
                     "obra/superpowers", "https://github.com/obra/superpowers"
                 )
-                assert path.endswith("superpowers")
+                # 2026-08 — dict return with cache + targets
+                assert isinstance(result, dict)
+                assert str(result.get("cache", "")).endswith("superpowers")
+                assert "targets" in result
                 # Sidecar must be written
                 origins = json.loads((cache.parent / "origins.json").read_text())
                 assert origins["skills"]["superpowers"]["owner"] == "obra"
@@ -284,6 +291,80 @@ def test_top_5k_plus_data_shape():
         assert by_name[0]["name"] == "owner/repo0"
         by_recent = sorted(repos, key=lambda r: r.get("pushed", ""), reverse=True)
         assert by_recent[0]["pushed"] == "2026-07-20"
+
+
+def test_is_ai_relevant_blocks_finance_domain():
+    """产品定位 = AI 应用开发雷达：股票/金融/交易类一律排除（即使 AI 驱动）。"""
+    trading_agents = {
+        "name": "TauricResearch/TradingAgents",
+        "desc": "Multi-agent LLM trading framework",
+        "topics": ["finance", "trading", "llm", "multi-agent"],
+    }
+    assert radar.is_ai_relevant(trading_agents) is False
+
+    finrobot = {
+        "name": "AI4Finance-Foundation/FinRobot",
+        "desc": "AI agent for financial markets",
+        "topics": ["finance", "agent"],
+    }
+    assert radar.is_ai_relevant(finrobot) is False
+
+    # 描述级短语（没有 blocklist topic 也能拦）
+    desc_only = {
+        "name": "x/QuantTrader",
+        "desc": "LLM-powered algorithmic trading system",
+        "topics": ["llm"],
+    }
+    assert radar.is_ai_relevant(desc_only) is False
+
+
+def test_is_ai_relevant_no_finance_false_positives():
+    """quantization / quantum 等含 quant 的 AI 术语不得误伤。"""
+    llama_factory = {
+        "name": "hiyouga/LlamaFactory",
+        "desc": "Unified fine-tuning of LLMs",
+        "topics": ["quantization", "llm", "fine-tuning"],
+    }
+    assert radar.is_ai_relevant(llama_factory) is True
+
+    quantum = {"name": "QuantumNous/new-api", "desc": "LLM API gateway", "topics": ["llm"]}
+    assert radar.is_ai_relevant(quantum) is True
+
+
+def test_finance_block_sparing_for_category_results():
+    """分类路径只用 is_finance_blocked（query 本身是 AI 信号）—
+    Qwen-VL / playwright-mcp 这类 topics 变体不在 AI_TOPIC_HARD 的正经项目不被误伤。"""
+    qwen_vl = {
+        "name": "QwenLM/Qwen-VL",
+        "desc": "The official repo of Qwen-VL chat & pretrained large vision language model",
+        "topics": ["large-language-models", "vision-language-model"],
+    }
+    assert radar.is_finance_blocked(qwen_vl) is False
+
+    pw_mcp = {
+        "name": "microsoft/playwright-mcp",
+        "desc": "Playwright MCP server",
+        "topics": ["mcp", "playwright"],
+    }
+    assert radar.is_finance_blocked(pw_mcp) is False
+
+    trading = {
+        "name": "TauricResearch/TradingAgents",
+        "desc": "Multi-agent LLM trading framework",
+        "topics": ["finance", "trading"],
+    }
+    assert radar.is_finance_blocked(trading) is True
+
+
+def test_normalize_git_url_dedup_key():
+    """去重规则 = git 完整仓库地址：大小写/.git/尾斜杠/www 变体归并为同一键。"""
+    f = radar.normalize_git_url
+    assert f("https://github.com/Owner/Repo") == f("https://www.github.com/owner/repo/")
+    assert f("https://github.com/owner/repo.git") == f("gh://owner/repo")
+    assert f("https://github.com/Owner/Repo") == "gh://owner/repo"
+    # 非 GitHub 地址保持域名区分
+    assert f("https://huggingface.co/spaces/a/b") == "https://huggingface.co/spaces/a/b"
+    assert f("") == ""
 
 
 if __name__ == "__main__":

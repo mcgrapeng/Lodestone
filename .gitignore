@@ -231,3 +231,6 @@ docs
 .playwright-mcp
 .claude
 .env
+graphify-out
+.code-review-graph
+storage

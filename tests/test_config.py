@@ -7,26 +7,20 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 def test_load_config_returns_all_sections():
-    """Default config has all 10 engines + orchestrator + browser-specific blocks."""
+    """timeouts/user_agents 仍为全部 14 个适配器保留配置（停用的可随时重启）。"""
     from scrapers.config_loader import load_config
 
     cfg = load_config()
     assert "orchestrator" in cfg
     assert "timeouts" in cfg
     assert "user_agents" in cfg
-    # All 10 engines tracked
+    # 超时/UA 配置覆盖所有适配器（含 2026-09 停用的 10 个 — 重新启用无需补配置）
     engines = set(cfg["timeouts"].keys())
     assert engines == {
-        "firecrawl",
-        "crawl4ai",
-        "playwright",
-        "playwright_stealth",
-        "cloudscraper",
-        "httpx",
-        "trafilatura",
-        "beautifulsoup",
-        "drissionpage",
-        "agent_reach",
+        "httpx", "cloudscraper", "playwright_stealth", "jina",
+        "firecrawl", "crawl4ai", "playwright", "nodriver",
+        "crawlee", "scrapy", "agent_reach", "trafilatura",
+        "beautifulsoup", "drissionpage",
     }, f"missing engines: {engines}"
 
 
@@ -44,13 +38,19 @@ def test_get_timeout_falls_back_to_default_for_unknown_engine():
     assert get_timeout("nonexistent_engine_xyz", default=99) == 99
 
 
-def test_get_priority_returns_all_engines():
+def test_get_priority_returns_curated_engines():
+    """2026-09：priority 白名单收敛为 4 个精选引擎，轻→重排序（httpx 打头）。"""
     from scrapers.config_loader import get_priority
 
     priority = get_priority()
-    assert len(priority) >= 10
-    # firecrawl should be first (highest priority)
-    assert priority[0] == "firecrawl"
+    assert priority == ["httpx", "cloudscraper", "playwright_stealth", "jina"]
+
+
+def test_selection_strategy_defaults_to_tiered():
+    """默认编排 = tiered（分级 fallback + 质量门）。"""
+    from scrapers.config_loader import get_selection_strategy
+
+    assert get_selection_strategy() == "tiered"
 
 
 def test_get_user_agent_returns_string():

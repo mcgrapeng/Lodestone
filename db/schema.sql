@@ -29,6 +29,13 @@ ALTER TABLE repos ADD COLUMN IF NOT EXISTS stars_today INT;  -- github.com/trend
 CREATE INDEX IF NOT EXISTS idx_repos_trending ON repos(trending) WHERE trending;
 CREATE INDEX IF NOT EXISTS idx_repos_stars_today ON repos(stars_today DESC) WHERE stars_today IS NOT NULL;
 
+-- ponytail: 2026-08 — comprehensive Chinese descriptions + traceability.
+-- readme_zh = translated README first paragraphs; readme_zh_source = provenance
+-- (GitHub raw URL + fetch timestamp + translator); readme_zh_at = last translation time.
+ALTER TABLE repos ADD COLUMN IF NOT EXISTS readme_zh TEXT;
+ALTER TABLE repos ADD COLUMN IF NOT EXISTS readme_zh_source TEXT;
+ALTER TABLE repos ADD COLUMN IF NOT EXISTS readme_zh_at TIMESTAMPTZ;
+
 CREATE TABLE IF NOT EXISTS repo_categories (
   repo_name    TEXT NOT NULL REFERENCES repos(name) ON DELETE CASCADE,
   category_id  TEXT NOT NULL,

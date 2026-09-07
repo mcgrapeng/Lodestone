@@ -9,6 +9,7 @@ still runs out of the box. If a section/key is missing, the adapter's own
 default kicks in (defense in depth).
 """
 
+import functools
 import sys
 from pathlib import Path
 
@@ -25,7 +26,7 @@ def _load_toml(path: Path) -> dict:
     # ponytail: Python 3.10 fallback. tomli ships a built-in module name conflict
     # so we use it as an import-only shim; tomli is BSD-licensed pure Python.
     try:
-        import tomli as tomllib
+        import tomli as tomllib  # type: ignore[import-not-found]
 
         with open(path, "rb") as f:
             return tomllib.load(f)
@@ -35,22 +36,18 @@ def _load_toml(path: Path) -> dict:
 
 # ponytail: hardcoded defaults — used when config.toml is missing or malformed.
 # Matches config.toml values; keep in sync.
+# 2026-09：引擎 14 → 4（本地轻 → 本地挑战破解 → 本地真浏览器 → 云端），
+# 默认编排改为 tiered（分级 fallback + 质量门）。
 _DEFAULTS: dict = {
     "orchestrator": {
         "wall_clock_timeout": 60,
-        "selection_strategy": "longest",
+        "selection_strategy": "tiered",
         "min_html_length": 500,
         "priority": [
-            "firecrawl",
-            "crawl4ai",
-            "playwright",
-            "playwright_stealth",
-            "cloudscraper",
             "httpx",
-            "trafilatura",
-            "beautifulsoup",
-            "drissionpage",
-            "agent_reach",
+            "cloudscraper",
+            "playwright_stealth",
+            "jina",
         ],
     },
     "timeouts": {
@@ -58,6 +55,10 @@ _DEFAULTS: dict = {
         "crawl4ai": 120,
         "playwright": 60,
         "playwright_stealth": 60,
+        "nodriver": 90,
+        "jina": 45,
+        "crawlee": 90,
+        "scrapy": 90,
         "cloudscraper": 90,
         "httpx": 60,
         "trafilatura": 60,
@@ -79,6 +80,13 @@ def load_config() -> dict:
     Returns the merged config dict; each section is independent so a missing
     section doesn't break the others.
     """
+    # ponytail: lru_cache — orchestrator runs 10 engines × multiple config reads per
+    # fetch = 100s of TOML parses per scrape. Cache once per process.
+    return _load_config_cached()
+
+
+@functools.lru_cache(maxsize=1)
+def _load_config_cached() -> dict:
     if not _CONFIG_PATH.exists():
         return _DEFAULTS
     try:
@@ -118,7 +126,7 @@ def get_wall_clock_timeout(default: int = 60) -> int:
     return cfg.get("orchestrator", {}).get("wall_clock_timeout", default)
 
 
-def get_selection_strategy(default: str = "longest") -> str:
+def get_selection_strategy(default: str = "tiered") -> str:
     cfg = load_config()
     return cfg.get("orchestrator", {}).get("selection_strategy", default)
 

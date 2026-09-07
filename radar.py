@@ -27,6 +27,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import db  # ponytail: PG is source of truth (was: data/latest.json)
 
+# ponytail: .env → os.environ（GH_TOKEN/GITHUB_TOKEN/JINA_API_KEY/FIRECRAWL_API_KEY）。
+# gh CLI 原生识别 GH_TOKEN — 是 gh auth login 过期后的非交互替代。
+try:
+    from env_loader import load_env as _load_env
+
+    _load_env()
+except Exception:
+    pass
+
 ROOT = Path(__file__).parent
 DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
@@ -46,6 +55,18 @@ CATEGORIES = [
             "topic:claude-code stars:>300",
             "topic:mcp-server stars:>200",
             "agent in:name,description stars:>1000",
+            # 2026-09 用户赛道清单：Skills 生态 + 反AI味
+            "topic:claude-skills stars:>20",
+            "topic:agent-skills stars:>20",
+            "skills-hub in:name stars:>50",
+            "awesome-agent-skills in:name stars:>100",
+            "topic:anti-slop stars:>20",
+            "stop-slop in:name,description stars:>20",
+            "hermes in:name topic:agent stars:>100",
+            # 2026-09 生态地图：Agent SDK / 沙箱隔离
+            "openai-agents in:name stars:>500",
+            "topic:agent-sdk stars:>100",
+            "topic:sandbox topic:agent stars:>100",
         ],
     },
     {
@@ -57,6 +78,12 @@ CATEGORIES = [
             "topic:vector-database stars:>500",
             "topic:llm-memory stars:>100",
             "agent-memory in:name,description stars:>200",
+            # 2026-09 记忆/上下文深挖赛道
+            "supermemory in:name stars:>100",
+            "memvid in:name stars:>50",
+            "topic:context-compression stars:>30",
+            "deep-searcher in:name stars:>100",
+            "khoj in:name stars:>1000",
         ],
     },
     {
@@ -100,6 +127,18 @@ CATEGORIES = [
             "topic:multimodal stars:>500",
             "topic:text-to-video stars:>500",
             "topic:vision-language-model stars:>300",
+            # 2026-09 用户赛道清单：内容创作管线
+            "fish-speech in:name stars:>1000",
+            "F5-TTS in:name stars:>1000",
+            "ComfyUI in:name stars:>5000",
+            "Fooocus in:name stars:>5000",
+            "KrillinAI in:name stars:>500",
+            "topic:video-translation stars:>100",
+            # 2026-09 生态地图：语音线（中文第一梯队 + 实时对话）
+            "FunASR in:name stars:>1000",
+            "CosyVoice in:name stars:>1000",
+            "LiveKit in:name stars:>1000",
+            "topic:realtime-voice stars:>100",
         ],
     },
     {
@@ -111,6 +150,14 @@ CATEGORIES = [
             "topic:llama-factory stars:>200",
             "lora in:name,description stars:>1000",
             "topic:peft stars:>300",
+            # 2026-09 生态地图「这类项目」：训练/微调/数据工程全方向
+            "topic:deepspeed stars:>500",
+            "unsloth in:name stars:>500",
+            "axolotl in:name stars:>1000",
+            "torchtune in:name stars:>500",
+            "topic:dpo topic:llm stars:>100",
+            "topic:synthetic-data stars:>200",
+            "topic:knowledge-distillation topic:llm stars:>100",
         ],
     },
     {
@@ -148,6 +195,9 @@ CATEGORIES = [
             "topic:llm-router stars:>100",
             "LLM gateway in:name,description stars:>200",
             "LLM proxy in:name,description stars:>300",
+            # 2026-09 生态地图：国内中转线
+            "one-api in:name stars:>1000",
+            "new-api in:name topic:llm stars:>500",
         ],
     },
     {
@@ -174,6 +224,13 @@ CATEGORIES = [
             "topic:claude-plugins stars:>50",
             "topic:claude-plugin stars:>50",
             "topic:claude-plugin-marketplace stars:>20",
+            # 2026-09 用户赛道清单：学习资源 / 教程 / 雷达
+            "ai-agents-for-beginners in:name stars:>1000",
+            "hello-agents in:name stars:>500",
+            "dive-into-llms in:name stars:>100",
+            "topic:llm-course stars:>100",
+            "awesome-LLM-AIOps in:name stars:>50",
+            "topic:ai-engineering stars:>100",
             "claude plugins in:name,description stars:>100",
         ],
     },
@@ -181,13 +238,19 @@ CATEGORIES = [
         "id": "mcp",
         "name": "MCP Servers & Clients",
         "desc": "Model Context Protocol — Claude/工具生态互联协议、服务端与客户端实现",
+        # 2026-08 — primary source is the official MCP Registry (registry.modelcontextprotocol.io);
+        # GitHub queries complement it with self-hosted clients / dev tools.
+        "source": "mcp_registry",
         "queries": [
             "topic:mcp-server stars:>100",
             "topic:mcp-servers stars:>100",
             "topic:model-context-protocol stars:>100",
+            "topic:mcp-client stars:>50",
+            "topic:claude-mcp stars:>50",
             "mcp-server in:name,description stars:>100",
             "model context protocol in:name,description stars:>100",
-            "mcp client in:name,description stars:>100",
+            "mcp client in:name,description stars:>50",
+            "claude mcp in:name,description stars:>50",
         ],
     },
     {
@@ -195,12 +258,22 @@ CATEGORIES = [
         "name": "Voice AI / Realtime",
         "desc": "语音对话、实时音视频、TTS/ASR、低延迟多模态应用（LiveKit / Pipecat / Vocode 系）",
         "queries": [
-            "topic:livekit stars:>200",
-            "topic:pipecat stars:>100",
-            "topic:vocode stars:>100",
-            "topic:realtime-ai stars:>100",
-            "voice-agent in:name,description stars:>200",
-            "realtime-voice in:name,description stars:>100",
+            "topic:livekit stars:>100",
+            "topic:pipecat stars:>50",
+            "topic:vocode stars:>50",
+            "topic:realtime-ai stars:>50",
+            "topic:voice-agent stars:>100",
+            "topic:realtime-voice stars:>50",
+            "topic:speech-ai stars:>100",
+            "topic:openai-realtime stars:>50",
+            "topic:gpt-realtime stars:>50",
+            "topic:tts stars:>500",
+            "topic:text-to-speech stars:>500",
+            "topic:asr stars:>200",
+            "voice-agent in:name,description stars:>100",
+            "realtime-voice in:name,description stars:>50",
+            "openai realtime in:name,description stars:>50",
+            "voice ai in:name,description stars:>200",
         ],
     },
     {
@@ -208,12 +281,17 @@ CATEGORIES = [
         "name": "Browser Use / Computer Use",
         "desc": "让 LLM 操作浏览器与桌面：浏览器自动化、视觉抓取、Computer-Use agent",
         "queries": [
-            "topic:browser-use stars:>200",
+            "topic:browser-use stars:>100",
             "topic:browser-automation stars:>500",
-            "topic:computer-use stars:>100",
-            "browser-use in:name,description stars:>200",
-            "stagehand in:name stars:>500",
-            "playwright-mcp in:name,description stars:>100",
+            "topic:computer-use stars:>50",
+            "topic:web-automation-agent stars:>50",
+            "topic:web-agent stars:>100",
+            "browser-use in:name,description stars:>100",
+            "computer use in:name,description stars:>50",
+            "stagehand in:name stars:>200",
+            "playwright-mcp in:name,description stars:>50",
+            "browser-mcp in:name,description stars:>50",
+            "stagehand-mcp in:name,description stars:>20",
         ],
     },
     {
@@ -221,22 +299,138 @@ CATEGORIES = [
         # Sources are populated by `fetch_huggingface_trending()` below, NOT GitHub queries;
         # queries list is kept empty so the standard loop skips it.
         "id": "huggingface",
-        "name": "🤗 HuggingFace 热门",
+        "name": "🤗 HuggingFace 热门 Spaces",
         "desc": "HuggingFace Trending Spaces — 社区里最热门的 AI 应用 demo / agent / 工具",
         "queries": [],  # populated by fetch_huggingface_trending()
+        "source": "hf_spaces",
+    },
+    {
+        # ponytail: 2026-08 — HuggingFace Trending Models (vs existing Spaces).
+        # JSON API (huggingface.co/api/models?sort=likes7d). New category separate
+        # from Spaces so the UI can show both — model weights are a distinct signal.
+        "id": "hf_models",
+        "name": "🤗 HuggingFace 热门 Models",
+        "desc": "HuggingFace Trending Models — 7 天 likes 排行（Qwen / Llama / DeepSeek 等）",
+        "queries": [],  # populated by fetch_huggingface_models_trending()
+        "source": "hf_models",
+    },
+    {
+        # ponytail: 2026-09 — arXiv 最新 AI 论文（官方 Atom API，无 key）。
+        # cs.AI / cs.CL / cs.LG 按提交时间倒序；论文没有星标，排序靠提交时间戳。
+        "id": "arxiv",
+        "name": "📄 arXiv 论文",
+        "desc": "最新 AI 研究 — cs.AI / cs.CL / cs.LG 按提交时间（官方 API，非爬取）",
+        "queries": [],  # populated by fetch_arxiv_recent()
+        "source": "arxiv",
+    },
+    {
+        # ponytail: 2026-09 — 用户生态地图补齐：AI 工程全生命周期方向。
+        "id": "inference",
+        "name": "⚙️ 推理服务与部署",
+        "desc": "vLLM / SGLang / Ollama / LocalAI / Xinference — 模型自部署与推理框架",
+        "queries": [
+            "topic:vllm stars:>100",
+            "topic:sglang stars:>100",
+            "topic:localai stars:>100",
+            "xinference in:name stars:>500",
+            "topic:llm-serving stars:>100",
+            "topic:inference-server stars:>100",
+        ],
+    },
+    {
+        # ponytail: 2026-09 — 用户赛道清单：代码理解 / 知识图谱。
+        "id": "codekg",
+        "name": "🕸 代码理解与知识图谱",
+        "desc": "codegraph / gitingest / GitNexus / graphify — 代码库的结构化理解与检索",
+        "queries": [
+            "codegraph in:name stars:>100",
+            "gitingest in:name stars:>500",
+            "GitNexus in:name stars:>100",
+            "graphify in:name stars:>100",
+            "topic:code-knowledge-graph stars:>20",
+            "Understand-Anything in:name stars:>100",
+            "topic:code-intelligence topic:llm stars:>100",
+        ],
+    },
+    {
+        "id": "searchweb",
+        "name": "🔍 搜索与数据获取",
+        "desc": "SearXNG / Firecrawl / Crawl4AI / Browser-Use — agent 的联网与抓取手脚",
+        "queries": [
+            "topic:searxng stars:>500",
+            "firecrawl in:name stars:>500",
+            "crawl4ai in:name stars:>300",
+            "topic:web-crawler topic:llm stars:>100",
+            "topic:browser-automation topic:ai stars:>200",
+            # 2026-09 用户赛道清单
+            "AnyCrawl in:name stars:>100",
+            "scrapling in:name stars:>500",
+            "TrendRadar in:name stars:>100",
+        ],
+    },
+    {
+        "id": "chatui",
+        "name": "💬 聊天前端",
+        "desc": "LobeChat / Open WebUI / LibreChat — 自部署模型的成品 UI",
+        "queries": [
+            "topic:lobechat stars:>500",
+            "open-webui in:name stars:>2000",
+            "librechat in:name stars:>1000",
+            "topic:chatbot-ui stars:>300",
+            "topic:llm-ui stars:>100",
+            "Kotaemon in:name stars:>500",
+            "AnythingLLM in:name stars:>5000",
+        ],
+    },
+    {
+        "id": "docparse",
+        "name": "📄 文档解析",
+        "desc": "MinerU / Docling / Unstructured — PDF→Markdown，RAG 的前置环节",
+        "queries": [
+            "MinerU in:name stars:>1000",
+            "docling in:name stars:>1000",
+            "unstructured in:name stars:>3000",
+            "topic:document-parsing stars:>200",
+            "topic:pdf topic:markdown topic:llm stars:>100",
+            # 2026-09 用户赛道清单：翻译线 + OCR
+            "marker in:name topic:pdf stars:>1000",
+            "BabelDOC in:name stars:>100",
+            "PDFMathTranslate in:name stars:>500",
+            "LibreTranslate in:name stars:>1000",
+            "topic:ocr stars:>200 topic:document",
+        ],
+    },
+    {
+        "id": "aiui",
+        "name": "🎨 AI UI 组件库",
+        "desc": "assistant-ui / CopilotKit / AI Elements / Streamdown — 聊天界面与流式渲染组件",
+        "queries": [
+            "assistant-ui in:name stars:>500",
+            "copilotkit in:name stars:>1000",
+            "topic:ai-sdk stars:>300",
+            "topic:ai-chatbot topic:react stars:>200",
+            "streamdown in:name stars:>300",
+        ],
     },
     {
         "id": "security",
         "name": "AI 安全 & 隐私",
         "desc": "Prompt injection 防御、LLM 红队 / Jailbreak 检测、PII 脱敏、模型水印、对齐研究",
         "queries": [
-            "topic:prompt-injection stars:>100",
-            "topic:llm-security stars:>100",
-            "topic:ai-safety stars:>200",
-            "topic:red-team stars:>100",
-            "topic:ai-alignment stars:>200",
-            "prompt injection in:name,description stars:>100",
-            "jailbreak in:name,description stars:>100",
+            "topic:prompt-injection stars:>50",
+            "topic:llm-security stars:>50",
+            "topic:ai-safety stars:>100",
+            "topic:red-team stars:>50",
+            "topic:ai-alignment stars:>100",
+            "topic:llm-firewall stars:>20",
+            "topic:prompt-guard stars:>20",
+            "topic:ai-guardrails stars:>50",
+            "topic:watermark-llm stars:>20",
+            "prompt injection in:name,description stars:>50",
+            "jailbreak in:name,description stars:>50",
+            "llm firewall in:name,description stars:>20",
+            "ai guardrails in:name,description stars:>50",
+            "model safety in:name,description stars:>100",
         ],
     },
     {
@@ -244,13 +438,19 @@ CATEGORIES = [
         "name": "机器人 / Embodied AI",
         "desc": "具身智能、机器人控制、sim-to-real、Open X-Embodiment、机器人学习框架",
         "queries": [
-            "topic:embodied-ai stars:>200",
-            "topic:robotics stars:>500",
-            "topic:robot-learning stars:>200",
-            "topic:sim-to-real stars:>100",
-            "topic:open-x-embodiment stars:>50",
-            "humanoid in:name,description stars:>200",
-            "manipulation in:name,description stars:>200",
+            "topic:embodied-ai stars:>100",
+            "topic:robotics stars:>200",
+            "topic:robot-learning stars:>100",
+            "topic:sim-to-real stars:>50",
+            "topic:open-x-embodiment stars:>20",
+            "topic:humanoid-robot stars:>50",
+            "topic:robot-manipulation stars:>50",
+            "topic:vla-model stars:>20",
+            "topic:vision-language-action stars:>20",
+            "humanoid in:name,description stars:>100",
+            "manipulation in:name,description stars:>100",
+            "embodied agent in:name,description stars:>50",
+            "robot foundation model in:name,description stars:>20",
         ],
     },
 ]
@@ -429,6 +629,31 @@ AI_TOPIC_HARD = frozenset(
         "mcp-server",
         "spring-ai",
         "springai",
+        # ponytail: 2026-09 补齐 topics 变体 — 分类结果启用完整过滤后
+        # 这些变体缺了会误伤正经 AI 项目（Qwen-VL / playwright-mcp 实测踩过）
+        "mcp",
+        "mcp-client",
+        "mcp-servers",
+        "model-context-protocol",
+        "large-language-model",
+        "large-language-models",
+        "vision-language-model",
+        "vision-language-models",
+        "vlm",
+        "chatbot",
+        "chat-bot",
+        "ai-chatbot",
+        "generative-ai",
+        "ai-framework",
+        "ai-sdk",
+        "ai-agents",
+        "ai-applications",
+        "local-llm",
+        "llm-inference",
+        "llama-cpp",
+        "text-generation",
+        "fine-tuning",
+        "fine-tuning-framework",
     }
 )
 
@@ -468,16 +693,61 @@ AI_TEXT_HINTS = frozenset(
         "speech-to-text",
         "speech to text",
         "coding agent",
+        # ponytail: 2026-09 — lit-llama 这类空 topics 项目的描述信号。
+        # 注意不加 "multimodal"：数据工程的 SeaTunnel 描述里有 "multimodal"
+        # （数据模态≠AI多模态），实测误伤。
+        "language model",
+        ".agents",
+    }
+)
+
+# ponytail: 2026-09 — 用户精选赛道白名单：这些项目（agent 基建/记忆/爬虫手脚/
+# 内容管线）topics 不含 AI 关键词但属于雷达定位内的基础设施，跳过严格 AI 过滤。
+CURATED_ALLOWLIST = frozenset(
+    {
+        # 注意：查询方对 repo name 做 lower() 比对 — 此处必须全小写
+        # （曾因 "VoltAgent/..." 大小写不一致导致白名单永不命中）
+        "d4vinci/scrapling",
+        "lllyasviel/fooocus",
+        "letta-ai/letta",
+        "supermemoryai/supermemory",
+        "memvid/memvid",
+        "labring/fastgpt",
+        "funstory-ai/babeldoc",
+        "swivid/f5-tts",
+        "coderamp-labs/gitingest",
+        "lordog/dive-into-llms",
+        "voltagent/awesome-agent-skills",
+        "libretranslate/libretranslate",
+        "yt-dlp/yt-dlp",
     }
 )
 
 # ponytail: high-star noise that would otherwise sneak past the AI whitelist
+# 2026-09：按产品定位收紧 — 只收「AI 应用开发」类项目，股票/金融/交易类
+# 即使是 AI 驱动的（如 multi-agent trading framework）也不收。
 AI_TOPIC_BLOCKLIST = frozenset(
     {
         "stock",
         "stocks",
+        "stock-market",
+        "stock-prediction",
+        "stock-analysis",
         "trading",
+        "trading-bot",
+        "tradingview",
+        "algorithmic-trading",
+        "quantitative-finance",
+        "quant-trading",
+        "quantconnect",
+        "backtesting",
+        "finance",
+        "fintech",
+        "investment",
+        "investing",
+        "portfolio-optimization",
         "crypto",
+        "cryptocurrency",
         "nft",
         "forex",
         "porn",
@@ -489,13 +759,42 @@ AI_TOPIC_BLOCKLIST = frozenset(
     }
 )
 
+# ponytail: 描述级金融领域短语（精确匹配，避免误伤 quantization/quantum 等 AI 术语）。
+# 命中即排除 — TradingAgents/FinRobot 这类「AI 驱动但领域是金融」的项目从这里拦下。
+NON_AI_DEV_DESC_BLOCKLIST = re.compile(
+    r"(?:trading\s+(?:bot|agent|framework|strategy|system|platform)"
+    r"|stock\s+(?:market|price|prediction|trading|analysis)"
+    r"|algorithmic\s+trading|quantitative\s+finance|financial\s+market"
+    r"|股票|炒股|量化交易|证券|金融行情)",
+    re.IGNORECASE,
+)
+
+
+def is_finance_blocked(repo):
+    """股票/金融/交易领域检测（topic 精确匹配 + 描述短语匹配）。
+    产品定位 = AI 应用开发雷达：这类项目即使 AI 驱动（如 multi-agent trading
+    framework）也一律排除。所有来源（分类查询 / 5k 池 / trending）都适用。"""
+    topics = [t.lower() for t in (repo.get("topics") or [])]
+    if any(t in AI_TOPIC_BLOCKLIST for t in topics):
+        return True
+    desc = repo.get("description") or repo.get("desc") or ""
+    return bool(NON_AI_DEV_DESC_BLOCKLIST.search(desc))
+
 
 def is_ai_relevant(repo):
     """Strict AI filter — requires at least one HARD topic, OR an AI phrase in name/description.
-    ponytail: bare 'ai' topic alone is no longer enough — that caught dbeaver/netdata."""
-    topics = [t.lower() for t in (repo.get("topics") or [])]
-    if any(t in AI_TOPIC_BLOCKLIST for t in topics):
+    ponytail: bare 'ai' topic alone is no longer enough — that caught dbeaver/netdata.
+    2026-09：先过金融领域屏蔽（is_finance_blocked），再做 AI 判定。
+    注意：分类查询的结果不要用这个函数整体过滤 — category query 本身就是 AI
+    信号（topic:llm / topic:langgraph...），只需 is_finance_blocked；严格过滤
+    用于来源宽泛的 5k 大池（"stars:>500 xxx" 这类）。"""
+    if is_finance_blocked(repo):
         return False
+    # ponytail: 用户精选赛道白名单（CURATED_ALLOWLIST 在上方定义）— agent 基建类
+    # 项目 topics 无 AI 关键词但属于雷达定位，豁免 AI 相关性判定（金融拦截不豁免）。
+    if (repo.get("name") or "").lower() in CURATED_ALLOWLIST:
+        return True
+    topics = [t.lower() for t in (repo.get("topics") or [])]
     blob_topics = " ".join(topics)
     if any(h in blob_topics for h in AI_TOPIC_HARD):
         return True
@@ -506,7 +805,150 @@ def is_ai_relevant(repo):
     return any(h in text for h in AI_TEXT_HINTS)
 
 
+def normalize_git_url(url):
+    """去重键：git 仓库地址规范化 — 小写、去 www/.git/尾斜杠，GitHub 归一为 gh://owner/repo。
+    任何开源项目一定有 GitHub 地址；非 GitHub（HF/arXiv/registry）原样小写规范化。
+    同一仓库的大小写变体（gh://Owner/Repo vs gh://owner/repo）归并为同一个键。"""
+    u = (url or "").strip().lower()
+    u = re.sub(r"\.git$", "", u).rstrip("/")
+    return re.sub(r"^https?://(www\.)?github\.com/", "gh://", u)
+
+
 TRANSLATE_CACHE = DATA / "zh_cache.json"
+
+
+_LANG_NAV_WORDS = (
+    "English", "Português", "简体中文", "繁体中文", "日本語", "日本语",
+    "한국어", "Türkçe", "Русский", "Français", "Deutsch", "Español", "Tiếng Việt",
+    # 翻译后的语言名（缓存里的中文版语言行）
+    "英语", "葡萄牙语", "日语", "韩语", "土耳其语", "俄语", "法语", "德语", "西班牙语",
+)
+
+
+def _clean_readme_text(md: str, max_chars: int = 600) -> str:
+    """README → 干净摘要文本。
+    处理真实 README 的脏开头：徽章/语言切换表/导航链接往往占据前几百字符。
+    ① 去图片/链接/标题标记/强调/代码标记；② 跳过语言导航段；③ 取第一个 ≥40 字符的实质段落。"""
+    if not md:
+        return ""
+    s = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", md)          # 图片
+    s = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", s)        # 链接 → 文本
+    s = re.sub(r"^#{1,6}\s*", "", s, flags=re.M)           # 标题标记
+    s = re.sub(r"<[^>]+>", " ", s)                          # HTML 标签（徽章）
+    s = s.replace("**", "").replace("__", "")
+    s = re.sub(r"[`<>|]", " ", s)
+    # GFM 警告标记 [!WARNING]/[!警告] 与语言切换括号 [ En 中 Fr 日 ] — 去前缀保留正文
+    s = re.sub(
+        r"^\s*\[\s*[!！]?\s*(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION|注意|重要|警告|提示)\s*\]\s*",
+        "", s, flags=re.M,
+    )
+    s = re.sub(r"^\s*\[[^\]\n]{0,24}\]\s+(?=\S)", "", s)
+    # 段落级选择：跳过徽章/语言行/短导航，取第一个有实质内容的段落
+    paragraphs = [re.sub(r"\s+", " ", p).strip() for p in re.split(r"\n\s*\n", s)]
+    for p in paragraphs:
+        if len(p) < 40:
+            continue
+        lang_words = sum(1 for w in _LANG_NAV_WORDS if w in p)
+        if p.startswith("Language:") or p.startswith("语言") or lang_words >= 3:
+            # 语言表与正文并成一段（缓存翻译常见）→ 从最后一个语言词之后截断
+            if lang_words >= 3:
+                cut = 0
+                for w in _LANG_NAV_WORDS:
+                    i = p.rfind(w)
+                    if i >= 0:
+                        cut = max(cut, i + len(w))
+                body = p[cut:].lstrip(" |·>—-：:]）)")
+                if len(body) >= 40:
+                    return body[:max_chars]
+            continue
+        return p[:max_chars]
+    # 全部段落都像导航/太短 → 取最长的一段（正文段几乎总是最长的）
+    return (max(paragraphs, key=len) if paragraphs else "")[:max_chars]
+
+
+def _summary_from_entry(entry: dict, limit: int = 240) -> str:
+    """从 readme_zh 缓存条目取摘要 — 句子边界截断，不切半句。"""
+    text = _clean_readme_text(entry.get("text") or "", max_chars=limit + 60)
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    for sep in ("。", "！", "？", "；", ". ", "! ", "? "):
+        idx = cut.rfind(sep)
+        if idx > limit * 0.5:
+            return cut[: idx + len(sep)].strip()
+    return cut.rsplit(" ", 1)[0].strip()
+
+
+def _build_summary_zh(repo: dict, cache: dict) -> None:
+    """为单个 repo 生成 summary_zh（详细中文描述）。
+    缓存命中 → 直接截取；未命中 → 拉 README 首段翻译并写回 cache。
+    非 GitHub 条目（HF/arXiv/MCP）用 desc_zh 兜底。失败静默降级。"""
+    full_name = repo.get("name") or ""
+    fallback = repo.get("desc_zh") or repo.get("desc") or ""
+    url = repo.get("url") or ""
+    if "/" not in full_name or "github.com" not in url:
+        repo["summary_zh"] = fallback
+        return
+    key = full_name.lower()
+    entry = cache.get(key)
+    if entry and entry.get("text"):
+        summary = _summary_from_entry(entry)
+        # 缓存里是英文残留（旧抽屉时代翻译失败的原样缓存）→ 视为未命中重做
+        if summary and any("一" <= ch <= "鿿" for ch in summary[:60]):
+            repo["summary_zh"] = summary
+            return
+        cache.pop(key, None)
+    fetched = _fetch_readme_from_github(full_name)
+    if not fetched:
+        repo["summary_zh"] = fallback
+        return
+    raw_md, source_url = fetched
+    clean = _clean_readme_text(raw_md)
+    zh = _chunked_translate(clean) if clean else ""
+    if zh and _looks_translated(zh, clean):
+        cache[key] = {
+            "text": zh,
+            "source_url": source_url,
+            "fetched_at": datetime.datetime.now().isoformat(timespec="seconds"),
+            "translator": "google-translate-free",
+        }
+        repo["summary_zh"] = _summary_from_entry(cache[key]) or fallback
+    else:
+        # 翻译失败不缓存、不展示英文 — 回退中文简介
+        repo["summary_zh"] = fallback
+
+
+def enrich_summaries(repos: list, max_workers: int = 4) -> int:
+    """爬取期为全部 repos 生成详细中文描述（summary_zh）。
+    README 拉取 + 翻译 4 线程并发；缓存读写只做一次（整文件）。
+    返回生成数量。任何失败不阻塞爬取主流程。"""
+    cache: dict = {}
+    if README_ZH_CACHE.exists():
+        try:
+            cache = json.loads(README_ZH_CACHE.read_text())
+        except Exception:
+            cache = {}
+    github_repos = [
+        r for r in repos if "github.com" in (r.get("url") or "")
+    ]
+    print(
+        f"[crawl] summaries: {len(github_repos)} GitHub repos "
+        f"({sum(1 for r in github_repos if cache.get((r['name'] or '').lower(), {}).get('text'))} cached)"
+    )
+    lock_free_cache = cache  # dict set/get 在 GIL 下线程安全
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        list(ex.map(lambda r: _build_summary_zh(r, lock_free_cache), github_repos))
+    # 非 GitHub 条目直接补 desc_zh
+    for r in repos:
+        if not r.get("summary_zh"):
+            r["summary_zh"] = r.get("desc_zh") or r.get("desc") or ""
+    try:
+        README_ZH_CACHE.write_text(
+            json.dumps(cache, ensure_ascii=False, indent=1)
+        )
+    except Exception as e:
+        print(f"  [warn] summary cache write failed: {e}", file=sys.stderr)
+    return sum(1 for r in repos if r.get("summary_zh"))
 
 
 def facts_for_repo(repo):
@@ -530,28 +972,48 @@ FRONTMATTER_DESC = re.compile(
 
 
 def translate_text(text, target="zh-CN"):
-    """Google Translate free endpoint via urllib — zero deps. Returns '' on failure."""
+    """Google Translate free endpoint via urllib, falling back to system `curl` when
+    Python's SSL cert chain is missing (common on macOS Python builds). Returns '' on failure."""
     if not text or not text.strip():
         return ""
+    params = urllib.parse.urlencode(
+        {
+            "client": "gtx",
+            "sl": "auto",
+            "tl": target,
+            "dt": "t",
+            "q": text[:500],
+        }
+    )
+    url = f"https://translate.googleapis.com/translate_a/single?{params}"
+    # ponytail: try urllib first (zero deps); fall back to system curl which
+    # uses the OS keychain and avoids macOS Python's missing-cert issue.
     try:
-        params = urllib.parse.urlencode(
-            {
-                "client": "gtx",
-                "sl": "auto",
-                "tl": target,
-                "dt": "t",
-                "q": text[:500],
-            }
-        )
         req = urllib.request.Request(
-            f"https://translate.googleapis.com/translate_a/single?{params}",
-            headers={"User-Agent": "Mozilla/5.0"},
+            url, headers={"User-Agent": "Mozilla/5.0"}
         )
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
-        return "".join(seg[0] for seg in data[0] if seg and seg[0])
+        result = "".join(seg[0] for seg in data[0] if seg and seg[0])
+        if result:
+            return result
     except Exception:
-        return ""
+        pass
+    try:
+        out = subprocess.run(
+            [
+                "curl", "-q", "-sS", "--max-time", "10",
+                "-A", "Mozilla/5.0", url,
+            ],
+            capture_output=True, text=True, timeout=15,
+        )
+        if out.returncode == 0 and out.stdout.strip():
+            data = json.loads(out.stdout)
+            result = "".join(seg[0] for seg in data[0] if seg and seg[0])
+            return result
+    except Exception:
+        pass
+    return ""
 
 
 def translate_batch(pairs):
@@ -579,6 +1041,289 @@ def translate_batch(pairs):
 
 
 # SKILLS_CACHE / SKILL_ORIGINS defined at top of file (lines 27-28)
+
+
+# ponytail: 2026-08 — comprehensive Chinese README translation cache.
+# Keyed by repo name; value is {text, source_url, fetched_at, translator}.
+# Falls back to JSON file when PG unavailable.
+README_ZH_CACHE = DATA / "readme_zh_cache.json"
+
+
+def _fetch_readme_from_github(full_name: str, max_chars: int = 6000) -> tuple[str, str] | None:
+    """Fetch README.md from GitHub raw for owner/repo. Returns (text, source_url) or None.
+    ponytail: try common README filenames in order — README.md / readme.md / README.rst.
+    Cap text at max_chars so Google Translate free endpoint (500 char limit) can chunk."""
+    candidates = ["README.md", "readme.md", "README.rst", "README.txt"]
+    # ponytail: GitHub raw URL is owner/repo/HEAD/<file>. Use gh CLI to find the
+    # default branch first, then raw URL.
+    try:
+        r = subprocess.run(
+            ["gh", "api", f"repos/{full_name}"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if r.returncode != 0:
+            return None
+        info = json.loads(r.stdout)
+        branch = info.get("default_branch", "main")
+    except Exception:
+        branch = "main"
+    for fname in candidates:
+        url = f"https://raw.githubusercontent.com/{full_name}/{branch}/{fname}"
+        # ponytail: macOS Python lacks system certs (same issue as HF fetch).
+        # Try urllib first, fall back to system curl which uses OS keychain.
+        try:
+            req = urllib.request.Request(
+                url, headers={"User-Agent": "lodestone/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+            if raw.strip():
+                return raw[:max_chars], url
+        except Exception:
+            pass
+        try:
+            out = subprocess.run(
+                [
+                    "curl", "-q", "-sSL", "--max-time", "20",
+                    "-A", "lodestone/1.0", url,
+                ],
+                capture_output=True, text=True, timeout=25,
+            )
+            if out.returncode == 0 and out.stdout.strip():
+                return out.stdout[:max_chars], url
+        except Exception:
+            pass
+    return None
+
+
+def _strip_markdown_to_text(md: str, max_chars: int = 4500) -> str:
+    """Strip Markdown to clean prose for translation.
+    Aggressively drops noise: code blocks, badges, language tables, empty links, HTML,
+    GitHub admonitions. Keeps headings (with # prefix) + bullet list markers so the
+    translated text retains some shape."""
+    text = md
+    # remove fenced code blocks (any language tag)
+    text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+    text = re.sub(r"`[^`]+`", "", text)
+    # remove images and inline badges — leaves empty `[]()` pairs
+    text = re.sub(r"!\[[^\]]*\]\([^)]+\)", "", text)
+    text = re.sub(r"\[\s*\]\(\s*\)", "", text)
+    # collapse links [text](url) → text
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    # remove HTML tags
+    text = re.sub(r"<[^>]+>", "", text)
+    # drop pure-shields.io badge lines (image inside link inside link)
+    text = re.sub(r"^\s*\[!\[.*?\]\(.*?\)\]\(.*?\)\s*$", "", text, flags=re.MULTILINE)
+    # drop GitHub-style admonitions
+    text = re.sub(r"^>\s*\[!\w+\].*$", "", text, flags=re.MULTILINE)
+    # drop "Language: a | b | c" tables (Google Translate fumbles these)
+    text = re.sub(r"^[A-Za-z][A-Za-z\s]*:\s*\|.*$", "", text, flags=re.MULTILINE)
+    # drop lines that are mostly `|` separators (table rows)
+    text = re.sub(r"^[\s|:-]+$", "", text, flags=re.MULTILINE)
+    # drop pure-link lines ("[a](b)") — these are usually nav menus
+    text = re.sub(
+        r"^[\s\[]*\[([^\]]+)\]\([^)]+\)[\s\]]*$",
+        r"\1",
+        text,
+        flags=re.MULTILINE,
+    )
+    # collapse whitespace
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    # paragraph-level filtering: skip pure-noise paragraphs (badges, nav, separators)
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    keep: list[str] = []
+    skipped_chars = 0
+    noise_threshold = 400  # skip up to ~400 chars of preamble noise (badges / TOC)
+    for p in paragraphs:
+        # skip pure-separator paragraphs
+        if not p or all(c in " \t-*#_=|\n" for c in p):
+            continue
+        # skip "Language: a | b | c" lines that slipped through
+        if re.match(r"^[A-Za-z][\w\s]*:\s*[\w\s|]+$", p) and len(p) < 200:
+            continue
+        # skip if more than 80% URLs / pipes
+        non_text = sum(
+            1 for c in p if c in "|[](){}<>#=*_`@"
+        )
+        if non_text > len(p) * 0.4:
+            continue
+        # ponytail: skip the noisy preamble (links / nav menus) but keep all real prose
+        if skipped_chars < noise_threshold and (
+            p.startswith("- ")
+            or p.startswith("*[")
+            or " | " in p[:200]
+        ):
+            skipped_chars += len(p)
+            continue
+        keep.append(p)
+        if sum(len(x) for x in keep) > max_chars:
+            break
+    return "\n\n".join(keep)[:max_chars]
+
+
+def _chunked_translate(text: str, target: str = "zh-CN") -> str:
+    """Translate long text by chunking at sentence boundaries (<= 280 chars per chunk).
+    ponytail: Google Translate free endpoint silently returns original text on chunks that
+    contain too many URLs / special chars. Smaller chunks + retry-on-suspect-output
+    dramatically improves coverage."""
+    if not text or not text.strip():
+        return ""
+    if len(text) <= 280:
+        result = translate_text(text, target=target)
+        if _looks_translated(result, text):
+            return result
+        return text  # fallback to original on first failure
+
+    parts: list[str] = []
+    cursor = 0
+    while cursor < len(text):
+        end = min(cursor + 280, len(text))
+        if end < len(text):
+            boundary = end
+            for sep in ("\n\n", "。", ". ", "! ", "? ", "\n"):
+                idx = text.rfind(sep, cursor, end)
+                if idx > cursor + 60:
+                    boundary = idx + len(sep)
+                    break
+            end = boundary
+        chunk = text[cursor:end].strip()
+        if chunk:
+            translated = translate_text(chunk, target=target)
+            if _looks_translated(translated, chunk):
+                parts.append(translated)
+            else:
+                parts.append(chunk)  # graceful degradation
+        cursor = end
+    return "".join(parts)
+
+
+def _looks_translated(translated: str, original: str) -> bool:
+    """Heuristic: a chunk is 'translated' if it has CJK chars AND less than 60% ASCII overlap
+    with the source. Avoids keeping 'echoed English' as a translation result."""
+    if not translated:
+        return False
+    cjk = sum(1 for c in translated if "一" <= c <= "鿿")
+    if cjk < max(8, len(translated) * 0.05):
+        return False  # < 5% CJK → not translated
+    return True
+
+
+def get_readme_zh(full_name: str, force: bool = False) -> dict:
+    """Get or build comprehensive Chinese description for a repo.
+    Returns {text, source_url, fetched_at, translator, from_cache}.
+    Falls back to short description (translated on the fly) if README fetch fails."""
+    if not full_name or "/" not in full_name:
+        return {"text": "", "source_url": "", "from_cache": False, "error": "invalid name"}
+    cache_key = full_name.lower()
+
+    # Tier 1: PG
+    if not force and db._DB_OK:
+        try:
+            conn = db.connect()
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT readme_zh, readme_zh_source, readme_zh_at FROM repos WHERE name = %s",
+                    (full_name,),
+                )
+                row = cur.fetchone()
+                if row and row[0]:
+                    return {
+                        "text": row[0],
+                        "source_url": row[1] or "",
+                        "fetched_at": row[2].isoformat() if row[2] else "",
+                        "translator": "google-translate-free",
+                        "from_cache": True,
+                    }
+            finally:
+                conn.close()
+        except Exception:
+            pass
+
+    # Tier 2: JSON cache
+    if not force and README_ZH_CACHE.exists():
+        try:
+            cache = json.loads(README_ZH_CACHE.read_text())
+            entry = cache.get(cache_key)
+            if entry and entry.get("text"):
+                return {**entry, "from_cache": True}
+        except (OSError, ValueError):
+            pass
+
+    # Tier 3: fetch + translate
+    fetched = _fetch_readme_from_github(full_name)
+    if not fetched:
+        # ponytail: README fetch failed — return short desc_zh fallback (translated on fly).
+        try:
+            short_desc = _gh_repo_meta(full_name)
+            short = (short_desc or {}).get("description") or ""
+            if short:
+                zh = translate_text(short) or short
+                return {
+                    "text": (
+                        f"【GitHub 简介 · 中文翻译】\n\n{zh}\n\n"
+                        f"（自动翻译，原文出处：https://github.com/{full_name}）"
+                    ),
+                    "source_url": f"https://github.com/{full_name}",
+                    "translator": "google-translate-free",
+                    "from_cache": False,
+                    "fallback": "short_description",
+                }
+        except Exception:
+            pass
+        return {"text": "", "source_url": "", "from_cache": False, "error": "fetch failed"}
+
+    raw_md, source_url = fetched
+    clean = _strip_markdown_to_text(raw_md)
+    zh_text = _chunked_translate(clean)
+    # ponytail: if translation truly failed, return the cleaned English content with
+    # an explicit marker so the UI can show "（翻译失败 · 原文）" rather than confused text.
+    if not zh_text:
+        zh_text = (
+            "【自动翻译暂不可用 · 以下为英文原文 · 数据源：" + source_url + "】\n\n" + clean
+        )
+    now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+    entry = {
+        "text": zh_text,
+        "source_url": source_url,
+        "fetched_at": now_iso,
+        "translator": "google-translate-free",
+        "from_cache": False,
+    }
+
+    # Persist to PG
+    if db._DB_OK:
+        try:
+            conn = db.connect()
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE repos SET readme_zh = %s, readme_zh_source = %s, readme_zh_at = NOW() WHERE name = %s",
+                    (zh_text, source_url, full_name),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception:
+            pass
+
+    # Persist to JSON cache
+    try:
+        cache = (
+            json.loads(README_ZH_CACHE.read_text())
+            if README_ZH_CACHE.exists()
+            else {}
+        )
+        cache[cache_key] = entry
+        README_ZH_CACHE.write_text(
+            json.dumps(cache, ensure_ascii=False, indent=2)
+        )
+    except OSError:
+        pass
+    return entry
 
 
 def _parse_frontmatter_desc(path) -> str | None:
@@ -618,10 +1363,14 @@ def _gh_repo_meta(full_name: str) -> dict | None:
     Returns None if `gh` unavailable or repo private/missing."""
     if not full_name or "/" not in full_name:
         return None
+    # ponytail: per-function cache via monkey-patch attribute. Avoids module-level
+    # mutable state and survives reloads. Pyright doesn't know about the runtime
+    # attribute set on FunctionType, so silence the false positive here.
     if not hasattr(_gh_repo_meta, "_cache"):
-        _gh_repo_meta._cache = {}
-    if full_name in _gh_repo_meta._cache:
-        return _gh_repo_meta._cache[full_name]
+        _gh_repo_meta._cache = {}  # type: ignore[attr-defined]
+    cache: dict = _gh_repo_meta._cache  # type: ignore[attr-defined]
+    if full_name in cache:
+        return cache[full_name]
     try:
         r = subprocess.run(
             ["gh", "api", f"repos/{full_name}"],
@@ -630,7 +1379,7 @@ def _gh_repo_meta(full_name: str) -> dict | None:
             timeout=15,
         )
         if r.returncode != 0:
-            _gh_repo_meta._cache[full_name] = None
+            cache[full_name] = None
             return None
         data = json.loads(r.stdout)
         out = {
@@ -641,15 +1390,22 @@ def _gh_repo_meta(full_name: str) -> dict | None:
             "pushed_at": data.get("pushed_at"),
             "description": data.get("description"),
         }
-        _gh_repo_meta._cache[full_name] = out
+        cache[full_name] = out
         return out
     except Exception:
-        _gh_repo_meta._cache[full_name] = None
+        cache[full_name] = None
         return None
 
 
 def _load_repo_index() -> dict:
-    """Build repo lookup {segment → repo} from PG. Used for topic/stars enrichment + replacement detection."""
+    """Build repo lookup {segment → repo} from PG. Used for topic/stars enrichment + replacement detection.
+    ponytail: cache 30s — /api/local calls this twice per request, with 30s SPA polling the
+    SQL hit becomes ~4x per minute for nothing. Mutations (install/uninstall) call
+    invalidate_repo_index() to bust the cache immediately."""
+    now = time.time()
+    cache = _repo_index_cache
+    if cache["data"] is not None and now - cache["ts"] < _REPO_INDEX_TTL:
+        return cache["data"]
     by_repo = {}
     try:
         import db
@@ -667,19 +1423,38 @@ def _load_repo_index() -> dict:
                 by_repo[rec["name"].split("/")[-1]] = rec
     except Exception:
         pass
+    cache["ts"] = now
+    cache["data"] = by_repo
     return by_repo
+
+
+# ponytail: TTL cache for _load_repo_index() — same purpose as _local_scan_cache above.
+_REPO_INDEX_TTL = 30
+_repo_index_cache: dict = {"ts": 0.0, "data": None}
+
+
+def invalidate_repo_index():
+    _repo_index_cache["ts"] = 0.0
+    _repo_index_cache["data"] = None
 
 
 # ponytail: local-scan TTL cache — detect_local_skills() walks brew dirs + runs `uv tool list`
 # + may hit `gh api` per unmatched skill. /api/* called it 2x per request → cache 60s,
 # invalidated by any install/uninstall/origin mutation.
+# ponytail: threading.Lock because ThreadingHTTPServer may invoke detect_local_skills()
+# from multiple worker threads concurrently; without the lock, two threads can both see
+# an expired cache and both run the (slow) scan.
+import threading
+
 _LOCAL_SCAN_TTL = 60
 _local_scan_cache: dict = {"ts": 0.0, "data": None}
+_local_scan_lock = threading.Lock()
 
 
 def invalidate_local_scan():
-    _local_scan_cache["ts"] = 0.0
-    _local_scan_cache["data"] = None
+    with _local_scan_lock:
+        _local_scan_cache["ts"] = 0.0
+        _local_scan_cache["data"] = None
 
 
 def detect_local_skills(force: bool = False):
@@ -694,12 +1469,13 @@ def detect_local_skills(force: bool = False):
     Cached for 60s — pass force=True to rescan (install/uninstall paths auto-invalidate).
     """
     now = time.time()
-    if (
-        not force
-        and _local_scan_cache["data"] is not None
-        and now - _local_scan_cache["ts"] < _LOCAL_SCAN_TTL
-    ):
-        return _local_scan_cache["data"]
+    with _local_scan_lock:
+        if (
+            not force
+            and _local_scan_cache["data"] is not None
+            and now - _local_scan_cache["ts"] < _LOCAL_SCAN_TTL
+        ):
+            return _local_scan_cache["data"]
     out = {"skills": {}, "commands": {}, "agents": {}, "plugins": []}
 
     # ponytail: build lookup from PostgreSQL — match by repo segment (last path component). DB is source of truth (latest.json deprecated).
@@ -962,15 +1738,108 @@ def detect_local_skills(force: bool = False):
             p.stem for p in apps_dir.iterdir() if p.suffix == ".app"
         )
 
-    _local_scan_cache["ts"] = time.time()
-    _local_scan_cache["data"] = out
+    with _local_scan_lock:
+        _local_scan_cache["ts"] = time.time()
+        _local_scan_cache["data"] = out
     return out
 
 
-def install_skill_from_github(name, url):
-    """Clone GitHub repo to SKILLS_CACHE/<repo>, symlink to both skills dirs.
-    Validates name as 'owner/repo'. Writes/updates sidecar at SKILL_ORIGINS.
-    Idempotent. `url` is optional — if empty, derived from name."""
+# ponytail: smart install — supports Claude Code + Codex + OpenCode.
+# Detects 4 states per target:
+#   1) not installed  → full clone + symlink
+#   2) already linked to our cache, cache fresh → already up-to-date
+#   3) already linked, cache stale       → git pull + re-link
+#   4) exists but points elsewhere       → replace with symlink (back up first)
+# Returns a structured {target: action: detail} so the UI can show per-CLI status.
+SUPPORTED_CLIS = ("claude", "codex", "opencode")
+
+
+def _skills_root_for(cli: str) -> Path:
+    """Map CLI name → skills directory."""
+    if cli == "claude":
+        return Path.home() / ".claude" / "skills"
+    if cli == "codex":
+        return Path.home() / ".codex" / "skills"
+    if cli == "opencode":
+        return Path.home() / ".config" / "opencode" / "skills"
+    raise ValueError(f"unsupported CLI: {cli!r}")
+
+
+def _git_head_sha(path: Path) -> str | None:
+    """Read current HEAD SHA from a git working tree."""
+    try:
+        r = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(path),
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if r.returncode == 0:
+            return r.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+def _git_pull_fast_forward(path: Path) -> tuple[bool, str]:
+    """Fetch + reset to origin/HEAD on a --depth=1 clone. Returns (ok, detail)."""
+    try:
+        # Unshallow so we can compare against origin; cheap if already shallow.
+        # For --depth=1 clones, fetch will get the latest commit only.
+        fetch = subprocess.run(
+            ["git", "fetch", "--depth=1", "origin", "HEAD"],
+            cwd=str(path),
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if fetch.returncode != 0:
+            return False, f"fetch failed: {fetch.stderr.strip()[:120]}"
+        reset = subprocess.run(
+            ["git", "reset", "--hard", "origin/HEAD"],
+            cwd=str(path),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if reset.returncode != 0:
+            return False, f"reset failed: {reset.stderr.strip()[:120]}"
+        return True, "updated"
+    except subprocess.TimeoutExpired:
+        return False, "pull timeout"
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
+
+
+def _git_remote_head_sha(url: str) -> str | None:
+    """Query the default branch's HEAD SHA via `git ls-remote` (no clone)."""
+    try:
+        r = subprocess.run(
+            ["git", "ls-remote", url, "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if r.returncode == 0:
+            for line in r.stdout.splitlines():
+                parts = line.strip().split()
+                if len(parts) == 2 and parts[1] == "HEAD":
+                    return parts[0]
+    except Exception:
+        pass
+    return None
+
+
+def install_skill_from_github(name, url, targets=None, force_update=False):
+    """Smart install: clone + symlink + version-aware update.
+    Supports Claude Code / Codex / OpenCode skills dirs.
+    targets: list of CLI names to install into; default = all three.
+    force_update: if True, always git pull even if local cache appears fresh.
+    Returns dict {target: {status: 'installed'|'updated'|'up_to_date'|'skipped'|'replaced', detail: str}}.
+    """
+    if targets is None:
+        targets = list(SUPPORTED_CLIS)
     if (
         not name
         or not all(c.isalnum() or c in "-_." for c in name.replace("/", ""))
@@ -984,17 +1853,19 @@ def install_skill_from_github(name, url):
         c.isalnum() or c in "-_." for c in repo
     ):
         raise ValueError(f"invalid owner/repo: {name!r}")
+    for t in targets:
+        if t not in SUPPORTED_CLIS:
+            raise ValueError(
+                f"unsupported target CLI: {t!r}. Supported: {SUPPORTED_CLIS}"
+            )
     if url and not url.startswith("https://github.com/"):
         raise ValueError(f"only github.com urls allowed: {url!r}")
     if not url:
         url = f"https://github.com/{name}"
     else:
-        # ponytail: name/url consistency — refuse mismatched pair to prevent cloning malicious
-        # content under a trusted name. Parse the path and require it to match name.
         from urllib.parse import urlparse
 
         path = urlparse(url).path.strip("/")
-        # path may include trailing ".git" — strip it
         if path.endswith(".git"):
             path = path[:-4]
         if path != name:
@@ -1002,9 +1873,8 @@ def install_skill_from_github(name, url):
                 f"url {url!r} does not match name {name!r} — refusing to clone mismatch"
             )
 
-    target = (
-        SKILLS_CACHE / f"{owner}__{repo}"
-    )  # ponytail: namespace by owner to avoid collisions across different owners with same repo name
+    target = SKILLS_CACHE / f"{owner}__{repo}"
+    cache_state = "fresh"
     if not target.exists():
         target.parent.mkdir(parents=True, exist_ok=True)
         result = subprocess.run(
@@ -1015,16 +1885,54 @@ def install_skill_from_github(name, url):
         )
         if result.returncode != 0:
             raise RuntimeError(f"git clone failed: {result.stderr.strip()[:200]}")
+        cache_state = "cloned"
+    elif force_update:
+        ok, detail = _git_pull_fast_forward(target)
+        cache_state = "updated" if ok else "stale"
+    else:
+        # ponytail: cheap freshness check — compare local HEAD to remote HEAD via
+        # ls-remote (no bandwidth). If they match, skip pull.
+        local_sha = _git_head_sha(target)
+        remote_sha = _git_remote_head_sha(url)
+        if local_sha and remote_sha and local_sha == remote_sha:
+            cache_state = "fresh"
+        else:
+            ok, detail = _git_pull_fast_forward(target)
+            cache_state = "updated" if ok else "stale"
 
-    for skills_root in [
-        Path.home() / ".claude" / "skills",
-        Path.home() / ".codex" / "skills",
-    ]:
+    out: dict = {"cache": target, "cache_state": cache_state, "targets": {}}
+    for cli in targets:
+        skills_root = _skills_root_for(cli)
         skills_root.mkdir(parents=True, exist_ok=True)
         link = skills_root / repo
-        if link.is_symlink() or link.exists():
-            continue
-        link.symlink_to(target)
+        action = "installed"
+        detail = f"linked → {target.name}"
+        if link.is_symlink():
+            try:
+                if link.resolve() == target.resolve():
+                    action = "up_to_date" if cache_state in ("fresh", "cloned") else "updated"
+                    detail = f"already linked, cache {cache_state}"
+                else:
+                    # ponytail: symlink exists but points elsewhere — replace
+                    backup = link.with_suffix(link.suffix + ".bak")
+                    shutil.move(str(link), str(backup))
+                    link.symlink_to(target)
+                    action = "replaced"
+                    detail = f"was pointing to {link.resolve()}; replaced (backup at {backup.name})"
+            except OSError as e:
+                action = "skipped"
+                detail = f"symlink check failed: {e}"
+        elif link.exists():
+            # ponytail: real dir/file at the path — back it up so we don't blow
+            # away user's local skill by accident.
+            backup = link.with_suffix(link.suffix + ".bak")
+            shutil.move(str(link), str(backup))
+            link.symlink_to(target)
+            action = "replaced"
+            detail = f"was a real dir; backed up to {backup.name}, replaced with symlink"
+        else:
+            link.symlink_to(target)
+        out["targets"][cli] = {"status": action, "detail": detail, "link": str(link)}
 
     # ponytail: write sidecar so origin URL survives latest.json roll; idempotent update
     try:
@@ -1034,19 +1942,21 @@ def install_skill_from_github(name, url):
             try:
                 origins = json.loads(SKILL_ORIGINS.read_text())
             except (OSError, ValueError):
-                origins = {}  # ponytail: corrupted sidecar — start fresh, don't break install
+                origins = {}
         origins.setdefault("skills", {})[repo] = {
             "owner": owner,
             "repo": repo,
             "url": url,
             "installed_at": datetime.datetime.now().isoformat(timespec="seconds"),
+            "targets": list(targets),
         }
         SKILL_ORIGINS.write_text(json.dumps(origins, ensure_ascii=False, indent=2))
     except OSError as e:
         sys.stderr.write(f"  [warn] sidecar write failed: {e}\n")
 
     invalidate_local_scan()
-    return str(target)
+    invalidate_repo_index()
+    return out
 
 
 def uninstall_skill(name: str) -> dict:
@@ -1096,6 +2006,7 @@ def uninstall_skill(name: str) -> dict:
         except (OSError, ValueError):
             pass
     invalidate_local_scan()
+    invalidate_repo_index()
     return {"removed_links": removed}
 
 
@@ -1331,7 +2242,11 @@ def find_skill_replacements(
             top_cat = top_record.get("best_category")
             same_cat = bool(inst_cat and top_cat and inst_cat == top_cat)
             strong_overlap = len(top.get("anchors") or []) >= 2
-            much_stronger = top["stars"] > (inst_stars or 0) * 1.5
+            # ponytail: when inst_stars is 0 (PG 没收录的 skill), (inst or 0)*1.5 = 0,
+            # making ANY non-zero candidate "much_stronger" — wildly aggressive. Require a
+            # minimum baseline of 100 stars on the installed skill before allowing replace.
+            baseline = max(100, (inst_stars or 0) * 1.5)
+            much_stronger = top["stars"] > baseline
             mode = (
                 "replace"
                 if (same_cat and strong_overlap and much_stronger)
@@ -1392,6 +2307,7 @@ def set_capability_origin(
 
     SKILL_ORIGINS.write_text(json.dumps(origins, ensure_ascii=False, indent=2))
     invalidate_local_scan()
+    invalidate_repo_index()
     return bucket.get(name, {})
 
 
@@ -1562,6 +2478,7 @@ Execute `{command}` and explain the result.
 """
     target.write_text(body, encoding="utf-8")
     invalidate_local_scan()
+    invalidate_repo_index()
     return str(target)
 
 
@@ -1615,23 +2532,29 @@ def gh_search(q, per_page=20):
                 _SEARCH_PACE["sleep"] = 6.0
                 time.sleep(60)
                 continue
-            GH_SEARCH_STATS["failed"] += 1
+            # ponytail: 2026-08 — on persistent gh api failure, fall back to scraping
+            # the github.com search HTML page directly via the engine ladder
+            # (httpx → cloudscraper → playwright_stealth → jina). Bypasses the
+            # search-API secondary rate limit entirely.
             print(
-                f"  ! gh api failed for q={q[:60]!r}: {stderr[:120]}", file=sys.stderr
+                f"  ! gh api failed, falling back to HTML scrape: {stderr[:80]}",
+                file=sys.stderr,
             )
-            return []
+            return _gh_search_html_fallback(q, per_page=per_page)
         except subprocess.TimeoutExpired:
-            GH_SEARCH_STATS["failed"] += 1
-            print(f"  ! gh api timeout (>60s) for q={q!r}", file=sys.stderr)
-            return []
+            print(f"  ! gh api timeout (>60s) for q={q!r}; trying HTML", file=sys.stderr)
+            return _gh_search_html_fallback(q, per_page=per_page)
         except Exception as e:
-            GH_SEARCH_STATS["failed"] += 1
-            print(f"  ! gh search error: {e}", file=sys.stderr)
-            return []
+            print(f"  ! gh search error: {e}; trying HTML", file=sys.stderr)
+            return _gh_search_html_fallback(q, per_page=per_page)
     else:
-        GH_SEARCH_STATS["failed"] += 1
-        return []
+        # for/else runs only when the loop completes WITHOUT break — i.e. both
+        # attempts failed without raising. Fall back to HTML scrape.
+        return _gh_search_html_fallback(q, per_page=per_page)
 
+    # ponytail: success path — gh api returned JSON; build the repo dict list
+    # from `items`. Only reached when `break` exited the for-loop on attempt 1
+    # or attempt 2 (after a 60s wait, gh api recovered).
     out = []
     for item in data.get("items", []):
         out.append(
@@ -1651,6 +2574,115 @@ def gh_search(q, per_page=20):
     return out
 
 
+def _parse_github_search_html(html: str) -> list:
+    """Parse github.com/search HTML for repository cards.
+    ponytail: GitHub's search HTML is JS-rendered for full data, but the SSR'd repo
+    cards carry enough signals (name, description, language, stars, topics in
+    data-ga-click attributes) for us to extract basic fields. We also pull
+    stars from the <a href="/owner/repo/stargazers">123,456</a> pattern.
+    """
+    out: list[dict] = []
+    # ponytail: extract owner/repo from <a class="Link" data-view-component href="/owner/repo">
+    for m in re.finditer(
+        r'<a[^>]+href="/([\w.-]+)/([\w.-]+)"[^>]*data-view-component[^>]*>([^<]+)</a>',
+        html,
+    ):
+        owner, repo, name_text = m.group(1), m.group(2), m.group(3).strip()
+        if not owner or not repo or owner in ("login", "logout", "settings", "notifications"):
+            continue
+        if repo in ("issues", "pulls", "actions", "projects", "wiki", "security"):
+            continue
+        # Approximate stars via aria-label or text near stargazers
+        stars = 0
+        # find next stargazers count in same article block
+        block = html[m.start(): m.start() + 4000]
+        s_m = re.search(
+            r'href="/' + re.escape(owner) + r'/' + re.escape(repo)
+            + r'/stargazers"[^>]*>.*?>([\d,\.]+)([kKmMbB]?)\s*</a>',
+            block,
+            re.DOTALL,
+        )
+        if s_m:
+            num = s_m.group(1).replace(",", "")
+            mult = {"k": 1_000, "m": 1_000_000, "b": 1_000_000_000}.get(
+                s_m.group(2).lower(), 1
+            )
+            try:
+                stars = int(float(num) * mult)
+            except ValueError:
+                pass
+        # description
+        d_m = re.search(
+            r'<p class="[^"]*col-9[^"]*"[^>]*>(.*?)</p>', block, re.DOTALL
+        )
+        desc = re.sub(r"<[^>]+>", "", d_m.group(1)).strip() if d_m else ""
+        # language
+        lang_m = re.search(
+            r'itemprop="programmingLanguage">([^<]+)<', block
+        )
+        lang = lang_m.group(1).strip() if lang_m else "—"
+        # topics: scrape from the badge list
+        topics: list[str] = []
+        for t_m in re.finditer(r'class="topic-tag[^"]*"[^>]*>([^<]+)<', block):
+            topics.append(t_m.group(1).strip())
+        out.append(
+            {
+                "name": f"{owner}/{repo}",
+                "desc": desc[:300],
+                "url": f"https://github.com/{owner}/{repo}",
+                "stars": stars,
+                "forks": 0,
+                "lang": lang,
+                "topics": topics,
+                "updated": "",
+                "pushed": "",
+                "score": 0.0,
+                "source": "github_search_html",
+            }
+        )
+    # dedupe by name
+    seen: set[str] = set()
+    deduped: list[dict] = []
+    for r in out:
+        if r["name"] in seen:
+            continue
+        seen.add(r["name"])
+        deduped.append(r)
+    return deduped
+
+
+def _gh_search_html_fallback(q: str, per_page: int = 20) -> list:
+    """Scrape github.com/search?q=<query>&type=repositories via the tiered engine ladder.
+    Used when gh api search is rate-limited. Returns parsed repo dicts.
+    ponytail: search HTML is JS-rendered; the SSR'd cards still carry name/desc/lang/stars
+    which is enough for trending-style data. Stars are the only missing accurate field — we
+    try to extract from the stargazers link pattern; if not found, leave as 0 (caller can
+    enrich via gh_fetch_repo later).
+    """
+    url = (
+        f"https://github.com/search?q={urllib.parse.quote(q)}"
+        f"&type=repositories&s=stars&o=desc"
+    )
+    try:
+        from scrapers import fetch_html
+
+        html_text, engine = fetch_html(url, strategy="tiered", timeout=45)
+    except Exception as e:
+        print(f"  ! search-html fallback failed to even import scrapers: {e}", file=sys.stderr)
+        GH_SEARCH_STATS["failed"] += 1
+        return []
+    if not html_text:
+        print(f"  ! search-html fallback returned empty (engine={engine})", file=sys.stderr)
+        GH_SEARCH_STATS["failed"] += 1
+        return []
+    parsed = _parse_github_search_html(html_text)
+    if parsed:
+        print(f"  · search-html via {engine}: {len(parsed)} repos (q={q[:60]!r})", file=sys.stderr)
+        return parsed[:per_page]
+    GH_SEARCH_STATS["failed"] += 1
+    return []
+
+
 # ponytail: hand-picked repos that escape topic/description search but are obvious AI tools
 # (some maintainers never set topics, some are <5k stars at crawl time). Force-include on every
 # crawl so the 5k+ view reflects what users actually expect to see.
@@ -1658,6 +2690,17 @@ MANUAL_SEED_REPOS = frozenset(
     {
         # User-curated 2026-07-21 list — these all slipped past TOP_5K_QUERIES at crawl time
         "Egonex-AI/Understand-Anything",  # knowledge-graph IDE (75k stars, claude-code topic)
+        # 2026-09-06 用户赛道清单 — agent 基建/记忆/内容管线等精选项目，强制收录
+        "letta-ai/letta",               # MemGPT 分层记忆
+        "supermemoryai/supermemory",    # 记忆 API
+        "memvid/memvid",              # 单文件视频记忆
+        "labring/FastGPT",              # 知识库平台
+        "funstory-ai/BabelDOC",            # 学术文档翻译
+        "D4Vinci/Scrapling",            # 自适应爬虫（agent 手脚）
+        "SWivid/F5-TTS",                # 语音合成
+        "lllyasviel/Fooocus",           # 图像生成
+        "coderamp-labs/gitingest",      # 代码库 → LLM 文本
+        "VoltAgent/awesome-agent-skills", # skills 聚合清单
         "lodestone/hallmark",  # anti-AI-slop design skill
         "Shubhamsaboo/awesome-llm-apps",  # 100+ AI agent apps (125k stars, generic topics)
         "stablyai/orca",  # desktop ADE for parallel coding agents (24k stars)
@@ -1700,7 +2743,7 @@ def gh_fetch_repo(full_name):
     }
 
 
-def fetch_huggingface_trending(max_items: int = 30) -> list:
+def fetch_huggingface_trending(max_items: int = 30, sort: str = "likes7d") -> list:
     """HuggingFace Trending Spaces — JSON API (no auth). Returns repo-shaped dicts so the
     rest of the pipeline (translation, upsert, hot_now) works without special-casing.
 
@@ -1708,42 +2751,68 @@ def fetch_huggingface_trending(max_items: int = 30) -> list:
     `trendingScore` (their internal 7-day pop score). We surface that as `stars` so the
     rest of the UI / sorting treats HF spaces uniformly. `likes` becomes total likes (lifetime).
 
+    2026-09: sort 白名单与 sources/huggingface_models.py 共用（两个 HF fetcher
+    一套规则），非法值回退 likes7d。
+
     Source: https://huggingface.co/api/spaces?sort=likes7d&limit=N (public JSON).
     Falls back to system `curl` when Python's SSL certs are missing (macOS Python builds
     commonly lack the cert chain). Returns [] on any error — HF down shouldn't block
     the GitHub crawl."""
-    url = f"https://huggingface.co/api/spaces?sort=likes7d&limit={max_items}"
-    data = None
-    # ponytail: try Python urllib first (zero deps)
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "lodestone/1.0"})
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            data = json.loads(resp.read())
-    except Exception as e:
-        # ponytail: macOS Python often lacks system certs — fall back to system `curl`
-        # which uses the OS keychain. Public JSON API, no secrets at risk.
+        from sources.huggingface_models import VALID_SORTS
+    except Exception:
+        VALID_SORTS = ("trending", "likes7d", "downloads", "downloads7d", "updated")
+    if sort not in VALID_SORTS:
+        print(f"  [warn] HF spaces: invalid sort {sort!r}, falling back to likes7d", file=sys.stderr)
+        sort = "likes7d"
+    url = f"https://huggingface.co/api/spaces?sort={sort}&limit={max_items}"
+    data = None
+    # ponytail: 2026-09 — httpx 优先（自带 certifi 证书链）。本机实测 urllib 100%
+    # SSL: CERTIFICATE_VERIFY_FAILED（macOS Python 缺系统证书链），curl 走系统
+    # 代理偶发 Connection reset — 两级都塌导致 Spaces 分类连续两次爬到 0 条。
+    try:
+        import httpx
+
+        r = httpx.get(
+            url, timeout=20, headers={"User-Agent": "lodestone/1.0"}, follow_redirects=True
+        )
+        if r.status_code == 200 and r.text.strip():
+            data = r.json()
+    except Exception:
+        pass
+    # ponytail: httpx 已拿到数据就别再走旧路径 — 旧路径 urllib 失败后 curl 再失败
+    # 会 return []，把 httpx 的成功结果一起丢掉（Spaces 连续 0 条的根因之二）。
+    if data is None:
+        # ponytail: try Python urllib first (zero deps)
         try:
-            out = subprocess.run(
-                # ponytail: `-q` skips ~/.curlrc (which appends "HTTP %{http_code}…" that
-                # would break json.loads on the captured stdout). Public API, no auth.
-                ["curl", "-q", "-sS", "--max-time", "20", "-A", "lodestone/1.0", url],
-                capture_output=True,
-                text=True,
-                timeout=25,
-            )
-            if out.returncode == 0 and out.stdout.strip():
-                data = json.loads(out.stdout)
-            else:
+            req = urllib.request.Request(url, headers={"User-Agent": "lodestone/1.0"})
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                data = json.loads(resp.read())
+        except Exception as e:
+            # ponytail: macOS Python often lacks system certs — fall back to system `curl`
+            # which uses the OS keychain. Public JSON API, no secrets at risk.
+            try:
+                out = subprocess.run(
+                    # ponytail: `-q` skips ~/.curlrc (which appends "HTTP %{http_code}…" that
+                    # would break json.loads on the captured stdout). Public API, no auth.
+                    ["curl", "-q", "-sS", "--max-time", "20", "-A", "lodestone/1.0", url],
+                    capture_output=True,
+                    text=True,
+                    timeout=25,
+                )
+                if out.returncode == 0 and out.stdout.strip():
+                    data = json.loads(out.stdout)
+                else:
+                    print(
+                        f"  [warn] HF trending (curl) failed: {out.stderr.strip()[:120] or e}",
+                        file=sys.stderr,
+                    )
+                    return []
+            except Exception as e2:
                 print(
-                    f"  [warn] HF trending (curl) failed: {out.stderr.strip()[:120] or e}",
-                    file=sys.stderr,
+                    f"  [warn] HF trending fetch failed: {e}; curl: {e2}", file=sys.stderr
                 )
                 return []
-        except Exception as e2:
-            print(
-                f"  [warn] HF trending fetch failed: {e}; curl: {e2}", file=sys.stderr
-            )
-            return []
     out = []
     # ponytail: HF API returns a list on success, a dict ({"error": "..."}) on rate-limit
     # / auth errors. Be defensive — only iterate if it's actually a list.
@@ -1823,8 +2892,9 @@ def fetch_github_trending(since: str = "daily", max_repos: int = 30):
     """Scrape github.com/trending and enrich each entry with full data via gh_fetch_repo.
 
     Why: search-by-stars misses fresh AI tools that haven't crossed 5k yet but are trending today.
-    HTML sources, in order (see scrapers/ — optional real-browser engines ported from youzi):
-      1. firecrawl → crawl4ai → playwright (JS-rendered DOM, any subset installed works)
+    HTML sources, in order (see scrapers/ — 4-engine tiered ladder, 2026-09):
+      1. httpx → cloudscraper → playwright_stealth → jina (light→heavy→cloud,
+         quality-gated: each tier must return a REAL trending page or we escalate)
       2. plain urllib (stdlib, original path)
       3. all failed → fetch_recent_active_repos (search-API proxy for trending)
     Returns normalized repo dicts (same shape as gh_search output) with extra 'source' marker.
@@ -1832,14 +2902,13 @@ def fetch_github_trending(since: str = "daily", max_repos: int = 30):
     url = f"https://github.com/trending?since={since}"
     html_text, engine = "", "none"
     # tier 1: real scrapers — optional package; missing/broken → urllib still works.
-    # ponytail: strategy="parallel" — every available engine races under one wall-clock
-    # deadline; the longest meaningful HTML wins. Lets fast engines short-circuit and
-    # slow ones enrich when needed (firecrawl+crawl4ai+playwright complement each other
-    # rather than stopping at the first success).
+    # ponytail: strategy="tiered" — engines escalate light→heavy; each result must
+    # pass the quality gate (≥5 Box-row articles for trending) before it's accepted,
+    # so a bot-check page from httpx escalates to cloudscraper instead of winning.
     try:
         from scrapers import fetch_html
 
-        html_text, engine = fetch_html(url, strategy="parallel")
+        html_text, engine = fetch_html(url, strategy="tiered")
     except ImportError:
         pass
     # tier 2: stdlib urllib
@@ -2009,22 +3078,98 @@ def _crawl_inner():
         print("[crawl] scrapers: none (scrapers/ package missing; urllib only)")
     cat_results = []
 
+    # ponytail: 2026-09 — GraphQL 批量搜索。全部 GitHub query（20 分类 ~119 条 +
+    # 5k+ pass 85 条）先收集、去重、分批并行执行（分类批 6×first:30，5k 批
+    # 8×first:50；失败批对半拆分重试）。实测搜索阶段 ~12 分钟（串行 REST）→
+    # ~3 分钟（2026-09 全量验证：204 query 中 189 个走 GraphQL，15 个 REST 兜底）。
+    # GraphQL 彻底失败的 query 回退 REST gh_search（自适应 pace + HTML 兜底）。
+    _search_t0 = time.monotonic()
+    _all_gh_queries = [q for cat in CATEGORIES for q in cat.get("queries", [])]
+    _batch: dict[str, list] = {}
+    try:
+        from sources.github_graphql import gh_search_batch
+
+        print(
+            f"[crawl] GraphQL batch search: {len(_all_gh_queries)} category queries "
+            f"+ {len(TOP_5K_QUERIES)} 5k+ queries…"
+        )
+        _batch.update(
+            gh_search_batch(_all_gh_queries, per_page=30, batch_size=6)
+        )
+        _batch.update(
+            gh_search_batch(TOP_5K_QUERIES, per_page=50, batch_size=8)
+        )
+    except Exception as e:
+        print(
+            f"  [warn] GraphQL batch unavailable ({e}); REST serial fallback "
+            f"({len(_all_gh_queries) + len(TOP_5K_QUERIES)} queries, slow)",
+            file=sys.stderr,
+        )
+
+    def _query_repos(q: str, per_page: int = 20) -> list:
+        """批量结果优先；GraphQL 没覆盖到的 query 回退 REST gh_search。"""
+        if q in _batch:
+            return _batch[q]
+        _search_pace()  # rate limit: 30 search req/min — adaptive sleep between ALL search calls
+        try:
+            repos = gh_search(q, per_page=per_page)
+        except Exception as e:
+            print(f"  [warn] query '{q}' failed: {e}", file=sys.stderr)
+            repos = []
+        _batch[q] = repos
+        return repos
+
     for cat in CATEGORIES:
         seen = set()
         repos = []
-        # ponytail: empty `queries` = non-GitHub source category (e.g. HuggingFace). Skip the
-        # gh_search loop and call the dedicated fetcher instead. Keeps the rest of the pipeline
-        # (translation, hot_now, upsert, JSON snapshot) working uniformly.
+        # ponytail: empty `queries` = non-GitHub source category. Dispatch by the
+        # `source` field so adding new sources (HF Spaces, HF Models, MCP Registry,
+        # ...) is a single line. Keeps the rest of the pipeline (translation,
+        # hot_now, upsert, JSON snapshot) working uniformly.
         if not cat["queries"]:
-            if cat["id"] == "huggingface":
+            src = cat.get("source")
+            if src == "hf_spaces":
                 repos = fetch_huggingface_trending(max_items=30)
+            elif src == "hf_models":
+                try:
+                    from sources.huggingface_models import fetch_huggingface_models_trending
+                    repos = fetch_huggingface_models_trending(max_items=30)
+                except Exception as e:
+                    print(f"  [warn] HF models fetcher failed: {e}", file=sys.stderr)
+                    repos = []
+            elif src == "mcp_registry":
+                try:
+                    from sources.mcp_registry import fetch_mcp_registry
+                    repos = fetch_mcp_registry(max_items=30)
+                except Exception as e:
+                    print(f"  [warn] MCP registry fetcher failed: {e}", file=sys.stderr)
+                    repos = []
+            elif src == "arxiv":
+                try:
+                    from sources.arxiv_papers import fetch_arxiv_recent
+                    repos = fetch_arxiv_recent(max_items=30)
+                except Exception as e:
+                    print(f"  [warn] arXiv fetcher failed: {e}", file=sys.stderr)
+                    repos = []
+            # else: an unknown source type — drop with warning so silent data loss is loud
+            if not repos and src:
+                print(
+                    f"  [warn] category {cat['id']!r}: source {src!r} returned 0 items",
+                    file=sys.stderr,
+                )
         else:
             for q in cat["queries"]:
-                _search_pace()  # rate limit: 30 search req/min — adaptive sleep between ALL search calls
-                for r in gh_search(q):
-                    if r["name"] in seen:
+                for r in _query_repos(q, per_page=30):
+                    # ponytail: 2026-09 — 分类结果过完整 AI 过滤。宽 query
+                    # （topic:workflow-orchestration 等）会带进 airflow/nvm 这类
+                    # 非 AI 项目；AI_TOPIC_HARD 已补齐变体（vision-language-model/
+                    # mcp/...）避免误伤 Qwen-VL/playwright-mcp。
+                    if not is_ai_relevant(r):
                         continue
-                    seen.add(r["name"])
+                    ukey = normalize_git_url(r.get("url")) or r["name"]
+                    if ukey in seen:
+                        continue
+                    seen.add(ukey)
                     repos.append(r)
         # sort by stars desc
         repos.sort(key=lambda x: x["stars"], reverse=True)
@@ -2041,17 +3186,21 @@ def _crawl_inner():
         print(f"  ✓ {cat['name']}: {len(repos)} repos")
 
     # ponytail: 5k+ pass — catch mainstream AI tools not matched by category queries
-    print(f"[crawl] 5k+ pass ({len(TOP_5K_QUERIES)} queries, sleep 2s between)...")
+    print(f"[crawl] 5k+ pass ({len(TOP_5K_QUERIES)} queries)…")
     top_5k_repos = {}
     for q in TOP_5K_QUERIES:
-        _search_pace()  # rate limit: 30 req/min, adaptive after rate-limit hits
         try:
-            for r in gh_search(q, per_page=100):
+            for r in _query_repos(q, per_page=100):
                 if not is_ai_relevant(r):
                     continue
                 top_5k_repos.setdefault(r["name"], r)
         except Exception as e:
             print(f"  [warn] 5k+ query '{q}' failed: {e}")
+
+    print(
+        f"  ✓ 5k+ pass: {len(top_5k_repos)} repos after AI filter "
+        f"(search phase {time.monotonic() - _search_t0:.0f}s)"
+    )
 
     print(f"  ✓ 5k+ pass: {len(top_5k_repos)} repos after AI filter")
 
@@ -2068,9 +3217,23 @@ def _crawl_inner():
     # ponytail: GitHub trending — catches fresh AI tools with <5k stars that are hot today.
     # Pull BOTH daily and weekly — daily = today's buzz, weekly = rising stars the daily
     # doesn't yet show. Dedupe on name so a repo on both lists is counted once.
-    print("[crawl] GitHub trending (daily + weekly)…")
-    trending_daily = fetch_github_trending(since="daily", max_repos=30)
-    trending_weekly = fetch_github_trending(since="weekly", max_repos=30)
+    print("[crawl] GitHub trending (daily + weekly, parallel)…")
+    # ponytail: 2026-09 — daily/weekly 两路并发（各自走分级引擎阶梯），
+    # 串行要付两倍阶梯延迟。失败的一路返回 []，不拖累另一路。
+    trending_daily, trending_weekly = [], []
+    with ThreadPoolExecutor(max_workers=2) as _tex:
+        _futs = {
+            _tex.submit(fetch_github_trending, "daily", 30): "daily",
+            _tex.submit(fetch_github_trending, "weekly", 30): "weekly",
+        }
+        for _fut, _which in _futs.items():
+            try:
+                if _which == "daily":
+                    trending_daily = _fut.result()
+                else:
+                    trending_weekly = _fut.result()
+            except Exception as e:
+                print(f"  [warn] trending {_which} failed: {e}", file=sys.stderr)
     trending_seen, trending = set(), []
     for r in trending_daily + trending_weekly:
         if r["name"] in trending_seen:
@@ -2078,7 +3241,9 @@ def _crawl_inner():
         trending_seen.add(r["name"])
         trending.append(r)
     for r in trending:
-        if r["name"] not in top_5k_repos:
+        # ponytail: 合入 5k 池前过 AI 过滤 — 池子其他入口都过滤，这里不过滤
+        # 会让 nvm（87k⭐ 的 Node 版本管理器）这种非 AI 热门项目直接冲进 hot_now 头部。
+        if is_ai_relevant(r) and r["name"] not in top_5k_repos:
             top_5k_repos[r["name"]] = r
     trending_ai = [r for r in trending if is_ai_relevant(r)]
     print(
@@ -2114,13 +3279,22 @@ def _crawl_inner():
         if r["name"] not in {p["name"] for p in to_persist}:
             r["best_category"] = None
             to_persist.append(r)
+    # ponytail: 去重规则 = git 完整仓库地址（normalize_git_url 归一化：小写/
+    # 去 .git/去尾斜杠/gh:// 前缀）。同一仓库从 GitHub 搜索、trending、MCP
+    # registry 多路进来只会留一份（分类归属仍是多对多）。
+    # 2026-09：trending 标记在去重时打上 — JSON 快照此前 0 标记，前端「趋势」
+    # tab 一直在显示按星标排序的兜底数据，与 github.com/trending 对不上。
+    _trending_names = {r["name"] for r in trending_ai}
     seen = set()
     deduped = []
     for r in to_persist:
-        if r["name"] in seen:
+        ukey = normalize_git_url(r.get("url")) or r["name"]
+        if ukey in seen:
             continue
-        seen.add(r["name"])
+        seen.add(ukey)
         r["is_ai_relevant"] = is_ai_relevant(r)
+        if r["name"] in _trending_names:
+            r["trending"] = True
         deduped.append(r)
 
     # ponytail: translate once, cache forever — descriptions don't change day-to-day
@@ -2131,6 +3305,20 @@ def _crawl_inner():
         r["desc_zh"] = zh.get(f"{r['name']}::desc", "") or r.get("desc_zh", "")
         r["facts"] = facts_for_repo(r)
         r["local_installed"] = r["name"].split("/")[-1] in installed_skills
+        # 精选赛道标记 — hot_now 保底浮出用（CURATED_ALLOWLIST + 手工种子）
+        r["curated"] = (r["name"].lower() in CURATED_ALLOWLIST) or (
+            r["name"] in MANUAL_SEED_REPOS
+        )
+
+    # ponytail: 2026-09 — 详细中文描述（README 首段翻译，缓存复用）。
+    # 取代抽屉里的按需「中文详介」— 数据随快照就绪，前端零等待。
+    try:
+        n_sum = enrich_summaries(deduped)
+        print(f"  ✓ summaries: {n_sum}/{len(deduped)} repos with zh summary")
+    except Exception as e:
+        print(f"  [warn] summary enrichment failed: {e}", file=sys.stderr)
+        for r in deduped:
+            r.setdefault("summary_zh", r.get("desc_zh") or "")
 
     failed = GH_SEARCH_STATS["failed"]
     if failed:
@@ -2187,8 +3375,26 @@ def _crawl_inner():
         "date": datetime.date.today().isoformat(),
         "fetched_at": datetime.datetime.now().isoformat(timespec="seconds"),
         "total_unique": len(deduped),
-        "hot_now": sorted(deduped, key=lambda r: r.get("stars", 0), reverse=True)[:40],
+        # ponytail: hot_now = 星标 Top-40 + 精选赛道项目保底（用户清单里的项目
+        # 必须可见 — 此前只在 5k 池里，按星标排不进前 40 就整页不可见）。
+        "hot_now": (
+            lambda top40: top40
+            + [
+                r
+                for r in deduped
+                if r.get("curated")
+                and r["name"] not in {x["name"] for x in top40}
+            ]
+        )(
+            sorted(deduped, key=lambda r: r.get("stars", 0), reverse=True)[:40]
+        ),
         "categories": cat_results,
+        # 2026-09：trending 专区数据 — 今日上榜的完整列表（带 stars_today），
+        # 前端「趋势」tab 直接消费，不再用 hot_now 兜底。
+        "trending": sorted(
+            [r for r in deduped if r.get("trending")],
+            key=lambda r: -(r.get("stars_today") or 0),
+        ),
         # ponytail: stars_today carried over from trending scrape — /api/gain uses this when
         # no PG; previously empty because the field lived only on PG rows, not JSON snapshots.
         "stars_today": {
@@ -2250,16 +3456,15 @@ def _installed_segments(local: dict) -> set:
     """Flatten detect_local_skills() output to a set of FULL owner/repo names.
     ponytail: use full names only — bare segments like "skills" cause false positives.
     Sources:
-      1. local skills/commands/agents → wrap as 'local/<name>'
-      2. plugin cache .git/config origin (when plugin was git-installed, e.g. obra/superpowers)
-      3. plugin's marketplace source repo (when plugin lives in the marketplace repo,
+      1. plugin cache .git/config origin (when plugin was git-installed, e.g. obra/superpowers)
+      2. plugin's marketplace source repo (when plugin lives in the marketplace repo,
          source is './' relative to marketplace — use marketplace URL as the source)
-      4. known_marketplaces.json (covers the marketplace URL itself)
+      3. known_marketplaces.json (covers the marketplace URL itself)
+      4. local skills/commands/agents — covered separately by `plugin_segs` (bare name)
+         in _annotate_local_installed; do NOT add 'local/<name>' here (would never match
+         any real GitHub repo name and was previously dead code).
     """
     segs = set()
-    for kind in ("skills", "commands", "agents"):
-        for k in (local.get(kind) or {}).keys():
-            segs.add(f"local/{k}")
 
     # ponytail: load marketplace source map once
     mp_source: dict[str, str] = {}
@@ -2375,12 +3580,26 @@ def serve(port=8765):
                 ("http://localhost", "http://127.0.0.1", "http://[::1]")
             )
 
-        def _json(self, data, status=200):
+        def _json(self, data, status=200, etag=False):
             body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+            tag = None
+            if etag:
+                # ponytail: 2026-09 — ETag 协商。前端 30s 轮询 /api/data（~600KB/次），
+                # 304 让未变化的响应零传输。no-store 阻止浏览器自动缓存，所以由
+                # 前端手动带 If-None-Match（见 frontend/src/lib/api.ts）。
+                tag = '"' + __import__("hashlib").md5(body).hexdigest()[:16] + '"'
+                if (self.headers.get("If-None-Match") or "").strip() == tag:
+                    self.send_response(304)
+                    self.send_header("ETag", tag)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            if tag:
+                self.send_header("ETag", tag)
             self.end_headers()
             self.wfile.write(body)
 
@@ -2411,7 +3630,8 @@ def serve(port=8765):
                                 "hot_now": hot,
                                 "categories": cats,
                                 "fetched_at": datetime.datetime.now().isoformat(),
-                            }
+                            },
+                            etag=True,
                         )
                     except Exception as e:
                         print(
@@ -2434,7 +3654,13 @@ def serve(port=8765):
                             "hot_now": hot,
                             "categories": cats,
                             "fetched_at": snap.get("fetched_at"),
-                        }
+                            # 视觉审查修复：JSON 回退模式此前丢掉 stars_today，
+                            # 前端「今日上榜」永远显示 0（与卡片 +2206 当场矛盾）。
+                            "stars_today": snap.get("stars_today") or {},
+                            # 2026-09：trending 专区列表（趋势 tab 消费）
+                            "trending": snap.get("trending") or [],
+                        },
+                        etag=True,
                     )
                 return self._json(
                     {
@@ -2491,6 +3717,139 @@ def serve(port=8765):
                         ),
                     }
                 )
+            # ponytail: /api/stats — lightweight digest for the 📊 RTK-style token economy
+            # panel + ecosystem breakdown. Computed from PG (or JSON snapshot fallback).
+            if self.path == "/api/stats":
+                try:
+                    stats = {"by_lang": {}, "by_topic": {}, "total_repos": 0, "total_stars": 0}
+                    pg_failed = False
+                    # ponytail: 2026-08 — language allowlist. The repo `lang`
+                    # field can hold non-language tags leaked from upstream
+                    # sources ("Transformers", "Mcp server", "Model" — these
+                    # are HF library_name / registry pseudo-langs, not programming
+                    # languages). Filter to a curated set so by_lang counts
+                    # programming languages only.
+                    LANG_ALLOWLIST = {
+                        "Python", "JavaScript", "TypeScript", "Java", "C++", "C",
+                        "C#", "Go", "Rust", "Ruby", "PHP", "Swift", "Kotlin",
+                        "Scala", "Shell", "HTML", "CSS", "Lua", "Dart", "Elixir",
+                        "Haskell", "OCaml", "R", "Julia", "Racket", "Erlang",
+                        "Groovy", "Perl", "Nim", "Crystal", "Zig", "V", "Odin",
+                        "Vue", "Svelte", "CoffeeScript", "Hack",
+                        "F#", "Clojure", "Common Lisp", "Emacs Lisp", "Scheme",
+                        "Tcl", "Vala", "Verilog", "VHDL", "Solidity", "Move",
+                        "Dockerfile", "Makefile",
+                        "Markdown", "HTML+ERB", "PLpgSQL",
+                    }
+                    if db._DB_OK:
+                        try:
+                            conn = db.connect()
+                            try:
+                                cur = conn.cursor()
+                                cur.execute(
+                                    "SELECT lang, COUNT(*), SUM(stars) FROM repos "
+                                    "WHERE is_ai_relevant AND lang IS NOT NULL "
+                                    "AND lang = ANY(%s) "
+                                    "GROUP BY lang",
+                                    (list(LANG_ALLOWLIST),),
+                                )
+                                for row in cur.fetchall():
+                                    stats["by_lang"][row[0]] = {"count": row[1], "stars": int(row[2] or 0)}
+                                cur.execute("SELECT t, COUNT(*) FROM (SELECT unnest(topics) AS t FROM repos WHERE is_ai_relevant) x GROUP BY t ORDER BY COUNT(*) DESC LIMIT 20")
+                                for row in cur.fetchall():
+                                    stats["by_topic"][row[0]] = row[1]
+                                cur.execute("SELECT COUNT(*), SUM(stars) FROM repos WHERE is_ai_relevant")
+                                row = cur.fetchone()
+                                stats["total_repos"] = row[0]
+                                stats["total_stars"] = int(row[1] or 0)
+                            finally:
+                                conn.close()
+                        except Exception as e:
+                            # 2026-08 — PG installed but unreachable. Fall through to
+                            # JSON snapshot path so /api/stats doesn't return empty
+                            # when the credentials are wrong / DB is down.
+                            pg_failed = True
+                            stats["db_error"] = str(e)
+                    if (not db._DB_OK) or pg_failed:
+                        # ponytail: JSON fallback (no PG OR PG failed)
+                        latest = DATA / "latest.json"
+                        if latest.exists():
+                            snap = json.loads(latest.read_text())
+                            counts: dict[str, int] = {}
+                            for cat in snap.get("categories", []):
+                                for x in cat.get("repos", []):
+                                    # normalize lang casing — 'Python' and 'python' should merge
+                                    raw = (x.get("lang") or "—").strip()
+                                    key = raw if raw == "—" else raw[:1].upper() + raw[1:].lower()
+                                    # 2026-08 — filter to programming languages only;
+                                    # upstream tags like "Transformers", "Mcp server"
+                                    # would otherwise show in by_lang. Compare case-
+                                    # insensitively since the allowlist uses Title Case
+                                    # but data may come in any case.
+                                    if key != "—" and key not in LANG_ALLOWLIST and key.lower() not in {l.lower() for l in LANG_ALLOWLIST}:
+                                        continue
+                                    counts[key] = counts.get(key, 0) + 1
+                            # sort by count desc, keep top 15
+                            sorted_langs = sorted(counts.items(), key=lambda x: -x[1])[:15]
+                            stats["by_lang"] = {k: {"count": v, "stars": 0} for k, v in sorted_langs}
+                            # ponytail: same dedup logic for topics — lowercase normalize
+                            topic_counts: dict[str, int] = {}
+                            for cat in snap.get("categories", []):
+                                for x in cat.get("repos", []):
+                                    for t in (x.get("topics") or []):
+                                        tk = t.strip().lower()
+                                        if tk:
+                                            topic_counts[tk] = topic_counts.get(tk, 0) + 1
+                            sorted_topics = sorted(topic_counts.items(), key=lambda x: -x[1])[:30]
+                            stats["by_topic"] = {k: v for k, v in sorted_topics}
+                            stats["total_repos"] = snap.get("total_unique", 0)
+                            stats["total_stars"] = sum(r.get("stars", 0) for r in snap.get("hot_now", []))
+                            if pg_failed:
+                                stats["note"] = "PG unreachable — showing JSON snapshot"
+                    self._json(stats)
+                except Exception as e:
+                    self._json({"error": str(e)}, status=500)
+                return
+
+            # ponytail: comprehensive Chinese README on demand.
+            # GET /api/repo/<owner>/<repo>/readme[?force=1]
+            # Returns {text, source_url, fetched_at, translator, from_cache}.
+            if self.path.startswith("/api/repo/") and self.path.endswith("/readme"):
+                try:
+                    inner = self.path[len("/api/repo/") : -len("/readme")].strip("/")
+                    parsed_q = urllib.parse.urlparse(self.path)
+                    qs = urllib.parse.parse_qs(parsed_q.query)
+                    force = qs.get("force", ["0"])[0] in ("1", "true", "yes")
+                    full_name = urllib.parse.unquote(inner)
+                    result = get_readme_zh(full_name, force=force)
+                    if result.get("error") and not result.get("text"):
+                        return self._json(result, status=404)
+                    return self._json(
+                        {
+                            "ok": True,
+                            "repo": full_name,
+                            "text": result.get("text", ""),
+                            "source_url": result.get("source_url", ""),
+                            "fetched_at": result.get("fetched_at", ""),
+                            "translator": result.get("translator", ""),
+                            "from_cache": result.get("from_cache", False),
+                            "fallback": result.get("fallback", ""),
+                        }
+                    )
+                except Exception as e:
+                    return self._json({"ok": False, "error": str(e)}, status=500)
+
+            if self.path == "/api/scrapers/status":
+                # ponytail: exposes the {engine: available} map for the 🛠 引擎
+                # panel in the UI. Cached via scrapers.status() which itself caches
+                # the underlying is_available() calls.
+                try:
+                    from scrapers import status as _scraper_status
+
+                    self._json(_scraper_status())
+                except ImportError:
+                    self._json({"error": "scrapers module unavailable"}, status=503)
+                return
             if self.path == "/api/workbuddy":
                 picks_path = DATA / "workbuddy_picks.json"
                 picks = []
@@ -2534,7 +3893,9 @@ def serve(port=8765):
                             f"  [warn] /api/top db read failed: {e}; falling back to latest.json",
                             file=sys.stderr,
                         )
-                # ponytail: fallback — paginate all repos from latest.json in-memory
+                # ponytail: fallback — paginate all repos from latest.json in-memory.
+                # Filter to 1k+ stars to mirror PG query_top_5k's star gate so the
+                # JSON-only mode doesn't show 50-star repos in the "1k+ 主流" view.
                 latest = DATA / "latest.json"
                 if latest.exists():
                     snap = json.loads(latest.read_text())
@@ -2553,22 +3914,35 @@ def serve(port=8765):
                             "stars", 0
                         ):
                             by_name[n] = r
+                    # 2026-08 — drop the ≥1000 ⭐ filter. The "1k+ 主流 AI 项目"
+                    # view should show ALL mainstream AI tools / skills / plugins
+                    # regardless of star count (a fresh trending MCP server with
+                    # 200 stars is still mainstream). The category filter at the
+                    # front-end side is the right way to gate; the API should
+                    # return the full pool.
+                    repos_1k = list(by_name.values())
                     # ponytail: pin MANUAL_SEED_REPOS to the front so they show up regardless of stars rank
                     # (lidge-jun/opencodex = 3264⭐ is in MANUAL_SEED but doesn't make top 48 by stars)
-                    seen = set(by_name.keys())
+                    seen = set(r["name"] for r in repos_1k)
                     pinned_first = []
                     for full_name in MANUAL_SEED_REPOS:
                         if full_name in seen:
                             pinned_first.append(by_name[full_name])
                             seen.discard(full_name)
-                    rest = [r for k, r in by_name.items() if k in seen]
-                    repos = pinned_first + sorted(
-                        rest,
-                        key=lambda r: r.get("stars", 0)
-                        if sort == "stars"
-                        else -(r.get("stars_today") or 0),
-                        reverse=True,
-                    )
+                    rest = [r for r in repos_1k if r["name"] in seen]
+                    if sort == "stars":
+                        sort_key = lambda r: r.get("stars", 0)
+                        reverse = True
+                    elif sort == "recent":
+                        sort_key = lambda r: r.get("pushed", "") or ""
+                        reverse = True
+                    elif sort == "name":
+                        sort_key = lambda r: (r.get("name") or "").lower()
+                        reverse = False
+                    else:
+                        sort_key = lambda r: r.get("stars", 0)
+                        reverse = True
+                    repos = pinned_first + sorted(rest, key=sort_key, reverse=reverse)
                     total = len(repos)
                     start = (page - 1) * size
                     page_repos = repos[start : start + size]
@@ -2606,7 +3980,11 @@ def serve(port=8765):
                 except ValueError:
                     size = 24
                 # ponytail: only 24h window — data source is repos.stars_today (from github.com/trending)
-                prev_ago, recent_ago = "20 hours", "4 hours"
+                # ponytail: 26h/44h (was 20h/4h) — the original 4h recent window never captured
+                # a daily-crawl row (crawls are 24h apart), so the snapshot_gain CTE was always
+                # empty. 26h gives us "today's snapshot", 44h gives us "yesterday's snapshot" —
+                # this works for any cadence from 2×/day to once/2days.
+                prev_ago, recent_ago = "44 hours", "26 hours"
                 if db._DB_OK:
                     try:
                         conn = db.connect()
@@ -2741,6 +4119,201 @@ def serve(port=8765):
                 return self._json(
                     {"error": "no data — run ./radar.py crawl"}, status=503
                 )
+
+            # ponytail: code-graph endpoints — integrate graphify + code-review-graph
+            # for installed skills so the UI can render rich relationship visualizations.
+            if self.path.startswith("/api/graph/"):
+                try:
+                    slug = urllib.parse.unquote(
+                        self.path[len("/api/graph/") :]
+                    ).strip("/")
+                    owner_repo = slug
+                    if "/" not in owner_repo:
+                        idx = _load_repo_index()
+                        if slug in idx:
+                            owner_repo = idx[slug].get("name", "")
+                    if "/" not in owner_repo:
+                        # ponytail: fall back to local scan — installed skills without
+                        # a PG entry should still be resolvable for graph viz.
+                        local = detect_local_skills()
+                        for s, meta in (local.get("skills") or {}).items():
+                            if s == slug:
+                                if meta.get("url"):
+                                    owner_repo = _repo_slug_from_url(meta["url"])
+                                else:
+                                    owner_repo = f"local/{slug}"
+                                break
+                    if "/" not in owner_repo:
+                        return self._json(
+                            {"error": f"unknown skill: {slug}"}, status=404
+                        )
+                    owner, repo = owner_repo.split("/", 1)
+                    candidates = [
+                        SKILLS_CACHE / f"{owner}__{repo}",
+                        SKILLS_CACHE / repo,
+                        Path.home() / ".claude" / "skills" / repo,
+                        Path.home() / ".codex" / "skills" / repo,
+                    ]
+                    skill_dir = next(
+                        (p for p in candidates if p.exists()), None
+                    )
+                    if not skill_dir:
+                        return self._json(
+                            {"error": f"skill {owner_repo} not installed locally"},
+                            status=404,
+                        )
+                    graph_path = skill_dir / "graphify-out" / "graph.json"
+                    # ponytail: graceful path — if no graph.json exists, try building it
+                    # in-place via `graphify update <skill_dir>` (uses tree-sitter, no LLM).
+                    # If still nothing (e.g. SKILL.md-only skills), return an actionable 200.
+                    if not graph_path.exists():
+                        build = subprocess.run(
+                            ["graphify", "update", str(skill_dir), "--no-cluster"],
+                            capture_output=True,
+                            text=True,
+                            timeout=60,
+                        )
+                        # build.returncode may be 0 even when no code was found
+                    if graph_path.exists():
+                        r = subprocess.run(
+                            [
+                                "graphify",
+                                "explain",
+                                slug,
+                                "--graph",
+                                str(graph_path),
+                            ],
+                            capture_output=True,
+                            text=True,
+                            timeout=30,
+                        )
+                        if r.returncode == 0:
+                            return self._json(
+                                {
+                                    "ok": True,
+                                    "skill": owner_repo,
+                                    "source": "graphify",
+                                    "explanation": r.stdout.strip(),
+                                }
+                            )
+                    # ponytail: fallback — return install metadata so the UI can still
+                    # render *something* useful (stars, topics, readme hint) when the
+                    # skill has no code to graph (most Claude Code skills are SKILL.md only).
+                    idx = _load_repo_index()
+                    repo_meta = idx.get(slug) or {}
+                    return self._json(
+                        {
+                            "ok": True,
+                            "skill": owner_repo,
+                            "source": "metadata",
+                            "explanation": (
+                                "此 skill 主要由 SKILL.md 组成（无 Python/TS 代码可做图谱分析）。"
+                                "可用的元数据："
+                                + (
+                                    f"\n  • 描述：{repo_meta.get('description', '')[:160]}"
+                                    if repo_meta.get("description")
+                                    else ""
+                                )
+                                + (
+                                    f"\n  • ⭐ {repo_meta.get('stars', 0):,}"
+                                    if repo_meta.get("stars")
+                                    else ""
+                                )
+                                + (
+                                    f"\n  • Topics: {', '.join(repo_meta.get('topics') or [])[:120]}"
+                                    if repo_meta.get("topics")
+                                    else ""
+                                )
+                                + (
+                                    f"\n  • URL: {repo_meta.get('url')}"
+                                    if repo_meta.get("url")
+                                    else ""
+                                )
+                            ).strip(),
+                            "repo": repo_meta,
+                        }
+                    )
+                except subprocess.TimeoutExpired:
+                    return self._json({"error": "graphify timeout"}, status=504)
+                except Exception as e:
+                    return self._json({"error": str(e)}, status=500)
+
+            if self.path.startswith("/api/crg/"):
+                try:
+                    slug = urllib.parse.unquote(
+                        self.path[len("/api/crg/") :]
+                    ).strip("/")
+                    owner_repo = slug
+                    if "/" not in owner_repo:
+                        idx = _load_repo_index()
+                        if slug in idx:
+                            owner_repo = idx[slug].get("name", "")
+                    if "/" not in owner_repo:
+                        local = detect_local_skills()
+                        for s, meta in (local.get("skills") or {}).items():
+                            if s == slug:
+                                if meta.get("url"):
+                                    owner_repo = _repo_slug_from_url(meta["url"])
+                                else:
+                                    owner_repo = f"local/{slug}"
+                                break
+                    if "/" not in owner_repo:
+                        return self._json(
+                            {"error": f"unknown skill: {slug}"}, status=404
+                        )
+                    owner, repo = owner_repo.split("/", 1)
+                    candidates = [
+                        SKILLS_CACHE / f"{owner}__{repo}",
+                        SKILLS_CACHE / repo,
+                        Path.home() / ".claude" / "skills" / repo,
+                        Path.home() / ".codex" / "skills" / repo,
+                    ]
+                    skill_dir = next(
+                        (p for p in candidates if p.exists()), None
+                    )
+                    if not skill_dir:
+                        return self._json(
+                            {"error": f"skill {owner_repo} not installed locally"},
+                            status=404,
+                        )
+                    r = subprocess.run(
+                        ["code-review-graph", "status"],
+                        cwd=str(skill_dir),
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                    )
+                    if r.returncode == 0 and r.stdout.strip():
+                        return self._json(
+                            {
+                                "ok": True,
+                                "skill": owner_repo,
+                                "source": "crg",
+                                "stats": r.stdout.strip(),
+                            }
+                        )
+                    # ponytail: graceful — CRG needs a built graph; if status fails (no
+                    # graph yet), suggest the build step in the response.
+                    return self._json(
+                        {
+                            "ok": True,
+                            "skill": owner_repo,
+                            "source": "metadata",
+                            "stats": "",
+                            "note": (
+                                "此 skill 尚未建立 CRG 图谱。运行 "
+                                f"`cd {skill_dir} && code-review-graph build` 后重试。"
+                                if r.stderr
+                                else ""
+                            ),
+                            "warnings": r.stderr.strip()[:300] if r.stderr else "",
+                        }
+                    )
+                except subprocess.TimeoutExpired:
+                    return self._json({"error": "crg timeout"}, status=504)
+                except Exception as e:
+                    return self._json({"error": str(e)}, status=500)
+
             # ponytail: pure API server — UI lives at :5173 (Vite). Anything else is 404.
             self.send_error(404)
 
@@ -2772,8 +4345,70 @@ def serve(port=8765):
                     body = self._read_body()
                     name = body.get("name", "").strip()
                     url = body.get("url", "").strip()
-                    path = install_skill_from_github(name, url)
-                    self._json({"ok": True, "message": f"已安装 {name}", "path": path})
+                    # ponytail: smart multi-CLI install — targets list lets user pick
+                    # claude / codex / opencode. Default = all three.
+                    raw_targets = body.get("targets")
+                    if raw_targets:
+                        targets = [t.strip() for t in raw_targets if t.strip()]
+                    else:
+                        targets = None
+                    force_update = bool(body.get("force_update", False))
+                    result = install_skill_from_github(
+                        name, url, targets=targets, force_update=force_update
+                    )
+                    # ponytail: build a per-CLI human-readable status string
+                    statuses = [
+                        f"  · {cli}: {info['status']} ({info['detail']})"
+                        for cli, info in result["targets"].items()
+                    ]
+                    msg = f"{name}\n" + "\n".join(statuses)
+                    invalidate_local_scan()  # 「已装」徽标立即生效，不等 60s TTL
+                    self._json(
+                        {
+                            "ok": True,
+                            "message": msg,
+                            "cache": str(result["cache"]),
+                            "cache_state": result["cache_state"],
+                            "targets": result["targets"],
+                        }
+                    )
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=400)
+                return
+            if self.path == "/api/update":
+                # ponytail: 2026-09 — 更新 = install 的 force_update 变体
+                # （git fetch + reset --hard origin/HEAD，不重新 clone）。
+                try:
+                    body = self._read_body()
+                    name = body.get("name", "").strip()
+                    url = body.get("url", "").strip()
+                    result = install_skill_from_github(
+                        name, url, targets=body.get("targets"), force_update=True
+                    )
+                    statuses = [
+                        f"  · {cli}: {info['status']} ({info['detail']})"
+                        for cli, info in result["targets"].items()
+                    ]
+                    invalidate_local_scan()
+                    self._json(
+                        {
+                            "ok": True,
+                            "message": f"{name} 已更新\n" + "\n".join(statuses),
+                            "cache_state": result["cache_state"],
+                            "targets": result["targets"],
+                        }
+                    )
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=400)
+                return
+            if self.path == "/api/uninstall":
+                # ponytail: 2026-09 — 卸载闭环：删软链接 + 缓存目录可选保留。
+                try:
+                    body = self._read_body()
+                    name = body.get("name", "").strip()
+                    result = uninstall_skill(name)
+                    invalidate_local_scan()
+                    self._json({"ok": True, "message": f"{name} 已卸载", "result": result})
                 except Exception as e:
                     self._json({"ok": False, "error": str(e)}, status=400)
                 return
@@ -2808,13 +4443,17 @@ def serve(port=8765):
                     return self._json(
                         {"ok": False, "error": "crawl already running"}, status=409
                     )
-                # ponytail: fire-and-forget background crawl so UI doesn't block
+                # ponytail: fire-and-forget background crawl so UI doesn't block.
+                # Log fd must be closed BEFORE Popen takes ownership so the parent doesn't
+                # leak it on every /api/crawl request (long-running dev server accumulates fds).
+                log_fd = os.open(DATA / "crawl.log", os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
                 subprocess.Popen(
                     [sys.executable, str(Path(__file__).resolve()), "crawl"],
                     cwd=str(Path(__file__).parent.resolve()),
-                    stdout=open(DATA / "crawl.log", "ab"),
+                    stdout=log_fd,
                     stderr=subprocess.STDOUT,
                     start_new_session=True,
+                    close_fds=True,
                 )
                 return self._json(
                     {"ok": True, "message": "crawl started in background"}
@@ -2823,8 +4462,35 @@ def serve(port=8765):
 
     # ponytail: bind loopback ONLY — this API can git-clone into your skills dirs;
     # exposing it to the LAN would let anyone on the network install skills.
-    with socketserver.ThreadingTCPServer(("127.0.0.1", port), Handler) as httpd:
-        url = f"http://localhost:{port}"
+    # ponytail: port auto-fallback — if the requested port is busy (another lodestone
+    # instance, stale process, OS-assigned random port from a previous dev run, ...),
+    # walk forward until we find a free one. dev.cjs parses the [serve-port] marker
+    # to learn the actual port so Vite's proxy target stays in sync.
+    import errno as _errno
+    actual_port = port
+    httpd = None
+    for offset in range(50):
+        try_port = port + offset
+        try:
+            httpd = socketserver.ThreadingTCPServer(("127.0.0.1", try_port), Handler)
+        except OSError as e:
+            if e.errno == _errno.EADDRINUSE:
+                continue
+            raise
+        actual_port = try_port
+        break
+    if httpd is None:
+        raise SystemExit(f"no free port in [{port}..{port + 49}] for radar.py serve")
+
+    with httpd:
+        url = f"http://localhost:{actual_port}"
+        if actual_port != port:
+            print(
+                f"[serve] requested port {port} busy, bound to {actual_port} instead",
+                file=sys.stderr,
+            )
+        # ponytail: machine-parseable port line for dev.cjs — keep the format stable.
+        print(f"[serve-port] {actual_port}", flush=True)
         print(
             f"[serve] {url}  (loopback only · API: /api/data /api/local /api/top /api/install /api/crawl · Ctrl-C to stop)"
         )
@@ -2832,6 +4498,63 @@ def serve(port=8765):
             httpd.serve_forever()
         except KeyboardInterrupt:
             print("\n[serve] stopped")
+
+
+def audit():
+    """数据质量审计 — 去重 / 金融过滤 / 来源分布 / AI 相关性抽样。
+    供人工或 /loop 定期复查：`./radar.py audit`。"""
+    latest = DATA / "latest.json"
+    if not latest.exists():
+        print("no data/latest.json — run ./radar.py crawl first")
+        return
+    d = json.loads(latest.read_text())
+    all_repos = list(d.get("hot_now", []))
+    for c in d.get("categories", []):
+        all_repos.extend(c.get("repos", []))
+
+    print(f"=== 数据质量审计 · {d.get('fetched_at', '?')} · {len(all_repos)} 条（含跨分类重复计数）")
+
+    # 1) 去重规则：git 完整仓库地址
+    keys: dict[str, list[str]] = {}
+    for r in all_repos:
+        k = normalize_git_url(r.get("url")) or r["name"]
+        keys.setdefault(k, []).append(r["name"])
+    cross = {k: v for k, v in keys.items() if len(set(v)) > 1}
+    print(f"1) 跨条目 URL 重复: {len(cross)} {'✓' if not cross else '✗'}")
+    for k, v in list(cross.items())[:10]:
+        print(f"   {k} ← {sorted(set(v))}")
+
+    # 2) 金融/交易残留
+    fin = sorted({r["name"] for r in all_repos if is_finance_blocked(r)})
+    print(f"2) 金融/交易残留: {len(fin)} {'✓' if not fin else '✗'} {fin[:8]}")
+
+    # 3) 来源分布（四个主源 + 辅助源）
+    from collections import Counter
+
+    src = Counter(r.get("source", "?") for r in all_repos)
+    print("3) 来源分布:")
+    for s, n in src.most_common(10):
+        print(f"   {s:<28} {n}")
+
+    # 4) GitHub 条目 AI 相关性抽样（5k 池口径的严格过滤在入库时已做；
+    #    这里抽样检查分类条目里有没有明显不相关的）
+    gh = [r for r in all_repos if normalize_git_url(r.get("url")).startswith("gh://")]
+    weak = [
+        r["name"]
+        for r in gh
+        if not is_ai_relevant(r) and not any(
+            t in AI_TOPIC_BLOCKLIST for t in (x.lower() for x in (r.get("topics") or []))
+        )
+    ]
+    # 注：分类条目允许过严格过滤（topics 变体），这里只报告数量供人工抽查
+    print(f"4) GitHub 条目未过严格 AI 过滤（分类口径允许，供抽查）: {len(weak)}/{len(gh)}")
+    for n in weak[:8]:
+        print(f"   {n}")
+
+    # 5) 分类规模健康度
+    cats = d.get("categories", [])
+    tiny = [(c["id"], len(c.get("repos", []))) for c in cats if len(c.get("repos", [])) < 5]
+    print(f"5) 分类数 {len(cats)} · 过小分类(<5): {tiny or '无 ✓'}")
 
 
 if __name__ == "__main__":
@@ -2842,6 +4565,8 @@ if __name__ == "__main__":
         serve(int(sys.argv[2]) if len(sys.argv) > 2 else 8765)
     elif cmd == "today":
         today()
+    elif cmd == "audit":
+        audit()
     else:
         print(__doc__)
         sys.exit(1)
