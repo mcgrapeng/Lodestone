@@ -5,6 +5,7 @@ lodestone: GitHub AI trending crawler + JSON API for the Vue 3 frontend.
 Commands:
   radar.py crawl   - fetch trending AI repos from GitHub, write to PG (fallback: data/latest.json)
   radar.py serve   - JSON API on http://localhost:PORT (loopback only; Vite at :5173 proxies /api/* here)
+  radar.py web     - one-shot dashboard: start serve in background (if needed) + open browser
   radar.py today   - print today's top picks in terminal
 
 Reuses `gh` CLI for GitHub auth (avoids token management).
@@ -3609,6 +3610,52 @@ def serve(port=8765):
                 return {}
             return json.loads(self.rfile.read(length).decode("utf-8"))
 
+        # ponytail: /zp 一键体验 — serve 不再是纯 API：非 /api 的 GET 直接托管
+        # frontend/dist 构建产物（前端 BASE='' 同源相对路径，无需 Vite）。
+        # 开发模式仍走 `cd frontend && npm run dev`（热更新）。
+        _STATIC_TYPES = {
+            ".js": "text/javascript; charset=utf-8",
+            ".css": "text/css; charset=utf-8",
+            ".html": "text/html; charset=utf-8",
+            ".svg": "image/svg+xml",
+            ".png": "image/png",
+            ".ico": "image/x-icon",
+            ".woff2": "font/woff2",
+        }
+
+        def _serve_static(self):
+            root = (ROOT / "frontend" / "dist").resolve()
+            if not (root / "index.html").is_file():
+                self.send_error(
+                    503,
+                    "frontend/dist not built — run `cd frontend && npm install && npm run build`",
+                )
+                return
+            path = urllib.parse.urlparse(self.path).path
+            if path.startswith("/assets/"):
+                f = (root / path.lstrip("/")).resolve()
+                # ponytail: path-traversal guard — /assets/../radar.py 不许读源码
+                if root not in f.parents or not f.is_file():
+                    self.send_error(404)
+                    return
+                body = f.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", self._STATIC_TYPES.get(f.suffix, "application/octet-stream"))
+                self.send_header("Content-Length", str(len(body)))
+                # ponytail: 文件名带 hash → 内容变名字变，可放心长缓存
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            # SPA 兜底：其余路径（含 /）都回 index.html，路由由前端接管
+            body = (root / "index.html").read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(body)
+
         def do_GET(self):
             if self.path == "/api/data":
                 if db._DB_OK:
@@ -4314,8 +4361,8 @@ def serve(port=8765):
                 except Exception as e:
                     return self._json({"error": str(e)}, status=500)
 
-            # ponytail: pure API server — UI lives at :5173 (Vite). Anything else is 404.
-            self.send_error(404)
+            # ponytail: 非 /api 的 GET → 托管 frontend/dist（`radar.py web` 一键开浏览器即用）
+            self._serve_static()
 
         def do_POST(self):
             if self._origin_forbidden():
@@ -4500,6 +4547,56 @@ def serve(port=8765):
             print("\n[serve] stopped")
 
 
+def web(port=8765):
+    """一键打开仪表盘：已在跑就直接开浏览器；否则后台拉起 serve 再开。
+    /zp 的默认入口 — 免去手动 serve + 开浏览器两步。"""
+    import webbrowser
+
+    def radar_alive(p: int) -> bool:
+        # ponytail: 不只探端口 — / 返回 HTML（带静态托管的新版 serve）且
+        # /api/data 可达才是 lodestone；旧版纯 API 或无关服务都不算，
+        # 端口被占时自动落到下一端口新起一个
+        # ponytail: ProxyHandler({}) 强制直连 — 用户 shell 常挂全局代理（7890），
+        # urlopen 默认走代理会把 loopback 健康检查挂死
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        try:
+            with opener.open(f"http://127.0.0.1:{p}/", timeout=1) as r:
+                if r.status != 200 or "html" not in (r.headers.get("Content-Type") or ""):
+                    return False
+            with opener.open(f"http://127.0.0.1:{p}/api/data", timeout=1) as r:
+                return r.status == 200
+        except Exception:
+            return False
+
+    alive = next((p for p in range(port, port + 50) if radar_alive(p)), None)
+    if alive is None:
+        # ponytail: detached spawn，与 /api/crawl 同款 — start_new_session 脱离
+        # /zp 的 Bash 会话，本命令返回后 serve 继续活着
+        log_fd = os.open(DATA / "serve.log", os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+        subprocess.Popen(
+            [sys.executable, str(Path(__file__).resolve()), "serve", str(port)],
+            cwd=str(Path(__file__).parent.resolve()),
+            stdout=log_fd,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            close_fds=True,
+        )
+        os.close(log_fd)  # ponytail: Popen 已 dup — 父进程立刻关，防 fd 泄漏
+        for _ in range(100):  # 10s 上限等端口就绪（serve 端口被占会顺延）
+            alive = next((p for p in range(port, port + 50) if radar_alive(p)), None)
+            if alive:
+                break
+            time.sleep(0.1)
+        if alive is None:
+            raise SystemExit(f"serve did not come up — see {DATA / 'serve.log'}")
+    # ponytail: 显式 127.0.0.1 而非 localhost — macOS 浏览器可能优先解析 IPv6 ::1，
+    # 若 ::1 同端口被别的服务占着（本机就发生过：synapse 文档服务在 *:8765），
+    # localhost 会打开错页面。serve 只绑 IPv4 loopback，127.0.0.1 必定命中。
+    url = f"http://127.0.0.1:{alive}"
+    print(f"⚡ Lodestone → {url}")
+    webbrowser.open(url)
+
+
 def audit():
     """数据质量审计 — 去重 / 金融过滤 / 来源分布 / AI 相关性抽样。
     供人工或 /loop 定期复查：`./radar.py audit`。"""
@@ -4563,6 +4660,8 @@ if __name__ == "__main__":
         crawl()
     elif cmd == "serve":
         serve(int(sys.argv[2]) if len(sys.argv) > 2 else 8765)
+    elif cmd == "web":
+        web(int(sys.argv[2]) if len(sys.argv) > 2 else 8765)
     elif cmd == "today":
         today()
     elif cmd == "audit":

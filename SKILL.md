@@ -23,9 +23,12 @@ allowed-tools: Bash, Read, Write, Edit
 
 ```bash
 # skill 安装后，从任意 cwd 都可调用
+~/.claude/skills/zp/radar.py web      # 一键仪表盘：后台起 serve + 自动打开浏览器（已在跑则直接打开）
 ~/.claude/skills/zp/radar.py crawl    # 爬取 + 入库（约 5-8 分钟，含限速等待）
 ~/.claude/skills/zp/radar.py today    # 终端直接看 Top 15 + 分类概览
 ```
+
+> **`/zp` 默认流程**：先执行 `radar.py web`（自动打开浏览器仪表盘），再用 `radar.py today` 在终端补充 Top 15 摘要；数据超过 6 小时可先 `crawl`。
 
 > 安装器创建的是 symlink（不是复制），所以两个路径指向同一个源目录，编辑一处即时生效。
 
@@ -33,9 +36,10 @@ allowed-tools: Bash, Read, Write, Edit
 
 | 命令 | 作用 |
 |------|------|
+| `radar.py web [port]` | 一键仪表盘：检测到 serve 已在跑就直接开浏览器，否则后台拉起（detached）再开。幂等，重复执行无副作用 |
 | `radar.py crawl` | 拉取 GitHub（分类 + 5k 补捞 + trending + manual seed）+ HuggingFace Spaces + HuggingFace Models + MCP Registry → 翻译 → 写入 Postgres（无 PG 时回退 `data/latest.json`） |
 | `radar.py today` | 终端打印 Top 15 + 分类概览（PG 优先，latest.json 回退） |
-| `radar.py serve [port]` | 起 JSON API（默认 8765，**仅绑定 127.0.0.1**） |
+| `radar.py serve [port]` | 起 JSON API + 静态托管 `frontend/dist`（默认 8765，**仅绑定 127.0.0.1**；前端 dev 模式仍走 `cd frontend && npm run dev`） |
 
 crawl 全程持文件锁（`data/crawl.lock`），并发触发会自动拒绝，不会互相打爆 GitHub 限流。
 
