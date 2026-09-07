@@ -107,3 +107,22 @@ jina_format = "markdown"
 # 是否启用 LLM 提取（需要 ANTHROPIC_API_KEY / OPENAI_API_KEY）
 # 当前 lodestone 不用 LLM 提取，永远 False
 llm_extraction = false
+
+# ─────────────────────────────────────────
+# Skill 安装平台（2026-09）
+# 安装端与检测端共用此表；雷达 UI 勾选哪些平台就装/扫哪些目录。
+# 覆盖内置路径或追加新平台示例：
+#
+# [install.platforms]
+# easycode = "~/custom/easycode-skills"
+# mycli    = "~/.mycli/skills"
+#
+# 不配置则用内置四平台：
+#   claude   ~/.claude/skills
+#   codex    ~/.codex/skills
+#   opencode ~/.config/opencode/skills
+#   easycode ~/.easycode/skills
+[install]
+# 默认勾选（前端初始状态 / API 不传 targets 时的后端默认）
+default_targets = ["claude"]
+

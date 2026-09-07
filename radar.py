@@ -237,11 +237,19 @@ CATEGORIES = [
     },
     {
         "id": "mcp",
-        "name": "MCP Servers & Clients",
-        "desc": "Model Context Protocol — Claude/工具生态互联协议、服务端与客户端实现",
-        # 2026-08 — primary source is the official MCP Registry (registry.modelcontextprotocol.io);
-        # GitHub queries complement it with self-hosted clients / dev tools.
+        "name": "MCP Servers(官方注册表)",
+        "desc": "Model Context Protocol 官方注册表 — registry.modelcontextprotocol.io 活跃服务端,按更新时间排序",
+        # ponytail: 2026-09 P0 修复 — 旧定义同时挂 source + 9 条 queries,而分发条件是
+        # `if not cat["queries"]` 才走 source 分支 → registry 抓取器永不可达(PG 0 行
+        # registry 数据)。拆成两类:本类 registry 独占(0 星项不会被 GitHub 结果的
+        # [:30] 星标截断挤掉),9 条 GitHub query 挪到 mcp_dev。
         "source": "mcp_registry",
+        "queries": [],
+    },
+    {
+        "id": "mcp_dev",
+        "name": "MCP 开发与自托管",
+        "desc": "MCP 客户端 / SDK / 自托管服务端与开发工具 — GitHub 生态侧(注册表之外)",
         "queries": [
             "topic:mcp-server stars:>100",
             "topic:mcp-servers stars:>100",
@@ -562,7 +570,11 @@ TOP_5K_QUERIES = [
     "stars:>5000 awesome-claude in:name",
     "stars:>5000 awesome-agents in:name",
 ]
-TOP_5K_LIMIT = 300
+# ponytail: 2026-09 P1 修复 — 300 时每天只有星标 top300 能入 PG,5k 池"跨天累积"
+# 的补偿机制被截断卡死(51-100 名、500-1500 星的大量项目永远进不了库)。
+# 800 让 stars:>500 的 unique 几乎全量入库;抓取量不变(数据本就抓回来了,
+# 只是不再丢),仅 upsert 行数与首次翻译量增加(有缓存)。
+TOP_5K_LIMIT = 800
 
 # ponytail: HARD AI topics — strict subset. Bare 'ai' is NOT here. Used to require a strong
 # AI signal so non-AI repos with just an 'ai' topic (dbeaver, netdata) get filtered out.
@@ -1421,7 +1433,7 @@ def _load_repo_index() -> dict:
             for row in cur.fetchall():
                 rec = dict(zip(cols, row))
                 rec["topics"] = list(rec.get("topics") or [])
-                by_repo[rec["name"].split("/")[-1]] = rec
+                by_repo[rec["name"].split("/")[-1].lower()] = rec
     except Exception:
         pass
     cache["ts"] = now
@@ -1456,6 +1468,45 @@ def invalidate_local_scan():
     with _local_scan_lock:
         _local_scan_cache["ts"] = 0.0
         _local_scan_cache["data"] = None
+
+
+def _owner_repo_from_url(url: str) -> str | None:
+    """https://github.com/owner/repo(.git)/… → 'owner/repo';否则 None。"""
+    if not url:
+        return None
+    from urllib.parse import urlparse
+
+    if "github.com" not in (urlparse(url).netloc or ""):
+        return None
+    parts = [p for p in urlparse(url).path.strip("/").split("/") if p]
+    if len(parts) < 2:
+        return None
+    owner, repo = parts[0], parts[1]
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+    if owner and repo:
+        return f"{owner}/{repo}"
+    return None
+
+
+def _owner_repo_from_link_target(link: Path) -> str | None:
+    """本工具安装的 symlink 指向 SKILLS_CACHE/owner__repo → 'owner/repo'。
+    只认缓存目录前缀,不解析任意链接目标。"""
+    try:
+        target = link.resolve()
+        if SKILLS_CACHE.resolve() not in target.parents:
+            return None
+        stem = target.name  # owner__repo
+        if "__" not in stem:
+            return None
+        owner, _, repo = stem.partition("__")
+        if not owner or not repo:
+            return None
+        if not all(c.isalnum() or c in "-_." for c in owner + repo):
+            return None
+        return f"{owner}/{repo}"
+    except (OSError, RuntimeError):
+        return None
 
 
 def detect_local_skills(force: bool = False):
@@ -1497,11 +1548,10 @@ def detect_local_skills(force: bool = False):
     agent_origin_by_name = by_origin["agents"]
     plugin_origin_by_key = by_origin["plugins"]  # plugin key format: name@marketplace
 
-    # skills dirs
-    for label, d in [
-        ("claude", Path.home() / ".claude" / "skills"),
-        ("codex", Path.home() / ".codex" / "skills"),
-    ]:
+    # skills dirs — 遍历全平台表(2026-09 修复:此前硬编码 claude/codex,
+    # 装到 opencode 的 ~250 个技能全部漏检)
+    for label, path_expr in _SKILL_PLATFORM_PATHS.items():
+        d = Path(path_expr).expanduser()
         if not d.exists():
             continue
         try:
@@ -1513,8 +1563,7 @@ def detect_local_skills(force: bool = False):
                 meta = out["skills"].setdefault(
                     entry.name,
                     {
-                        "claude": False,
-                        "codex": False,
+                        **{p: False for p in _SKILL_PLATFORM_PATHS},
                         "url": None,
                         "desc_zh": None,
                         "desc_en": None,
@@ -1524,13 +1573,22 @@ def detect_local_skills(force: bool = False):
                     },
                 )
                 meta[label] = True
+                # ponytail: 2026-09 — symlink 指向本工具缓存(SKILLS_CACHE/owner__repo)
+                # 时直接还原 owner/repo,零歧义且不依赖 sidecar/PG(实测 ecc 的
+                # origins.json 无记录,sidecar 兜不住,链接目标才是事实来源)。
+                if entry.is_symlink():
+                    full = _owner_repo_from_link_target(entry)
+                    if full:
+                        meta["origin_full"] = full
         except OSError:
             pass
 
     # ponytail: enrich each skill with desc/url from 3 sources (priority: cache > origin > skillmd)
     for name, meta in out["skills"].items():
-        if name in by_repo:
-            r = by_repo[name]
+        # ponytail: 2026-09 大小写不敏感 — 目录名/symlink 名与 GitHub repo 名大小写
+        # 不必一致(实测 opencode/skills/ecc ↔ affaan-m/ECC);索引键已统一小写。
+        if name.lower() in by_repo:
+            r = by_repo[name.lower()]
             meta.update(
                 {
                     "url": r.get("url"),
@@ -1560,8 +1618,7 @@ def detect_local_skills(force: bool = False):
                     meta["pushed_at"] = gh.get("pushed_at")
         else:
             for skills_root in [
-                Path.home() / ".claude" / "skills",
-                Path.home() / ".codex" / "skills",
+                Path(p).expanduser() for p in _SKILL_PLATFORM_PATHS.values()
             ]:
                 skill_md = skills_root / name / "SKILL.md"
                 if skill_md.exists():
@@ -1660,8 +1717,11 @@ def detect_local_skills(force: bool = False):
         try:
             data = json.loads(plugins_file.read_text())
             for plugin_key, installs in (data.get("plugins") or {}).items():
-                if enabled_set and plugin_key not in enabled_set:
-                    continue  # ponytail: skip disabled plugins
+                # ponytail: 2026-09 修复 enabled 误杀 installed — installed_plugins.json
+                # 本身就是安装记录;不在 enabledPlugins 只说明「未启用」,不代表「未安装」
+                # (实测 ecc@ecc v2.0.0 已装但被此过滤整行跳过,卡片永远不亮)。
+                # enabled 如实记录,不再影响是否收录。
+                plugin_enabled = not enabled_set or plugin_key in enabled_set
                 if "@" in plugin_key:
                     name, marketplace = plugin_key.split("@", 1)
                 else:
@@ -1682,7 +1742,7 @@ def detect_local_skills(force: bool = False):
                         "url": origin.get("url") or default_url,
                         "desc_zh": origin.get("desc_zh"),
                         "desc_en": origin.get("desc_en"),
-                        "enabled": True,
+                        "enabled": plugin_enabled,
                     }
                 )
         except (OSError, ValueError, TypeError):
@@ -1752,18 +1812,58 @@ def detect_local_skills(force: bool = False):
 #   3) already linked, cache stale       → git pull + re-link
 #   4) exists but points elsewhere       → replace with symlink (back up first)
 # Returns a structured {target: action: detail} so the UI can show per-CLI status.
-SUPPORTED_CLIS = ("claude", "codex", "opencode")
+# ponytail: skill 平台表 — 安装端与检测端共用同一张表。
+# 2026-09 修复「装得到 opencode 却扫不到」的不对称:此前检测端硬编码只扫
+# claude/codex 两个目录,凡只装到 opencode 的技能(含本工具 /api/install 装的)
+# 一律不显示「已装」。现在两端都从 SKILL_PLATFORMS 取目录。
+# config.toml [install.platforms] 可覆盖内置路径或追加自定义平台:
+#   [install.platforms]
+#   easycode = "~/.easycode/skills"
+#   mycli    = "~/skills-mycli"
+_SKILL_PLATFORM_PATHS: dict[str, str] = {
+    "claude": "~/.claude/skills",
+    "codex": "~/.codex/skills",
+    "opencode": "~/.config/opencode/skills",
+    "easycode": "~/.easycode/skills",
+}
+try:  # ponytail: config.toml 覆盖/扩展 — 解析失败静默回退内置表(爬虫配置同理)
+    import tomllib as _tomllib
+
+    with open(ROOT / "config.toml", "rb") as _f:
+        _cfg = _tomllib.load(_f)
+    _install_cfg = _cfg.get("install") or {}
+    for _k, _v in (_install_cfg.get("platforms") or {}).items():
+        if isinstance(_v, str) and _v.strip():
+            _SKILL_PLATFORM_PATHS[_k.strip()] = _v.strip()
+    # 默认安装平台(前端初始勾选由前端常量定义;此处管 API 不传 targets 时)
+    _dt = _install_cfg.get("default_targets")
+    if isinstance(_dt, list) and _dt:
+        _DEFAULT_INSTALL_TARGETS = tuple(
+            t for t in (str(x).strip() for x in _dt) if t in _SKILL_PLATFORM_PATHS
+        )
+    else:
+        _DEFAULT_INSTALL_TARGETS = ("claude",)
+except Exception:
+    _DEFAULT_INSTALL_TARGETS = ("claude",)
+
+# ponytail: 平台显示名(前端文案/消息用);未知平台回退 CLI 名本身
+SKILL_PLATFORM_LABELS = {
+    "claude": "Claude Code",
+    "codex": "Codex",
+    "opencode": "OpenCode",
+    "easycode": "EasyCode",
+}
+SUPPORTED_CLIS = tuple(_SKILL_PLATFORM_PATHS)  # 安装 targets 校验 + 默认顺序
 
 
 def _skills_root_for(cli: str) -> Path:
-    """Map CLI name → skills directory."""
-    if cli == "claude":
-        return Path.home() / ".claude" / "skills"
-    if cli == "codex":
-        return Path.home() / ".codex" / "skills"
-    if cli == "opencode":
-        return Path.home() / ".config" / "opencode" / "skills"
-    raise ValueError(f"unsupported CLI: {cli!r}")
+    """Map CLI name → skills directory (single source: SKILL_PLATFORM_PATHS)."""
+    p = _SKILL_PLATFORM_PATHS.get(cli)
+    if not p:
+        raise ValueError(
+            f"unsupported CLI: {cli!r}. Supported: {', '.join(SUPPORTED_CLIS)}"
+        )
+    return Path(p).expanduser()
 
 
 def _git_head_sha(path: Path) -> str | None:
@@ -1840,7 +1940,9 @@ def install_skill_from_github(name, url, targets=None, force_update=False):
     Returns dict {target: {status: 'installed'|'updated'|'up_to_date'|'skipped'|'replaced', detail: str}}.
     """
     if targets is None:
-        targets = list(SUPPORTED_CLIS)
+        # ponytail: 2026-09 用户决策 — 默认只装 Claude Code(config.toml [install]
+        # default_targets 可改);其余平台由前端勾选显式传入
+        targets = list(_DEFAULT_INSTALL_TARGETS)
     if (
         not name
         or not all(c.isalnum() or c in "-_." for c in name.replace("/", ""))
@@ -2860,11 +2962,13 @@ def fetch_recent_active_repos(max_repos: int = 30, days_back: int = 7) -> list:
     import datetime as _dt
 
     cutoff = (_dt.date.today() - _dt.timedelta(days=days_back)).isoformat()
+    # 2026-09 P3: topic:ai → 硬 topic 组。裸 'ai' 是宽 topic(is_ai_relevant 也不认),
+    # 捞回来的多是非 AI 项目又被过滤掉,兜底几乎白跑。
     queries = [
-        f"stars:>500 pushed:>{cutoff} topic:ai",
-        f"stars:>500 pushed:>{cutoff} topic:llm",
-        f"stars:>500 pushed:>{cutoff} topic:claude-code",
-        f"stars:>500 pushed:>{cutoff} topic:mcp-server",
+        f"stars:>300 pushed:>{cutoff} topic:llm",
+        f"stars:>300 pushed:>{cutoff} topic:ai-agent",
+        f"stars:>300 pushed:>{cutoff} topic:claude-code",
+        f"stars:>300 pushed:>{cutoff} topic:mcp-server",
     ]
     seen = set()
     out = []
@@ -2889,7 +2993,7 @@ def fetch_recent_active_repos(max_repos: int = 30, days_back: int = 7) -> list:
     return out
 
 
-def fetch_github_trending(since: str = "daily", max_repos: int = 30):
+def fetch_github_trending(since: str = "daily", max_repos: int = 30, language: str | None = None):
     """Scrape github.com/trending and enrich each entry with full data via gh_fetch_repo.
 
     Why: search-by-stars misses fresh AI tools that haven't crossed 5k yet but are trending today.
@@ -2898,9 +3002,12 @@ def fetch_github_trending(since: str = "daily", max_repos: int = 30):
          quality-gated: each tier must return a REAL trending page or we escalate)
       2. plain urllib (stdlib, original path)
       3. all failed → fetch_recent_active_repos (search-API proxy for trending)
+    language: None = 全语言混合页;"python"/"typescript"/... = 语言子页(GitHub
+    trending 无翻页,语言变体是唯一扩容手段 — 每页固定 25 条,max_repos>25 无效)。
     Returns normalized repo dicts (same shape as gh_search output) with extra 'source' marker.
     """
-    url = f"https://github.com/trending?since={since}"
+    lang_path = f"/{language}" if language else ""
+    url = f"https://github.com/trending{lang_path}?since={since}"
     html_text, engine = "", "none"
     # tier 1: real scrapers — optional package; missing/broken → urllib still works.
     # ponytail: strategy="tiered" — engines escalate light→heavy; each result must
@@ -3087,6 +3194,10 @@ def _crawl_inner():
     _search_t0 = time.monotonic()
     _all_gh_queries = [q for cat in CATEGORIES for q in cat.get("queries", [])]
     _batch: dict[str, list] = {}
+    _new_star_queries: list[str] = []  # GraphQL 不可用时保持空(新星通道仅依赖 GraphQL)
+    _new_star_cutoff = (
+        datetime.date.today() - datetime.timedelta(days=14)
+    ).isoformat()
     try:
         from sources.github_graphql import gh_search_batch
 
@@ -3098,7 +3209,20 @@ def _crawl_inner():
             gh_search_batch(_all_gh_queries, per_page=30, batch_size=6)
         )
         _batch.update(
-            gh_search_batch(TOP_5K_QUERIES, per_page=50, batch_size=8)
+            gh_search_batch(
+                TOP_5K_QUERIES, per_page=50, batch_size=8, follow_page2=True
+            )
+        )
+        # ponytail: 2026-09 P1 修复 — 低星新星通道。全部 5k 池查询 stars:>500、
+        # 分类查询大多 stars:>100+，"刚开源、<500 星、没上 trending"的项目有
+        # 真空期（实测 PG 中 stars<500 且无分类的行 = 0）。近 14 天 created +
+        # 硬 topic + stars:>50 专门捞这批；走独立通道并入（不参与星标截断）。
+        _new_star_queries = [
+            f"stars:>50 created:>{_new_star_cutoff} topic:{t}"
+            for t in ("llm", "ai-agent", "mcp-server", "claude-code", "ai-coding")
+        ]
+        _batch.update(
+            gh_search_batch(_new_star_queries, per_page=30, batch_size=6)
         )
     except Exception as e:
         print(
@@ -3188,13 +3312,16 @@ def _crawl_inner():
 
     # ponytail: 5k+ pass — catch mainstream AI tools not matched by category queries
     print(f"[crawl] 5k+ pass ({len(TOP_5K_QUERIES)} queries)…")
+    # ponytail: 2026-09 P2 — 池内合并键统一小写:GitHub full_name 大小写随改名
+    # 变化,精确比较会产生大小写变体漏合并(单次 crawl 内 normalize_git_url 已
+    # 小写,这里对齐同一语义;repo["name"] 原样保留供显示)。
     top_5k_repos = {}
     for q in TOP_5K_QUERIES:
         try:
             for r in _query_repos(q, per_page=100):
                 if not is_ai_relevant(r):
                     continue
-                top_5k_repos.setdefault(r["name"], r)
+                top_5k_repos.setdefault(r["name"].lower(), r)
         except Exception as e:
             print(f"  [warn] 5k+ query '{q}' failed: {e}")
 
@@ -3203,52 +3330,70 @@ def _crawl_inner():
         f"(search phase {time.monotonic() - _search_t0:.0f}s)"
     )
 
-    print(f"  ✓ 5k+ pass: {len(top_5k_repos)} repos after AI filter")
-
     # ponytail: manual seed — guaranteed inclusion of well-known AI tools that escape topic search
     for full_name in MANUAL_SEED_REPOS:
-        if full_name in top_5k_repos:
+        if full_name.lower() in top_5k_repos:
             continue
         r = gh_fetch_repo(full_name)
         if not r or not is_ai_relevant(r):
             continue
-        top_5k_repos[full_name] = r
+        top_5k_repos[full_name.lower()] = r
         print(f"  ✓ manual seed: {full_name} ({r['stars']} ⭐)")
 
     # ponytail: GitHub trending — catches fresh AI tools with <5k stars that are hot today.
     # Pull BOTH daily and weekly — daily = today's buzz, weekly = rising stars the daily
     # doesn't yet show. Dedupe on name so a repo on both lists is counted once.
-    print("[crawl] GitHub trending (daily + weekly, parallel)…")
-    # ponytail: 2026-09 — daily/weekly 两路并发（各自走分级引擎阶梯），
-    # 串行要付两倍阶梯延迟。失败的一路返回 []，不拖累另一路。
-    trending_daily, trending_weekly = [], []
-    with ThreadPoolExecutor(max_workers=2) as _tex:
+    # 2026-09 P2 — daily 加语言子页(python/typescript/rust/go,各 25 条):GitHub
+    # trending 无翻页、全语言混合页每天只捞出 ~22 个 AI 项目,语言变体是唯一
+    # 扩容手段。6 路并发(各走分级引擎阶梯),失败一路不拖累其余。
+    _trend_routes = [
+        ("daily", None),
+        ("weekly", None),
+        ("daily", "python"),
+        ("daily", "typescript"),
+        ("daily", "rust"),
+        ("daily", "go"),
+    ]
+    print(
+        f"[crawl] GitHub trending ({len(_trend_routes)} routes: daily/weekly × all-lang + python/ts/rust/go)…"
+    )
+    trending_daily, trending_weekly, _trend_lang = [], [], []
+    with ThreadPoolExecutor(max_workers=len(_trend_routes)) as _tex:
         _futs = {
-            _tex.submit(fetch_github_trending, "daily", 30): "daily",
-            _tex.submit(fetch_github_trending, "weekly", 30): "weekly",
+            _tex.submit(fetch_github_trending, since, 30, lang): (since, lang)
+            for since, lang in _trend_routes
         }
-        for _fut, _which in _futs.items():
+        for _fut, (_since, _lang) in _futs.items():
             try:
-                if _which == "daily":
-                    trending_daily = _fut.result()
-                else:
-                    trending_weekly = _fut.result()
+                _res = _fut.result()
             except Exception as e:
-                print(f"  [warn] trending {_which} failed: {e}", file=sys.stderr)
+                print(
+                    f"  [warn] trending {_since}/{_lang or 'all'} failed: {e}",
+                    file=sys.stderr,
+                )
+                continue
+            if _lang is None:
+                if _since == "daily":
+                    trending_daily = _res
+                else:
+                    trending_weekly = _res
+            else:
+                _trend_lang.extend(_res)
     trending_seen, trending = set(), []
-    for r in trending_daily + trending_weekly:
-        if r["name"] in trending_seen:
+    for r in trending_daily + trending_weekly + _trend_lang:
+        if r["name"].lower() in trending_seen:
             continue
-        trending_seen.add(r["name"])
+        trending_seen.add(r["name"].lower())
         trending.append(r)
     for r in trending:
         # ponytail: 合入 5k 池前过 AI 过滤 — 池子其他入口都过滤，这里不过滤
         # 会让 nvm（87k⭐ 的 Node 版本管理器）这种非 AI 热门项目直接冲进 hot_now 头部。
-        if is_ai_relevant(r) and r["name"] not in top_5k_repos:
-            top_5k_repos[r["name"]] = r
+        if is_ai_relevant(r) and r["name"].lower() not in top_5k_repos:
+            top_5k_repos[r["name"].lower()] = r
     trending_ai = [r for r in trending if is_ai_relevant(r)]
     print(
-        f"  ✓ trending: {len(trending_daily)} daily + {len(trending_weekly)} weekly → {len(trending)} unique → {len(trending_ai)} AI-relevant → merged into 5k+ pool"
+        f"  ✓ trending: {len(trending_daily)} daily + {len(trending_weekly)} weekly + "
+        f"{len(_trend_lang)} lang-variant → {len(trending)} unique → {len(trending_ai)} AI-relevant → merged into 5k+ pool"
     )
     # ponytail: keep trending SEPARATELY so the 300-row TOP_5K_LIMIT truncation below can't
     # drop their stars_today. Trending repos are low-star by definition (the whole point is
@@ -3258,9 +3403,16 @@ def _crawl_inner():
     )[:TOP_5K_LIMIT]
 
     # Detect local skills — cached 60s; crawl marks which repos are already installed
+    # 2026-09: 与 serve/refresh 路径对齐 — 复用 _installed_segments(skills origin +
+    # marketplace + 插件 origin)并小写化,而非裸技能目录名大小写敏感匹配
     local = detect_local_skills()
-    installed_skills = set((local.get("skills") or {}).keys())
-    print(f"[crawl] local skills detected: {len(installed_skills)}")
+    installed_full = {s.lower() for s in _installed_segments(local)}
+    installed_segs = {
+        *installed_full,
+        *(s.split("/")[-1] for s in installed_full),
+        *(p["name"].split("@")[0].lower() for p in (local.get("plugins") or []) if p.get("name")),
+    }
+    print(f"[crawl] local installed (full/seg): {len(installed_segs)}")
 
     # ponytail: build flat deduped list of (cats ∪ 5k+); assign best_category; is_ai_relevant
     to_persist = []
@@ -3274,18 +3426,35 @@ def _crawl_inner():
         r["best_category"] = None  # 5k+ doesn't belong to a single category
         to_persist.append(r)
     # ponytail: trending repos get stars_today which is the entire signal for /api/gain.
-    # The TOP_5K_LIMIT=300 truncation above drops low-star trending repos — re-add them
+    # The TOP_5K_LIMIT truncation above drops low-star trending repos — re-add them
     # so the stars_today field always reaches the DB / JSON snapshot.
     for r in trending_ai:
-        if r["name"] not in {p["name"] for p in to_persist}:
+        if r["name"].lower() not in {p["name"].lower() for p in to_persist}:
             r["best_category"] = None
             to_persist.append(r)
+
+    # ponytail: 2026-09 P1 — 新星通道并入(同 trending 补回逻辑:不参与星标截断;
+    # 已在分类/5k/trending 里的不会重复并入;键统一小写防大小写变体漏判)。
+    new_stars: dict[str, dict] = {}
+    for q in _new_star_queries:
+        for r in _batch.get(q) or []:
+            if not is_ai_relevant(r):
+                continue
+            new_stars.setdefault(r["name"].lower(), r)
+    _ns_existing = {p["name"].lower() for p in to_persist}
+    for r in new_stars.values():
+        if r["name"].lower() not in _ns_existing:
+            r["best_category"] = None
+            to_persist.append(r)
+    print(
+        f"  ✓ new-star pass: {len(new_stars)} low-star repos (created>{_new_star_cutoff if _new_star_queries else '—'})"
+    )
     # ponytail: 去重规则 = git 完整仓库地址（normalize_git_url 归一化：小写/
     # 去 .git/去尾斜杠/gh:// 前缀）。同一仓库从 GitHub 搜索、trending、MCP
     # registry 多路进来只会留一份（分类归属仍是多对多）。
     # 2026-09：trending 标记在去重时打上 — JSON 快照此前 0 标记，前端「趋势」
     # tab 一直在显示按星标排序的兜底数据，与 github.com/trending 对不上。
-    _trending_names = {r["name"] for r in trending_ai}
+    _trending_names = {r["name"].lower() for r in trending_ai}
     seen = set()
     deduped = []
     for r in to_persist:
@@ -3294,7 +3463,7 @@ def _crawl_inner():
             continue
         seen.add(ukey)
         r["is_ai_relevant"] = is_ai_relevant(r)
-        if r["name"] in _trending_names:
+        if r["name"].lower() in _trending_names:
             r["trending"] = True
         deduped.append(r)
 
@@ -3305,7 +3474,10 @@ def _crawl_inner():
     for r in deduped:
         r["desc_zh"] = zh.get(f"{r['name']}::desc", "") or r.get("desc_zh", "")
         r["facts"] = facts_for_repo(r)
-        r["local_installed"] = r["name"].split("/")[-1] in installed_skills
+        r["local_installed"] = (
+            r["name"].lower() in installed_segs
+            or r["name"].split("/")[-1].lower() in installed_segs
+        )
         # 精选赛道标记 — hot_now 保底浮出用（CURATED_ALLOWLIST + 手工种子）
         r["curated"] = (r["name"].lower() in CURATED_ALLOWLIST) or (
             r["name"] in MANUAL_SEED_REPOS
@@ -3342,7 +3514,15 @@ def _crawl_inner():
             cur.execute("INSERT INTO crawl_log DEFAULT VALUES RETURNING id")
             crawl_id = cur.fetchone()[0]
             n_inserted, n_updated = db.upsert_repos(conn, deduped)
-            db.replace_categories(conn, cat_pairs)
+            # ponytail: 2026-09 — cat_pairs 必须按 deduped 过滤。分类循环收集的
+            # 关联在全局去重后可能指向被丢弃的条目(实测 MCP registry 项的
+            # websiteUrl 归一化后与别的条目撞键被 dedup 丢弃),外键约束会让
+            # 整个入库事务回滚 → JSON fallback,PG 数据停在旧 crawl。
+            _persisted_names = {r["name"] for r in deduped}
+            db.replace_categories(
+                conn,
+                [(n, c) for n, c in cat_pairs if n in _persisted_names],
+            )
             db.snapshot_stars(conn, [r["name"] for r in deduped])
             # ponytail: trending flag is recomputed each crawl — clear stale, then set today's trending repos
             db.set_trending(conn, [r["name"] for r in trending_ai])
@@ -3457,15 +3637,23 @@ def _installed_segments(local: dict) -> set:
     """Flatten detect_local_skills() output to a set of FULL owner/repo names.
     ponytail: use full names only — bare segments like "skills" cause false positives.
     Sources:
+      0. local skills 目录 origin — meta.url(PG 索引/sidecar)或 origin_full
+         (symlink 目标 SKILLS_CACHE/owner__repo 还原)。2026-09 修复:此前 skills
+         目录完全不参与本函数,凡以技能(非插件)形式装的卡片永远标不出「已装」。
       1. plugin cache .git/config origin (when plugin was git-installed, e.g. obra/superpowers)
       2. plugin's marketplace source repo (when plugin lives in the marketplace repo,
          source is './' relative to marketplace — use marketplace URL as the source)
       3. known_marketplaces.json (covers the marketplace URL itself)
-      4. local skills/commands/agents — covered separately by `plugin_segs` (bare name)
-         in _annotate_local_installed; do NOT add 'local/<name>' here (would never match
-         any real GitHub repo name and was previously dead code).
     """
     segs = set()
+
+    # ponytail: 2026-09 — skills 目录 origin(三路:origin_full > url > 跳过)
+    for _name, meta in (local.get("skills") or {}).items():
+        full = (meta or {}).get("origin_full") or _owner_repo_from_url(
+            (meta or {}).get("url") or ""
+        )
+        if full:
+            segs.add(full)
 
     # ponytail: load marketplace source map once
     mp_source: dict[str, str] = {}

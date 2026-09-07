@@ -75,8 +75,10 @@ def upsert_repos(conn, repos: Iterable[dict]):
           forks         = EXCLUDED.forks,
           lang          = EXCLUDED.lang,
           topics        = EXCLUDED.topics,
-          pushed_at     = EXCLUDED.pushed_at,
-          updated_at    = EXCLUDED.updated_at,
+          -- 2026-09 P3: COALESCE 防退化 — 多源(MCP/arXiv/GitHub)同名行互相覆盖时,
+          -- 空 pushed/updated 不再抹掉已有真值(此前 NULL 直接覆盖)。
+          pushed_at     = COALESCE(EXCLUDED.pushed_at, repos.pushed_at),
+          updated_at    = COALESCE(EXCLUDED.updated_at, repos.updated_at),
           description   = COALESCE(EXCLUDED.description, repos.description),
           desc_zh       = COALESCE(EXCLUDED.desc_zh, repos.desc_zh),
           is_ai_relevant = EXCLUDED.is_ai_relevant,
@@ -112,14 +114,16 @@ def replace_categories(conn, repo_cats: list[tuple[str, str]]):
 
 
 def snapshot_stars(conn, repo_names: list[str]):
-    """Append a (repo_name, stars, NOW()) row for every repo in repo_names."""
+    """Append a (repo_name, stars, today) row for every repo in repo_names.
+    2026-09 P3: snapshot_at 截断到当天 — (repo, snapshot_at) 主键 + ON CONFLICT
+    使同日多次 crawl 只记一行(旧行已由 schema.sql 迁移归一)。"""
     if not repo_names:
         return 0
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO repo_stars_history (repo_name, stars)
-        SELECT name, stars FROM repos WHERE name = ANY(%s)
+        INSERT INTO repo_stars_history (repo_name, snapshot_at, stars)
+        SELECT name, date_trunc('day', NOW()), stars FROM repos WHERE name = ANY(%s)
         ON CONFLICT DO NOTHING
     """,
         (repo_names,),

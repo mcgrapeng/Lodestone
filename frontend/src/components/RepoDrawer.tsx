@@ -8,11 +8,19 @@ import {
   DrawerBody,
   DrawerClose,
 } from '@appica/ui-react'
-import { X, Star, GitFork, ExternalLink, Globe, Calendar, Loader2, Download, Trash2, RefreshCw } from 'lucide-react'
+import { X, Star, GitFork, ExternalLink, Globe, Calendar, Loader2, Download, Trash2, RefreshCw, Check } from 'lucide-react'
 import type { Repo } from '../lib/types'
 import { api } from '../lib/api'
 import { formatStars, repoOwner, repoSlug } from '../lib/format'
 import { sourceOf } from '../lib/filters'
+
+/** 安装平台多选 — 与后端 SKILL_PLATFORM_PATHS 一一对应（config.toml [install.platforms] 可扩展） */
+const PLATFORMS = [
+  { id: 'claude', label: 'Claude Code' },
+  { id: 'codex', label: 'Codex' },
+  { id: 'opencode', label: 'OpenCode' },
+  { id: 'easycode', label: 'EasyCode' },
+] as const
 
 export interface RepoDrawerProps {
   repo: Repo | null
@@ -27,6 +35,14 @@ type Action = 'install' | 'update' | 'uninstall'
 export function RepoDrawer({ repo, open, onClose, onRepoChanged }: RepoDrawerProps) {
   const [busy, setBusy] = useState<Action | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
+  // 平台多选 — 默认只勾 Claude Code（2026-09 用户决策；此前默认静默装全部平台）
+  const [targets, setTargets] = useState<string[]>(['claude'])
+
+  function toggleTarget(id: string) {
+    setTargets((prev) =>
+      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id],
+    )
+  }
 
   // ponytail: GitHub 仓库才可装为 skill（HF/arXiv/MCP registry 条目没有可克隆的 repo）
   const installable = repo ? sourceOf(repo) === 'github' : false
@@ -41,8 +57,8 @@ export function RepoDrawer({ repo, open, onClose, onRepoChanged }: RepoDrawerPro
         kind === 'uninstall'
           ? await api.uninstallSkill(slug)
           : kind === 'update'
-            ? await api.updateSkill(repo.name, repo.url)
-            : await api.installSkill(repo.name, repo.url)
+            ? await api.updateSkill(repo.name, repo.url, targets)
+            : await api.installSkill(repo.name, repo.url, targets)
       setMsg(res.ok ? `✅ ${res.message}` : `❌ ${res.error ?? '操作失败'}`)
       if (res.ok) {
         onRepoChanged?.({ ...repo, local_installed: kind !== 'uninstall' })
@@ -149,13 +165,37 @@ export function RepoDrawer({ repo, open, onClose, onRepoChanged }: RepoDrawerPro
               {/* 安装 / 更新 / 卸载 — skills 闭环 */}
               {installable && (
                 <div className="mb-5">
+                  {/* 平台多选 — 安装/更新都作用于勾选的平台；默认仅 Claude Code */}
+                  <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                    <span className="mr-1 text-[11px] text-foreground-subtle">安装到</span>
+                    {PLATFORMS.map((p) => {
+                      const on = targets.includes(p.id)
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => toggleTarget(p.id)}
+                          className={
+                            'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 transition ' +
+                            (on
+                              ? 'bg-primary/20 text-primary ring-primary/50'
+                              : 'bg-background-muted text-foreground-subtle ring-border-muted hover:text-foreground')
+                          }
+                        >
+                          {on ? <Check className="h-3 w-3" /> : null}
+                          {p.label}
+                        </button>
+                      )
+                    })}
+                  </div>
                   {repo.local_installed ? (
                     /* 视觉审查修正：更新=品牌色主按钮；卸载=ghost 危险操作且分隔，降低误触 */
                     <div className="flex items-center gap-3">
                       <button
                         type="button"
                         onClick={() => act('update')}
-                        disabled={busy !== null}
+                        disabled={busy !== null || targets.length === 0}
                         className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary/25 px-3 py-2 text-xs font-semibold text-primary ring-1 ring-primary/40 transition hover:bg-primary/35 disabled:opacity-50"
                       >
                         {busy === 'update' ? (
@@ -184,7 +224,7 @@ export function RepoDrawer({ repo, open, onClose, onRepoChanged }: RepoDrawerPro
                     <button
                       type="button"
                       onClick={() => act('install')}
-                      disabled={busy !== null}
+                      disabled={busy !== null || targets.length === 0}
                       className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary/25 px-3 py-2 text-xs font-semibold text-primary ring-1 ring-primary/40 transition hover:bg-primary/35 disabled:opacity-50"
                     >
                       {busy === 'install' ? (
@@ -192,7 +232,7 @@ export function RepoDrawer({ repo, open, onClose, onRepoChanged }: RepoDrawerPro
                       ) : (
                         <Download className="h-3.5 w-3.5" />
                       )}
-                      安装为 Skill（claude · codex · opencode）
+                      安装为 Skill{targets.length === 0 ? '（请先勾选平台）' : ''}
                     </button>
                   )}
                   {msg && (

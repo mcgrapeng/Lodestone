@@ -57,7 +57,7 @@ from typing import Optional
 
 REGISTRY_URL = "https://registry.modelcontextprotocol.io/v0/servers"
 PAGE_SIZE = 100  # registry default page size; larger pulls cost a single roundtrip
-MAX_PAGES = 8   # ~800 servers; safe upper bound for a single crawl
+MAX_PAGES = 16  # 2026-09 P3: 8→16 (~1600 servers) — 注册表已超 800,8 页会静默截断
 
 
 def _http_get_json(url: str, timeout: int = 30) -> Optional[dict]:

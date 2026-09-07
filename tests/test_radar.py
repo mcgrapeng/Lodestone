@@ -11,6 +11,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import radar
 
 
+def _platforms_at(tmp: Path) -> dict:
+    """2026-09: detect/install 的平台目录来自 _SKILL_PLATFORM_PATHS(模块加载时
+    已展开为绝对路径),patch Path.home 不再影响 — 测试需显式重定向平台表,
+    否则 symlink/扫描会写真实 ~/.claude/skills。"""
+    return {
+        "claude": str(tmp / ".claude" / "skills"),
+        "codex": str(tmp / ".codex" / "skills"),
+        "opencode": str(tmp / ".config" / "opencode" / "skills"),
+    }
+
+
 def test_install_skill_from_github_accepts_owner_repo():
     """Bug: name='obra/superpowers' was rejected by old alnum-only check.
 
@@ -24,6 +35,7 @@ def test_install_skill_from_github_accepts_owner_repo():
             patch.object(radar, "SKILLS_CACHE", cache),
             patch.object(radar, "SKILL_ORIGINS", cache.parent / "origins.json"),
             patch("radar.Path.home", return_value=tmp),
+            patch.object(radar, "_SKILL_PLATFORM_PATHS", _platforms_at(tmp)),
         ):
             with patch("radar.subprocess.run") as mock_run:
                 mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
@@ -103,6 +115,7 @@ def test_detect_local_skills_enriches_from_repo_index():
             patch("radar.Path.home", return_value=tmp),
             patch("radar._load_repo_index", return_value=index),
             patch("radar.SKILL_ORIGINS", tmp / "origins.json"),
+            patch.object(radar, "_SKILL_PLATFORM_PATHS", _platforms_at(tmp)),
         ):
             radar.invalidate_local_scan()
             result = radar.detect_local_skills()
@@ -126,6 +139,7 @@ def test_detect_local_skills_falls_back_to_skill_md():
             patch("radar.Path.home", return_value=tmp),
             patch("radar._load_repo_index", return_value={}),
             patch("radar.SKILL_ORIGINS", tmp / "origins.json"),
+            patch.object(radar, "_SKILL_PLATFORM_PATHS", _platforms_at(tmp)),
             patch(
                 "radar.translate_batch", return_value={"custom-skill": "我的自定义技能"}
             ),
@@ -153,6 +167,7 @@ def test_detect_local_skills_translates_desc_en_when_no_zh():
             patch("radar.Path.home", return_value=tmp),
             patch("radar._load_repo_index", return_value={}),
             patch("radar.SKILL_ORIGINS", tmp / "origins.json"),
+            patch.object(radar, "_SKILL_PLATFORM_PATHS", _platforms_at(tmp)),
             patch(
                 "radar.translate_batch",
                 return_value={"english-only-skill": "完全中文的描述"},

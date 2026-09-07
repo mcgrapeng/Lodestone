@@ -63,3 +63,27 @@ CREATE TABLE IF NOT EXISTS crawl_log (
 );
 
 ALTER TABLE crawl_log ADD COLUMN IF NOT EXISTS queries_failed INT DEFAULT 0;
+
+-- ─────────────────────────────────────────
+-- 2026-09 数据修复迁移(幂等;ensure_schema 每次 crawl 前重放,无重复时零效果)
+
+-- P2:合并大小写变体行 — GitHub 仓库改名/大小写归一后,同一仓库会出现
+-- owner/Repo 与 owner/repo 两行(应用层合并键已统一小写,此处清历史存量)。
+-- 每组保留 stars 最大(平星标比 last_seen_at,再比 name 保证确定性);
+-- 子表行随 ON DELETE CASCADE 级联删除,分类关联下次 crawl 重建。
+DELETE FROM repos a
+USING repos b
+WHERE a.name <> b.name
+  AND lower(a.name) = lower(b.name)
+  AND (a.stars, a.last_seen_at, a.name) < (b.stars, b.last_seen_at, b.name);
+
+-- P3:stars 快照按天去重 — (repo, snapshot_at) 秒级主键使同日多次 crawl 产生
+-- 多行;先保每天最新一行,再把 snapshot_at 归一到当天零点(query_gain 语义不变)。
+DELETE FROM repo_stars_history a
+USING repo_stars_history b
+WHERE a.repo_name = b.repo_name
+  AND date_trunc('day', a.snapshot_at) = date_trunc('day', b.snapshot_at)
+  AND a.snapshot_at < b.snapshot_at;
+UPDATE repo_stars_history
+SET snapshot_at = date_trunc('day', snapshot_at)
+WHERE snapshot_at <> date_trunc('day', snapshot_at);
