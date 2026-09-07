@@ -2063,16 +2063,19 @@ def install_skill_from_github(name, url, targets=None, force_update=False):
 
 
 def uninstall_skill(name: str) -> dict:
-    """Remove a skill: unlink from ~/.claude/skills + ~/.codex/skills, drop cache dir, remove sidecar entry.
-    Returns {removed_links: [paths], cache: path_or_null}."""
-    if not name or not all(c.isalnum() or c in "-_." for c in name):
+    """Remove a skill: unlink from ALL platform skills dirs, drop cache dir, remove sidecar entry.
+    Returns {removed_links: [paths], cache: path_or_null}.
+    2026-09 闭环修复:① 名字校验与 install 契约对齐(owner/repo 或裸 repo 段均可,
+    此前字符集不含 '/' 直接 400);② 链接清理遍历平台表全平台(此前硬编码
+    claude/codex,opencode/easycode 链接残留导致卸载后「已装」徽标不消失)。"""
+    seg = name.split("/")[-1] if "/" in name else name
+    if not seg or not all(c.isalnum() or c in "-_." for c in seg) or ".." in seg:
         raise ValueError(f"invalid skill name: {name!r}")
     removed = []
     for skills_root in [
-        Path.home() / ".claude" / "skills",
-        Path.home() / ".codex" / "skills",
+        Path(p).expanduser() for p in _SKILL_PLATFORM_PATHS.values()
     ]:
-        link = skills_root / name
+        link = skills_root / seg
         if link.is_symlink() or link.exists():
             try:
                 if link.is_symlink():
@@ -2086,10 +2089,10 @@ def uninstall_skill(name: str) -> dict:
     if SKILL_ORIGINS.exists():
         try:
             origins = json.loads(SKILL_ORIGINS.read_text())
-            entry = (origins.get("skills") or {}).pop(name, None)
+            entry = (origins.get("skills") or {}).pop(seg, None)
             if entry:
                 owner = entry.get("owner", "")
-                repo = entry.get("repo", name)
+                repo = entry.get("repo", seg)
                 # ponytail: check both new (owner__repo) and legacy (bare repo) cache paths
                 candidates = [SKILLS_CACHE / f"{owner}__{repo}"]
                 if owner:

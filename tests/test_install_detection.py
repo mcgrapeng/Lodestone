@@ -203,6 +203,53 @@ def test_detect_keeps_disabled_plugin_as_installed():
     assert "ecc" in segs, "未启用插件必须仍参与已装匹配"
 
 
+# ── uninstall 闭环(2026-09 闭环验证暴露的两个真 bug)──────────────────
+
+
+def test_uninstall_accepts_owner_repo_form():
+    """U1:install 要求 owner/repo,uninstall 的字符集校验却不含 '/',直接调 API
+    卸 'octocat/Hello-World' 会 400(前端碰巧传裸段才没炸)— 两种形式都必须接受。"""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as td:
+        home = Path(td)
+        platforms = {"claude": str(home / "claude" / "skills")}
+        for p in platforms.values():
+            Path(p).mkdir(parents=True, exist_ok=True)
+        (Path(platforms["claude"]) / "Hello-World").symlink_to(home)  # 任意目标
+        with mock.patch.object(radar, "_SKILL_PLATFORM_PATHS", platforms), mock.patch.object(
+            radar, "SKILL_ORIGINS", home / "nope" / "origins.json"
+        ), mock.patch.object(radar, "SKILLS_CACHE", home / "nope"):
+            result = radar.uninstall_skill("octocat/Hello-World")  # 修复前:ValueError
+        assert not (Path(platforms["claude"]) / "Hello-World").exists()
+        assert result["removed_links"]
+
+
+def test_uninstall_cleans_all_platforms():
+    """U2:uninstall 硬编码只清 claude/codex — opencode/easycode 链接残留会让
+    卸载后「已装」徽标不消失。必须遍历平台表全平台。"""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as td:
+        home = Path(td)
+        platforms = {
+            "claude": str(home / "claude" / "skills"),
+            "codex": str(home / "codex" / "skills"),
+            "opencode": str(home / "opencode" / "skills"),
+            "easycode": str(home / "easycode" / "skills"),
+        }
+        for p in platforms.values():
+            d = Path(p)
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "Hello-World").symlink_to(home)
+        with mock.patch.object(radar, "_SKILL_PLATFORM_PATHS", platforms), mock.patch.object(
+            radar, "SKILL_ORIGINS", home / "nope" / "origins.json"
+        ), mock.patch.object(radar, "SKILLS_CACHE", home / "nope"):
+            radar.uninstall_skill("Hello-World")
+        for cli, p in platforms.items():
+            assert not (Path(p) / "Hello-World").exists(), f"{cli} 链接未清理"
+
+
 if __name__ == "__main__":
     import inspect
 
