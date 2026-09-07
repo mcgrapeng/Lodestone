@@ -32,10 +32,10 @@ def test_install_skill_from_github_accepts_owner_repo():
         tmp = Path(tmp)
         cache = tmp / "cache"
         with (
-            patch.object(radar, "SKILLS_CACHE", cache),
-            patch.object(radar, "SKILL_ORIGINS", cache.parent / "origins.json"),
+            patch("radar_pkg.core.SKILLS_CACHE", cache),
+            patch("radar_pkg.core.SKILL_ORIGINS", cache.parent / "origins.json"),
             patch("radar.Path.home", return_value=tmp),
-            patch.object(radar, "_SKILL_PLATFORM_PATHS", _platforms_at(tmp)),
+            patch("radar_pkg.detect._SKILL_PLATFORM_PATHS", _platforms_at(tmp)),
         ):
             with patch("radar.subprocess.run") as mock_run:
                 mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
@@ -63,7 +63,7 @@ def test_install_skill_from_github_rejects_bad_name():
         tmp = Path(tmp)
         cache = tmp / "cache"
         with (
-            patch.object(radar, "SKILLS_CACHE", cache),
+            patch("radar_pkg.core.SKILLS_CACHE", cache),
             patch("radar.Path.home", return_value=tmp),
         ):
             try:
@@ -80,7 +80,7 @@ def test_install_skill_rejects_url_name_mismatch():
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         with (
-            patch.object(radar, "SKILLS_CACHE", tmp / "cache"),
+            patch("radar_pkg.core.SKILLS_CACHE", tmp / "cache"),
             patch("radar.Path.home", return_value=tmp),
         ):
             try:
@@ -113,9 +113,9 @@ def test_detect_local_skills_enriches_from_repo_index():
         (skills_dir / "SKILL.md").write_text("---\nname: superpowers\n---\n")
         with (
             patch("radar.Path.home", return_value=tmp),
-            patch("radar._load_repo_index", return_value=index),
-            patch("radar.SKILL_ORIGINS", tmp / "origins.json"),
-            patch.object(radar, "_SKILL_PLATFORM_PATHS", _platforms_at(tmp)),
+            patch("radar_pkg.detect._load_repo_index", return_value=index),
+            patch("radar_pkg.core.SKILL_ORIGINS", tmp / "origins.json"),
+            patch("radar_pkg.detect._SKILL_PLATFORM_PATHS", _platforms_at(tmp)),
         ):
             radar.invalidate_local_scan()
             result = radar.detect_local_skills()
@@ -137,11 +137,11 @@ def test_detect_local_skills_falls_back_to_skill_md():
         )
         with (
             patch("radar.Path.home", return_value=tmp),
-            patch("radar._load_repo_index", return_value={}),
-            patch("radar.SKILL_ORIGINS", tmp / "origins.json"),
-            patch.object(radar, "_SKILL_PLATFORM_PATHS", _platforms_at(tmp)),
+            patch("radar_pkg.detect._load_repo_index", return_value={}),
+            patch("radar_pkg.core.SKILL_ORIGINS", tmp / "origins.json"),
+            patch("radar_pkg.detect._SKILL_PLATFORM_PATHS", _platforms_at(tmp)),
             patch(
-                "radar.translate_batch", return_value={"custom-skill": "我的自定义技能"}
+                "radar_pkg.detect.translate_batch", return_value={"custom-skill": "我的自定义技能"}
             ),
         ):
             radar.invalidate_local_scan()
@@ -165,11 +165,11 @@ def test_detect_local_skills_translates_desc_en_when_no_zh():
         )
         with (
             patch("radar.Path.home", return_value=tmp),
-            patch("radar._load_repo_index", return_value={}),
-            patch("radar.SKILL_ORIGINS", tmp / "origins.json"),
-            patch.object(radar, "_SKILL_PLATFORM_PATHS", _platforms_at(tmp)),
+            patch("radar_pkg.detect._load_repo_index", return_value={}),
+            patch("radar_pkg.core.SKILL_ORIGINS", tmp / "origins.json"),
+            patch("radar_pkg.detect._SKILL_PLATFORM_PATHS", _platforms_at(tmp)),
             patch(
-                "radar.translate_batch",
+                "radar_pkg.detect.translate_batch",
                 return_value={"english-only-skill": "完全中文的描述"},
             ) as mock_tb,
         ):

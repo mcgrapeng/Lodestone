@@ -49,7 +49,7 @@ def test_link_target_resolves_owner_repo():
     link = tmp / "ecc"
     link.symlink_to(cache / "affaan-m__ecc")
     try:
-        with mock.patch.object(radar, "SKILLS_CACHE", cache):
+        with mock.patch("radar_pkg.core.SKILLS_CACHE", cache):
             assert radar._owner_repo_from_link_target(link) == "affaan-m/ecc"
     finally:
         link.unlink(missing_ok=True)
@@ -65,7 +65,7 @@ def test_link_target_ignores_foreign_targets():
     link = tmp / "some-skill"
     link.symlink_to(foreign)
     try:
-        with mock.patch.object(radar, "SKILLS_CACHE", tmp / "skills-cache-not-here"):
+        with mock.patch("radar_pkg.core.SKILLS_CACHE", tmp / "skills-cache-not-here"):
             assert radar._owner_repo_from_link_target(link) is None
     finally:
         link.unlink(missing_ok=True)
@@ -162,10 +162,10 @@ def test_detect_scans_all_platform_dirs_and_recovers_origin():
             else:
                 (d / "handmade").mkdir()  # 手装技能,无任何 origin
 
-        with mock.patch.object(radar, "_SKILL_PLATFORM_PATHS", platforms), mock.patch.object(
-            radar, "SKILLS_CACHE", cache
-        ), mock.patch.object(radar, "_load_repo_index", return_value={}), mock.patch.object(
-            radar, "SKILL_ORIGINS", home / "nope" / "origins.json"
+        with mock.patch("radar_pkg.detect._SKILL_PLATFORM_PATHS", platforms), mock.patch(
+            "radar_pkg.core.SKILLS_CACHE", cache
+        ), mock.patch("radar_pkg.detect._load_repo_index", return_value={}), mock.patch(
+            "radar_pkg.core.SKILL_ORIGINS", home / "nope" / "origins.json"
         ):
             local = radar.detect_local_skills(force=True)
 
@@ -217,9 +217,9 @@ def test_uninstall_accepts_owner_repo_form():
         for p in platforms.values():
             Path(p).mkdir(parents=True, exist_ok=True)
         (Path(platforms["claude"]) / "Hello-World").symlink_to(home)  # 任意目标
-        with mock.patch.object(radar, "_SKILL_PLATFORM_PATHS", platforms), mock.patch.object(
+        with mock.patch("radar_pkg.detect._SKILL_PLATFORM_PATHS", platforms), mock.patch.object(
             radar, "SKILL_ORIGINS", home / "nope" / "origins.json"
-        ), mock.patch.object(radar, "SKILLS_CACHE", home / "nope"):
+        ), mock.patch("radar_pkg.core.SKILLS_CACHE", home / "nope"):
             result = radar.uninstall_skill("octocat/Hello-World")  # 修复前:ValueError
         assert not (Path(platforms["claude"]) / "Hello-World").exists()
         assert result["removed_links"]
@@ -242,9 +242,9 @@ def test_uninstall_cleans_all_platforms():
             d = Path(p)
             d.mkdir(parents=True, exist_ok=True)
             (d / "Hello-World").symlink_to(home)
-        with mock.patch.object(radar, "_SKILL_PLATFORM_PATHS", platforms), mock.patch.object(
+        with mock.patch("radar_pkg.detect._SKILL_PLATFORM_PATHS", platforms), mock.patch.object(
             radar, "SKILL_ORIGINS", home / "nope" / "origins.json"
-        ), mock.patch.object(radar, "SKILLS_CACHE", home / "nope"):
+        ), mock.patch("radar_pkg.core.SKILLS_CACHE", home / "nope"):
             radar.uninstall_skill("Hello-World")
         for cli, p in platforms.items():
             assert not (Path(p) / "Hello-World").exists(), f"{cli} 链接未清理"

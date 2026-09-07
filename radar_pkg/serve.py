@@ -1,0 +1,1086 @@
+# -*- coding: utf-8 -*-
+"""radar_pkg.serve — HTTP JSON API(组装各域模块;loopback only)。"""
+import datetime
+import http.server
+import json
+import os
+import socketserver
+import subprocess
+import sys
+import threading
+import time
+import webbrowser
+import urllib.parse
+from pathlib import Path
+
+from radar_pkg import core, detect
+import db  # ponytail: PG 查询(serve 各端点直接使用)
+from radar_pkg.crawl import audit, crawl, crawl_lock_held, today
+from radar_pkg.core import (
+    DATA,
+    MANUAL_SEED_REPOS,
+    ROOT,
+    TOP_5K_LIMIT,
+    _repo_slug_from_url,
+    is_ai_relevant,
+)
+from radar_pkg.detect import detect_cli_tools, detect_local_skills, invalidate_local_scan
+from radar_pkg.gh import gh_fetch_repo, gh_search
+from radar_pkg.install import (
+    find_skill_replacements,
+    group_capabilities_by_origin,
+    install_cli_wrapper,
+    install_skill_from_github,
+    replace_skill,
+    set_capability_origin,
+    uninstall_skill,
+)
+from radar_pkg.match import _annotate_local_installed, _build_plugin_segs, _installed_segments, _load_repo_index
+from radar_pkg.translate import enrich_summaries, get_readme_zh, translate_batch
+
+"""radar_pkg.serve — 由 radar.py 搬移(2026-09 架构拆分)。"""
+def serve(port=8765):
+    """Pure JSON API server — Vite (5173) proxies /api/* here.
+    Endpoints:
+      GET  /api/data    → {hot_now, categories, fetched_at}
+      GET  /api/local   → {skills, commands, agents, plugins, clis, ...}
+      GET  /api/top     → paginated 1k+ star AI repos
+      GET  /api/gain    → repos with star delta ≥ min_delta (24h / 7d)
+      GET  /api/workbuddy → workbuddy picks
+      POST /api/crawl   → spawn `radar.py crawl` in background
+      POST /api/install → clone+symlink a skill
+      POST /api/install-cli → wrap a CLI as slash command
+      POST /api/local/origin → tag a command/agent/plugin with GitHub URL
+      POST /api/local/replace → replace an installed skill with a stronger one
+    """
+    socketserver.ThreadingTCPServer.allow_reuse_address = True
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, fmt, *args):
+            sys.stderr.write(f"  [{self.command}] {self.path}\n")
+
+        # ponytail: security — this server can clone repos into your skills dirs.
+        # Browsers always send Origin on cross-origin POSTs, so a non-local Origin
+        # header = another website trying drive-by installs → reject. Local curl /
+        # same-origin Vite proxy send none and pass.
+        def _origin_forbidden(self) -> bool:
+            origin = (self.headers.get("Origin") or "").strip().lower()
+            if not origin:
+                return False
+            return not origin.startswith(
+                ("http://localhost", "http://127.0.0.1", "http://[::1]")
+            )
+
+        def _json(self, data, status=200, etag=False):
+            body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+            tag = None
+            if etag:
+                # ponytail: 2026-09 — ETag 协商。前端 30s 轮询 /api/data（~600KB/次），
+                # 304 让未变化的响应零传输。no-store 阻止浏览器自动缓存，所以由
+                # 前端手动带 If-None-Match（见 frontend/src/lib/api.ts）。
+                tag = '"' + __import__("hashlib").md5(body).hexdigest()[:16] + '"'
+                if (self.headers.get("If-None-Match") or "").strip() == tag:
+                    self.send_response(304)
+                    self.send_header("ETag", tag)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            if tag:
+                self.send_header("ETag", tag)
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _read_body(self):
+            length = int(self.headers.get("Content-Length", 0))
+            if not length:
+                return {}
+            return json.loads(self.rfile.read(length).decode("utf-8"))
+
+        # ponytail: /zp 一键体验 — serve 不再是纯 API：非 /api 的 GET 直接托管
+        # frontend/dist 构建产物（前端 BASE='' 同源相对路径，无需 Vite）。
+        # 开发模式仍走 `cd frontend && npm run dev`（热更新）。
+        _STATIC_TYPES = {
+            ".js": "text/javascript; charset=utf-8",
+            ".css": "text/css; charset=utf-8",
+            ".html": "text/html; charset=utf-8",
+            ".svg": "image/svg+xml",
+            ".png": "image/png",
+            ".ico": "image/x-icon",
+            ".woff2": "font/woff2",
+        }
+
+        def _serve_static(self):
+            root = (ROOT / "frontend" / "dist").resolve()
+            if not (root / "index.html").is_file():
+                self.send_error(
+                    503,
+                    "frontend/dist not built — run `cd frontend && npm install && npm run build`",
+                )
+                return
+            path = urllib.parse.urlparse(self.path).path
+            if path.startswith("/assets/"):
+                f = (root / path.lstrip("/")).resolve()
+                # ponytail: path-traversal guard — /assets/../radar.py 不许读源码
+                if root not in f.parents or not f.is_file():
+                    self.send_error(404)
+                    return
+                body = f.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", self._STATIC_TYPES.get(f.suffix, "application/octet-stream"))
+                self.send_header("Content-Length", str(len(body)))
+                # ponytail: 文件名带 hash → 内容变名字变，可放心长缓存
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            # SPA 兜底：其余路径（含 /）都回 index.html，路由由前端接管
+            body = (root / "index.html").read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):
+            if self.path == "/api/data":
+                if db._DB_OK:
+                    try:
+                        conn = db.connect()
+                        try:
+                            hot = db.query_hot_now(conn, limit=40)
+                            cats = db.query_categories(conn)
+                        finally:
+                            conn.close()
+                        # ponytail: per-request annotation — the DB doesn't know what's installed locally
+                        local_sk = detect_local_skills()
+                        segs = _installed_segments(local_sk)
+                        plugin_segs = _build_plugin_segs(local_sk)
+                        _annotate_local_installed(hot, segs, plugin_segs)
+                        _annotate_local_installed(cats, segs, plugin_segs)
+                        return self._json(
+                            {
+                                "hot_now": hot,
+                                "categories": cats,
+                                "fetched_at": datetime.datetime.now().isoformat(),
+                            },
+                            etag=True,
+                        )
+                    except Exception as e:
+                        print(
+                            f"  [warn] /api/data db read failed: {e}; falling back to data/latest.json",
+                            file=sys.stderr,
+                        )
+                # ponytail: fallback — read latest.json (PG-unavailable mode or DB transient error)
+                latest = DATA / "latest.json"
+                if latest.exists():
+                    snap = json.loads(latest.read_text())
+                    hot = snap.get("hot_now") or []
+                    cats = snap.get("categories") or []
+                    local_sk = detect_local_skills()
+                    segs = _installed_segments(local_sk)
+                    plugin_segs = _build_plugin_segs(local_sk)
+                    _annotate_local_installed(hot, segs, plugin_segs)
+                    _annotate_local_installed(cats, segs, plugin_segs)
+                    return self._json(
+                        {
+                            "hot_now": hot,
+                            "categories": cats,
+                            "fetched_at": snap.get("fetched_at"),
+                            # 视觉审查修复：JSON 回退模式此前丢掉 stars_today，
+                            # 前端「今日上榜」永远显示 0（与卡片 +2206 当场矛盾）。
+                            "stars_today": snap.get("stars_today") or {},
+                            # 2026-09：trending 专区列表（趋势 tab 消费）
+                            "trending": snap.get("trending") or [],
+                        },
+                        etag=True,
+                    )
+                return self._json(
+                    {
+                        "hot_now": [],
+                        "categories": [],
+                        "fetched_at": None,
+                        "note": "no data — run ./radar.py crawl",
+                    }
+                )
+            if self.path == "/api/local":
+                local = detect_local_skills()
+                legacy_clis = detect_cli_tools()
+                repos_idx = _load_repo_index()
+                replacements = find_skill_replacements(local, repos_idx)
+                # ponytail: merge detect_local_skills clis (brew/uv/cargo/cask) with legacy 14 CLI list
+                merged_clis = dict(legacy_clis)
+                for group, items in (local.get("clis") or {}).items():
+                    if not items:
+                        continue
+                    merged_clis[group] = (
+                        items  # e.g. {"brew": [...834 names...], "uv": [...]}
+                    )
+                return self._json(
+                    {
+                        "skills": local["skills"],
+                        "commands": local["commands"],
+                        "agents": local["agents"],
+                        "plugins": local["plugins"],
+                        "clis": merged_clis,
+                        "mcp_servers": local.get("mcp_servers") or [],
+                        "groups": group_capabilities_by_origin(local),
+                        "replacements": replacements,
+                        "counts": {
+                            "skills": len(local["skills"]),
+                            "commands": len(local["commands"]),
+                            "agents": len(local["agents"]),
+                            "plugins": len(local["plugins"]),
+                            "clis": sum(
+                                len(v) if isinstance(v, list) else 1
+                                for v in merged_clis.values()
+                            ),
+                            "mcp_servers": len(local.get("mcp_servers") or []),
+                        },
+                        "total": (
+                            len(local["skills"])
+                            + len(local["commands"])
+                            + len(local["agents"])
+                            + len(local["plugins"])
+                            + sum(
+                                len(v) if isinstance(v, list) else 1
+                                for v in merged_clis.values()
+                            )
+                            + len(local.get("mcp_servers") or [])
+                        ),
+                    }
+                )
+            # ponytail: /api/stats — lightweight digest for the 📊 RTK-style token economy
+            # panel + ecosystem breakdown. Computed from PG (or JSON snapshot fallback).
+            if self.path == "/api/stats":
+                try:
+                    stats = {"by_lang": {}, "by_topic": {}, "total_repos": 0, "total_stars": 0}
+                    pg_failed = False
+                    # ponytail: 2026-08 — language allowlist. The repo `lang`
+                    # field can hold non-language tags leaked from upstream
+                    # sources ("Transformers", "Mcp server", "Model" — these
+                    # are HF library_name / registry pseudo-langs, not programming
+                    # languages). Filter to a curated set so by_lang counts
+                    # programming languages only.
+                    LANG_ALLOWLIST = {
+                        "Python", "JavaScript", "TypeScript", "Java", "C++", "C",
+                        "C#", "Go", "Rust", "Ruby", "PHP", "Swift", "Kotlin",
+                        "Scala", "Shell", "HTML", "CSS", "Lua", "Dart", "Elixir",
+                        "Haskell", "OCaml", "R", "Julia", "Racket", "Erlang",
+                        "Groovy", "Perl", "Nim", "Crystal", "Zig", "V", "Odin",
+                        "Vue", "Svelte", "CoffeeScript", "Hack",
+                        "F#", "Clojure", "Common Lisp", "Emacs Lisp", "Scheme",
+                        "Tcl", "Vala", "Verilog", "VHDL", "Solidity", "Move",
+                        "Dockerfile", "Makefile",
+                        "Markdown", "HTML+ERB", "PLpgSQL",
+                    }
+                    if db._DB_OK:
+                        try:
+                            conn = db.connect()
+                            try:
+                                cur = conn.cursor()
+                                cur.execute(
+                                    "SELECT lang, COUNT(*), SUM(stars) FROM repos "
+                                    "WHERE is_ai_relevant AND lang IS NOT NULL "
+                                    "AND lang = ANY(%s) "
+                                    "GROUP BY lang",
+                                    (list(LANG_ALLOWLIST),),
+                                )
+                                for row in cur.fetchall():
+                                    stats["by_lang"][row[0]] = {"count": row[1], "stars": int(row[2] or 0)}
+                                cur.execute("SELECT t, COUNT(*) FROM (SELECT unnest(topics) AS t FROM repos WHERE is_ai_relevant) x GROUP BY t ORDER BY COUNT(*) DESC LIMIT 20")
+                                for row in cur.fetchall():
+                                    stats["by_topic"][row[0]] = row[1]
+                                cur.execute("SELECT COUNT(*), SUM(stars) FROM repos WHERE is_ai_relevant")
+                                row = cur.fetchone()
+                                stats["total_repos"] = row[0]
+                                stats["total_stars"] = int(row[1] or 0)
+                            finally:
+                                conn.close()
+                        except Exception as e:
+                            # 2026-08 — PG installed but unreachable. Fall through to
+                            # JSON snapshot path so /api/stats doesn't return empty
+                            # when the credentials are wrong / DB is down.
+                            pg_failed = True
+                            stats["db_error"] = str(e)
+                    if (not db._DB_OK) or pg_failed:
+                        # ponytail: JSON fallback (no PG OR PG failed)
+                        latest = DATA / "latest.json"
+                        if latest.exists():
+                            snap = json.loads(latest.read_text())
+                            counts: dict[str, int] = {}
+                            for cat in snap.get("categories", []):
+                                for x in cat.get("repos", []):
+                                    # normalize lang casing — 'Python' and 'python' should merge
+                                    raw = (x.get("lang") or "—").strip()
+                                    key = raw if raw == "—" else raw[:1].upper() + raw[1:].lower()
+                                    # 2026-08 — filter to programming languages only;
+                                    # upstream tags like "Transformers", "Mcp server"
+                                    # would otherwise show in by_lang. Compare case-
+                                    # insensitively since the allowlist uses Title Case
+                                    # but data may come in any case.
+                                    if key != "—" and key not in LANG_ALLOWLIST and key.lower() not in {l.lower() for l in LANG_ALLOWLIST}:
+                                        continue
+                                    counts[key] = counts.get(key, 0) + 1
+                            # sort by count desc, keep top 15
+                            sorted_langs = sorted(counts.items(), key=lambda x: -x[1])[:15]
+                            stats["by_lang"] = {k: {"count": v, "stars": 0} for k, v in sorted_langs}
+                            # ponytail: same dedup logic for topics — lowercase normalize
+                            topic_counts: dict[str, int] = {}
+                            for cat in snap.get("categories", []):
+                                for x in cat.get("repos", []):
+                                    for t in (x.get("topics") or []):
+                                        tk = t.strip().lower()
+                                        if tk:
+                                            topic_counts[tk] = topic_counts.get(tk, 0) + 1
+                            sorted_topics = sorted(topic_counts.items(), key=lambda x: -x[1])[:30]
+                            stats["by_topic"] = {k: v for k, v in sorted_topics}
+                            stats["total_repos"] = snap.get("total_unique", 0)
+                            stats["total_stars"] = sum(r.get("stars", 0) for r in snap.get("hot_now", []))
+                            if pg_failed:
+                                stats["note"] = "PG unreachable — showing JSON snapshot"
+                    self._json(stats)
+                except Exception as e:
+                    self._json({"error": str(e)}, status=500)
+                return
+
+            # ponytail: comprehensive Chinese README on demand.
+            # GET /api/repo/<owner>/<repo>/readme[?force=1]
+            # Returns {text, source_url, fetched_at, translator, from_cache}.
+            if self.path.startswith("/api/repo/") and self.path.endswith("/readme"):
+                try:
+                    inner = self.path[len("/api/repo/") : -len("/readme")].strip("/")
+                    parsed_q = urllib.parse.urlparse(self.path)
+                    qs = urllib.parse.parse_qs(parsed_q.query)
+                    force = qs.get("force", ["0"])[0] in ("1", "true", "yes")
+                    full_name = urllib.parse.unquote(inner)
+                    result = get_readme_zh(full_name, force=force)
+                    if result.get("error") and not result.get("text"):
+                        return self._json(result, status=404)
+                    return self._json(
+                        {
+                            "ok": True,
+                            "repo": full_name,
+                            "text": result.get("text", ""),
+                            "source_url": result.get("source_url", ""),
+                            "fetched_at": result.get("fetched_at", ""),
+                            "translator": result.get("translator", ""),
+                            "from_cache": result.get("from_cache", False),
+                            "fallback": result.get("fallback", ""),
+                        }
+                    )
+                except Exception as e:
+                    return self._json({"ok": False, "error": str(e)}, status=500)
+
+            if self.path == "/api/scrapers/status":
+                # ponytail: exposes the {engine: available} map for the 🛠 引擎
+                # panel in the UI. Cached via scrapers.status() which itself caches
+                # the underlying is_available() calls.
+                try:
+                    from scrapers import status as _scraper_status
+
+                    self._json(_scraper_status())
+                except ImportError:
+                    self._json({"error": "scrapers module unavailable"}, status=503)
+                return
+            if self.path == "/api/workbuddy":
+                picks_path = DATA / "workbuddy_picks.json"
+                picks = []
+                if picks_path.exists():
+                    try:
+                        picks = json.loads(picks_path.read_text())
+                    except (OSError, ValueError):
+                        picks = []
+                return self._json({"picks": picks, "count": len(picks)})
+            if self.path.startswith("/api/top"):
+                # ponytail: server-paginate from PG (was: read latest.json + slice client-side)
+                parsed = urllib.parse.urlparse(self.path)
+                qs = urllib.parse.parse_qs(parsed.query)
+                try:
+                    page = max(1, int(qs.get("page", ["1"])[0]))
+                except ValueError:
+                    page = 1
+                try:
+                    size = min(48, max(1, int(qs.get("size", ["12"])[0])))
+                except ValueError:
+                    size = 12
+                sort = qs.get("sort", ["stars"])[0]
+                if db._DB_OK:
+                    try:
+                        conn = db.connect()
+                        try:
+                            data = db.query_top_5k(
+                                conn, page=page, size=size, sort=sort
+                            )
+                        finally:
+                            conn.close()
+                        local_sk = detect_local_skills()
+                        _annotate_local_installed(
+                            data.get("repos"),
+                            _installed_segments(local_sk),
+                            _build_plugin_segs(local_sk),
+                        )
+                        return self._json(data)
+                    except Exception as e:
+                        print(
+                            f"  [warn] /api/top db read failed: {e}; falling back to latest.json",
+                            file=sys.stderr,
+                        )
+                # ponytail: fallback — paginate all repos from latest.json in-memory.
+                # Filter to 1k+ stars to mirror PG query_top_5k's star gate so the
+                # JSON-only mode doesn't show 50-star repos in the "1k+ 主流" view.
+                latest = DATA / "latest.json"
+                if latest.exists():
+                    snap = json.loads(latest.read_text())
+                    all_repos = list(snap.get("hot_now") or []) + [
+                        r
+                        for c in (snap.get("categories") or [])
+                        for r in c.get("repos") or []
+                    ]
+                    # dedupe by name, keep highest stars
+                    by_name = {}
+                    for r in all_repos:
+                        n = r.get("name")
+                        if not n:
+                            continue
+                        if n not in by_name or r.get("stars", 0) > by_name[n].get(
+                            "stars", 0
+                        ):
+                            by_name[n] = r
+                    # 2026-08 — drop the ≥1000 ⭐ filter. The "1k+ 主流 AI 项目"
+                    # view should show ALL mainstream AI tools / skills / plugins
+                    # regardless of star count (a fresh trending MCP server with
+                    # 200 stars is still mainstream). The category filter at the
+                    # front-end side is the right way to gate; the API should
+                    # return the full pool.
+                    repos_1k = list(by_name.values())
+                    # ponytail: pin MANUAL_SEED_REPOS to the front so they show up regardless of stars rank
+                    # (lidge-jun/opencodex = 3264⭐ is in MANUAL_SEED but doesn't make top 48 by stars)
+                    seen = set(r["name"] for r in repos_1k)
+                    pinned_first = []
+                    for full_name in MANUAL_SEED_REPOS:
+                        if full_name in seen:
+                            pinned_first.append(by_name[full_name])
+                            seen.discard(full_name)
+                    rest = [r for r in repos_1k if r["name"] in seen]
+                    if sort == "stars":
+                        sort_key = lambda r: r.get("stars", 0)
+                        reverse = True
+                    elif sort == "recent":
+                        sort_key = lambda r: r.get("pushed", "") or ""
+                        reverse = True
+                    elif sort == "name":
+                        sort_key = lambda r: (r.get("name") or "").lower()
+                        reverse = False
+                    else:
+                        sort_key = lambda r: r.get("stars", 0)
+                        reverse = True
+                    repos = pinned_first + sorted(rest, key=sort_key, reverse=reverse)
+                    total = len(repos)
+                    start = (page - 1) * size
+                    page_repos = repos[start : start + size]
+                    local_sk = detect_local_skills()
+                    _annotate_local_installed(
+                        page_repos,
+                        _installed_segments(local_sk),
+                        _build_plugin_segs(local_sk),
+                    )
+                    return self._json(
+                        {
+                            "repos": page_repos,
+                            "total": total,
+                            "page": page,
+                            "size": size,
+                            "pages": max(1, (total + size - 1) // size),
+                        }
+                    )
+                return self._json(
+                    {"error": "no data — run ./radar.py crawl"}, status=503
+                )
+            if self.path.startswith("/api/gain"):
+                parsed = urllib.parse.urlparse(self.path)
+                qs = urllib.parse.parse_qs(parsed.query)
+                try:
+                    min_delta = min(10000, max(0, int(qs.get("min_delta", ["100"])[0])))
+                except ValueError:
+                    min_delta = 100
+                try:
+                    page = max(1, int(qs.get("page", ["1"])[0]))
+                except ValueError:
+                    page = 1
+                try:
+                    size = min(48, max(1, int(qs.get("size", ["24"])[0])))
+                except ValueError:
+                    size = 24
+                # ponytail: only 24h window — data source is repos.stars_today (from github.com/trending)
+                # ponytail: 26h/44h (was 20h/4h) — the original 4h recent window never captured
+                # a daily-crawl row (crawls are 24h apart), so the snapshot_gain CTE was always
+                # empty. 26h gives us "today's snapshot", 44h gives us "yesterday's snapshot" —
+                # this works for any cadence from 2×/day to once/2days.
+                prev_ago, recent_ago = "44 hours", "26 hours"
+                if db._DB_OK:
+                    try:
+                        conn = db.connect()
+                        try:
+                            data = db.query_gain(
+                                conn,
+                                prev_ago=prev_ago,
+                                recent_ago=recent_ago,
+                                min_delta=min_delta,
+                                page=page,
+                                size=size,
+                            )
+                        finally:
+                            conn.close()
+                        local_sk = detect_local_skills()
+                        _annotate_local_installed(
+                            data.get("gainers"),
+                            _installed_segments(local_sk),
+                            _build_plugin_segs(local_sk),
+                        )
+                        data["range"] = "24h"
+                        # ponytail: cold start — gain needs consecutive daily crawls (stars_today
+                        # from trending + ≥20h of snapshots). Tell the user instead of an empty tab.
+                        if not data.get("gainers"):
+                            data["note"] = (
+                                "暂无 24h 增长数据：需连续多天定时 crawl 积累 stars 快照，或当日 GitHub trending 页无 AI 项目。"
+                            )
+                        return self._json(data)
+                    except Exception as e:
+                        print(
+                            f"  [warn] /api/gain db read failed: {e}; falling back to latest.json",
+                            file=sys.stderr,
+                        )
+                # ponytail: fallback — compute gainers from latest.json stars_today.
+                # Primary source: the top-level `stars_today` map (carried over from trending
+                # scrape; populated even when category repos don't carry the field).
+                # Secondary source: any per-repo `stars_today` on hot_now / category entries.
+                # Tertiary fallback: recent_activity (pushed_at <7d proxy) so the tab is
+                # never empty when there's at least fresh data.
+                latest = DATA / "latest.json"
+                if latest.exists():
+                    snap = json.loads(latest.read_text())
+                    today_map = dict(snap.get("stars_today") or {})
+                    all_repos = list(snap.get("hot_now") or []) + [
+                        r
+                        for c in (snap.get("categories") or [])
+                        for r in c.get("repos") or []
+                    ]
+                    # ponytail: index all repos by name so we can backfill desc/topics/etc
+                    # for the trending repos that are only in today_map (not in any category).
+                    by_name: dict = {}
+                    for r in all_repos:
+                        n = r.get("name")
+                        if not n:
+                            continue
+                        if n not in by_name or r.get("stars", 0) > by_name[n].get(
+                            "stars", 0
+                        ):
+                            by_name[n] = r
+                    # ponytail: build gainers — every name with a positive stars_today wins.
+                    gainers = []
+                    for n, st in today_map.items():
+                        if st <= 0:
+                            continue
+                        rec = by_name.get(n) or {
+                            "name": n,
+                            "stars": 0,
+                            "topics": [],
+                            "description": "",
+                            "desc_zh": "",
+                            "lang": "—",
+                        }
+                        gainers.append(
+                            {
+                                **rec,
+                                "stars_today": st,
+                                "delta_24h": st,
+                                "source": "json_snapshot",
+                            }
+                        )
+                    # ponytail: rank by delta desc, filter to AI-relevant / has topics.
+                    # Fallback to recent_activity if today_map is empty.
+                    if not gainers:
+                        cutoff = (
+                            datetime.date.today() - datetime.timedelta(days=7)
+                        ).isoformat()
+                        for r in all_repos:
+                            pushed = r.get("pushed", "")
+                            if pushed and pushed[:10] >= cutoff:
+                                rec = dict(r)
+                                rec["recent_activity"] = r.get("stars", 0)
+                                gainers.append(rec)
+                        if not gainers:
+                            return self._json(
+                                {
+                                    "gainers": [],
+                                    "total": 0,
+                                    "page": page,
+                                    "size": size,
+                                    "pages": 1,
+                                    "range": "24h",
+                                    "note": "stars_today 与 recent_active 都缺失. 跑 `radar.py crawl` 补回.",
+                                    "action": "crawl",
+                                }
+                            )
+                    # ponytail: rank by delta desc, paginate, annotate local-installed
+                    gainers.sort(
+                        key=lambda r: -(
+                            (r.get("delta_24h") or 0) + (r.get("recent_activity") or 0)
+                        )
+                    )
+                    total = len(gainers)
+                    start = (page - 1) * size
+                    page_gainers = gainers[start : start + size]
+                    local_sk = detect_local_skills()
+                    _annotate_local_installed(
+                        page_gainers,
+                        _installed_segments(local_sk),
+                        _build_plugin_segs(local_sk),
+                    )
+                    return self._json(
+                        {
+                            "gainers": page_gainers,
+                            "total": total,
+                            "page": page,
+                            "size": size,
+                            "pages": max(1, (total + size - 1) // size),
+                            "range": "24h",
+                            "note": None,
+                        }
+                    )
+                return self._json(
+                    {"error": "no data — run ./radar.py crawl"}, status=503
+                )
+
+            # ponytail: code-graph endpoints — integrate graphify + code-review-graph
+            # for installed skills so the UI can render rich relationship visualizations.
+            if self.path.startswith("/api/graph/"):
+                try:
+                    slug = urllib.parse.unquote(
+                        self.path[len("/api/graph/") :]
+                    ).strip("/")
+                    owner_repo = slug
+                    if "/" not in owner_repo:
+                        idx = _load_repo_index()
+                        if slug in idx:
+                            owner_repo = idx[slug].get("name", "")
+                    if "/" not in owner_repo:
+                        # ponytail: fall back to local scan — installed skills without
+                        # a PG entry should still be resolvable for graph viz.
+                        local = detect_local_skills()
+                        for s, meta in (local.get("skills") or {}).items():
+                            if s == slug:
+                                if meta.get("url"):
+                                    owner_repo = _repo_slug_from_url(meta["url"])
+                                else:
+                                    owner_repo = f"local/{slug}"
+                                break
+                    if "/" not in owner_repo:
+                        return self._json(
+                            {"error": f"unknown skill: {slug}"}, status=404
+                        )
+                    owner, repo = owner_repo.split("/", 1)
+                    candidates = [
+                        core.SKILLS_CACHE / f"{owner}__{repo}",
+                        core.SKILLS_CACHE / repo,
+                        Path.home() / ".claude" / "skills" / repo,
+                        Path.home() / ".codex" / "skills" / repo,
+                    ]
+                    skill_dir = next(
+                        (p for p in candidates if p.exists()), None
+                    )
+                    if not skill_dir:
+                        return self._json(
+                            {"error": f"skill {owner_repo} not installed locally"},
+                            status=404,
+                        )
+                    graph_path = skill_dir / "graphify-out" / "graph.json"
+                    # ponytail: graceful path — if no graph.json exists, try building it
+                    # in-place via `graphify update <skill_dir>` (uses tree-sitter, no LLM).
+                    # If still nothing (e.g. SKILL.md-only skills), return an actionable 200.
+                    if not graph_path.exists():
+                        build = subprocess.run(
+                            ["graphify", "update", str(skill_dir), "--no-cluster"],
+                            capture_output=True,
+                            text=True,
+                            timeout=60,
+                        )
+                        # build.returncode may be 0 even when no code was found
+                    if graph_path.exists():
+                        r = subprocess.run(
+                            [
+                                "graphify",
+                                "explain",
+                                slug,
+                                "--graph",
+                                str(graph_path),
+                            ],
+                            capture_output=True,
+                            text=True,
+                            timeout=30,
+                        )
+                        if r.returncode == 0:
+                            return self._json(
+                                {
+                                    "ok": True,
+                                    "skill": owner_repo,
+                                    "source": "graphify",
+                                    "explanation": r.stdout.strip(),
+                                }
+                            )
+                    # ponytail: fallback — return install metadata so the UI can still
+                    # render *something* useful (stars, topics, readme hint) when the
+                    # skill has no code to graph (most Claude Code skills are SKILL.md only).
+                    idx = _load_repo_index()
+                    repo_meta = idx.get(slug) or {}
+                    return self._json(
+                        {
+                            "ok": True,
+                            "skill": owner_repo,
+                            "source": "metadata",
+                            "explanation": (
+                                "此 skill 主要由 SKILL.md 组成（无 Python/TS 代码可做图谱分析）。"
+                                "可用的元数据："
+                                + (
+                                    f"\n  • 描述：{repo_meta.get('description', '')[:160]}"
+                                    if repo_meta.get("description")
+                                    else ""
+                                )
+                                + (
+                                    f"\n  • ⭐ {repo_meta.get('stars', 0):,}"
+                                    if repo_meta.get("stars")
+                                    else ""
+                                )
+                                + (
+                                    f"\n  • Topics: {', '.join(repo_meta.get('topics') or [])[:120]}"
+                                    if repo_meta.get("topics")
+                                    else ""
+                                )
+                                + (
+                                    f"\n  • URL: {repo_meta.get('url')}"
+                                    if repo_meta.get("url")
+                                    else ""
+                                )
+                            ).strip(),
+                            "repo": repo_meta,
+                        }
+                    )
+                except subprocess.TimeoutExpired:
+                    return self._json({"error": "graphify timeout"}, status=504)
+                except Exception as e:
+                    return self._json({"error": str(e)}, status=500)
+
+            if self.path.startswith("/api/crg/"):
+                try:
+                    slug = urllib.parse.unquote(
+                        self.path[len("/api/crg/") :]
+                    ).strip("/")
+                    owner_repo = slug
+                    if "/" not in owner_repo:
+                        idx = _load_repo_index()
+                        if slug in idx:
+                            owner_repo = idx[slug].get("name", "")
+                    if "/" not in owner_repo:
+                        local = detect_local_skills()
+                        for s, meta in (local.get("skills") or {}).items():
+                            if s == slug:
+                                if meta.get("url"):
+                                    owner_repo = _repo_slug_from_url(meta["url"])
+                                else:
+                                    owner_repo = f"local/{slug}"
+                                break
+                    if "/" not in owner_repo:
+                        return self._json(
+                            {"error": f"unknown skill: {slug}"}, status=404
+                        )
+                    owner, repo = owner_repo.split("/", 1)
+                    candidates = [
+                        core.SKILLS_CACHE / f"{owner}__{repo}",
+                        core.SKILLS_CACHE / repo,
+                        Path.home() / ".claude" / "skills" / repo,
+                        Path.home() / ".codex" / "skills" / repo,
+                    ]
+                    skill_dir = next(
+                        (p for p in candidates if p.exists()), None
+                    )
+                    if not skill_dir:
+                        return self._json(
+                            {"error": f"skill {owner_repo} not installed locally"},
+                            status=404,
+                        )
+                    r = subprocess.run(
+                        ["code-review-graph", "status"],
+                        cwd=str(skill_dir),
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                    )
+                    if r.returncode == 0 and r.stdout.strip():
+                        return self._json(
+                            {
+                                "ok": True,
+                                "skill": owner_repo,
+                                "source": "crg",
+                                "stats": r.stdout.strip(),
+                            }
+                        )
+                    # ponytail: graceful — CRG needs a built graph; if status fails (no
+                    # graph yet), suggest the build step in the response.
+                    return self._json(
+                        {
+                            "ok": True,
+                            "skill": owner_repo,
+                            "source": "metadata",
+                            "stats": "",
+                            "note": (
+                                "此 skill 尚未建立 CRG 图谱。运行 "
+                                f"`cd {skill_dir} && code-review-graph build` 后重试。"
+                                if r.stderr
+                                else ""
+                            ),
+                            "warnings": r.stderr.strip()[:300] if r.stderr else "",
+                        }
+                    )
+                except subprocess.TimeoutExpired:
+                    return self._json({"error": "crg timeout"}, status=504)
+                except Exception as e:
+                    return self._json({"error": str(e)}, status=500)
+
+            # ponytail: 非 /api 的 GET → 托管 frontend/dist（`radar.py web` 一键开浏览器即用）
+            self._serve_static()
+
+        def do_POST(self):
+            if self._origin_forbidden():
+                self._json({"ok": False, "error": "forbidden origin"}, status=403)
+                return
+            if self.path == "/api/local/replace":
+                try:
+                    body = self._read_body()
+                    old_name = body.get("old", "").strip()
+                    new_name = body.get("new", "").strip()
+                    new_url = body.get("url", "").strip()
+                    if not old_name or not new_name:
+                        raise ValueError("old and new are required")
+                    result = replace_skill(old_name, new_name, new_url)
+                    self._json(
+                        {
+                            "ok": True,
+                            "result": result,
+                            "message": f"已用 {new_name} 替换 {old_name}",
+                        }
+                    )
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=400)
+                return
+            if self.path == "/api/install":
+                try:
+                    body = self._read_body()
+                    name = body.get("name", "").strip()
+                    url = body.get("url", "").strip()
+                    # ponytail: smart multi-CLI install — targets list lets user pick
+                    # claude / codex / opencode. Default = all three.
+                    raw_targets = body.get("targets")
+                    if raw_targets:
+                        targets = [t.strip() for t in raw_targets if t.strip()]
+                    else:
+                        targets = None
+                    force_update = bool(body.get("force_update", False))
+                    result = install_skill_from_github(
+                        name, url, targets=targets, force_update=force_update
+                    )
+                    # ponytail: build a per-CLI human-readable status string
+                    statuses = [
+                        f"  · {cli}: {info['status']} ({info['detail']})"
+                        for cli, info in result["targets"].items()
+                    ]
+                    msg = f"{name}\n" + "\n".join(statuses)
+                    invalidate_local_scan()  # 「已装」徽标立即生效，不等 60s TTL
+                    self._json(
+                        {
+                            "ok": True,
+                            "message": msg,
+                            "cache": str(result["cache"]),
+                            "cache_state": result["cache_state"],
+                            "targets": result["targets"],
+                        }
+                    )
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=400)
+                return
+            if self.path == "/api/update":
+                # ponytail: 2026-09 — 更新 = install 的 force_update 变体
+                # （git fetch + reset --hard origin/HEAD，不重新 clone）。
+                try:
+                    body = self._read_body()
+                    name = body.get("name", "").strip()
+                    url = body.get("url", "").strip()
+                    result = install_skill_from_github(
+                        name, url, targets=body.get("targets"), force_update=True
+                    )
+                    statuses = [
+                        f"  · {cli}: {info['status']} ({info['detail']})"
+                        for cli, info in result["targets"].items()
+                    ]
+                    invalidate_local_scan()
+                    self._json(
+                        {
+                            "ok": True,
+                            "message": f"{name} 已更新\n" + "\n".join(statuses),
+                            "cache_state": result["cache_state"],
+                            "targets": result["targets"],
+                        }
+                    )
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=400)
+                return
+            if self.path == "/api/uninstall":
+                # ponytail: 2026-09 — 卸载闭环：删软链接 + 缓存目录可选保留。
+                try:
+                    body = self._read_body()
+                    name = body.get("name", "").strip()
+                    result = uninstall_skill(name)
+                    invalidate_local_scan()
+                    self._json({"ok": True, "message": f"{name} 已卸载", "result": result})
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=400)
+                return
+            if self.path == "/api/install-cli":
+                try:
+                    body = self._read_body()
+                    name = body.get("name", "").strip()
+                    command = body.get("command", "").strip()
+                    path = install_cli_wrapper(name, command)
+                    self._json(
+                        {"ok": True, "message": f"已创建 /{name} 命令", "path": path}
+                    )
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=400)
+                return
+            if self.path == "/api/local/origin":
+                try:
+                    body = self._read_body()
+                    kind = body.get("kind", "").strip()
+                    name = body.get("name", "").strip()
+                    url = body.get("url", "").strip()
+                    desc_zh = body.get("desc_zh", "").strip()
+                    desc_en = body.get("desc_en", "").strip()
+                    entry = set_capability_origin(kind, name, url, desc_zh, desc_en)
+                    self._json({"ok": True, "entry": entry})
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=400)
+                return
+            if self.path == "/api/crawl":
+                # ponytail: file-lock guard — 409 instead of spawning a doomed subprocess
+                if crawl_lock_held():
+                    return self._json(
+                        {"ok": False, "error": "crawl already running"}, status=409
+                    )
+                # ponytail: fire-and-forget background crawl so UI doesn't block.
+                # Log fd must be closed BEFORE Popen takes ownership so the parent doesn't
+                # leak it on every /api/crawl request (long-running dev server accumulates fds).
+                log_fd = os.open(DATA / "crawl.log", os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+                subprocess.Popen(
+                    [sys.executable, str(Path(__file__).resolve()), "crawl"],
+                    cwd=str(Path(__file__).parent.resolve()),
+                    stdout=log_fd,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                    close_fds=True,
+                )
+                return self._json(
+                    {"ok": True, "message": "crawl started in background"}
+                )
+            self.send_error(404)
+
+    # ponytail: bind loopback ONLY — this API can git-clone into your skills dirs;
+    # exposing it to the LAN would let anyone on the network install skills.
+    # ponytail: port auto-fallback — if the requested port is busy (another lodestone
+    # instance, stale process, OS-assigned random port from a previous dev run, ...),
+    # walk forward until we find a free one. dev.cjs parses the [serve-port] marker
+    # to learn the actual port so Vite's proxy target stays in sync.
+    import errno as _errno
+    actual_port = port
+    httpd = None
+    for offset in range(50):
+        try_port = port + offset
+        try:
+            httpd = socketserver.ThreadingTCPServer(("127.0.0.1", try_port), Handler)
+        except OSError as e:
+            if e.errno == _errno.EADDRINUSE:
+                continue
+            raise
+        actual_port = try_port
+        break
+    if httpd is None:
+        raise SystemExit(f"no free port in [{port}..{port + 49}] for radar.py serve")
+
+    with httpd:
+        url = f"http://localhost:{actual_port}"
+        if actual_port != port:
+            print(
+                f"[serve] requested port {port} busy, bound to {actual_port} instead",
+                file=sys.stderr,
+            )
+        # ponytail: machine-parseable port line for dev.cjs — keep the format stable.
+        print(f"[serve-port] {actual_port}", flush=True)
+        print(
+            f"[serve] {url}  (loopback only · API: /api/data /api/local /api/top /api/install /api/crawl · Ctrl-C to stop)"
+        )
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\n[serve] stopped")
+
+def web(port=8765):
+    """一键打开仪表盘：已在跑就直接开浏览器；否则后台拉起 serve 再开。
+    /zp 的默认入口 — 免去手动 serve + 开浏览器两步。"""
+    import webbrowser
+
+    def radar_alive(p: int) -> bool:
+        # ponytail: 不只探端口 — / 返回 HTML（带静态托管的新版 serve）且
+        # /api/data 可达才是 lodestone；旧版纯 API 或无关服务都不算，
+        # 端口被占时自动落到下一端口新起一个
+        # ponytail: ProxyHandler({}) 强制直连 — 用户 shell 常挂全局代理（7890），
+        # urlopen 默认走代理会把 loopback 健康检查挂死
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        try:
+            with opener.open(f"http://127.0.0.1:{p}/", timeout=1) as r:
+                if r.status != 200 or "html" not in (r.headers.get("Content-Type") or ""):
+                    return False
+            with opener.open(f"http://127.0.0.1:{p}/api/data", timeout=1) as r:
+                return r.status == 200
+        except Exception:
+            return False
+
+    alive = next((p for p in range(port, port + 50) if radar_alive(p)), None)
+    if alive is None:
+        # ponytail: detached spawn，与 /api/crawl 同款 — start_new_session 脱离
+        # /zp 的 Bash 会话，本命令返回后 serve 继续活着
+        log_fd = os.open(DATA / "serve.log", os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+        subprocess.Popen(
+            [sys.executable, str(Path(__file__).resolve()), "serve", str(port)],
+            cwd=str(Path(__file__).parent.resolve()),
+            stdout=log_fd,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            close_fds=True,
+        )
+        os.close(log_fd)  # ponytail: Popen 已 dup — 父进程立刻关，防 fd 泄漏
+        for _ in range(100):  # 10s 上限等端口就绪（serve 端口被占会顺延）
+            alive = next((p for p in range(port, port + 50) if radar_alive(p)), None)
+            if alive:
+                break
+            time.sleep(0.1)
+        if alive is None:
+            raise SystemExit(f"serve did not come up — see {DATA / 'serve.log'}")
+    # ponytail: 显式 127.0.0.1 而非 localhost — macOS 浏览器可能优先解析 IPv6 ::1，
+    # 若 ::1 同端口被别的服务占着（本机就发生过：synapse 文档服务在 *:8765），
+    # localhost 会打开错页面。serve 只绑 IPv4 loopback，127.0.0.1 必定命中。
+    url = f"http://127.0.0.1:{alive}"
+    print(f"⚡ Lodestone → {url}")
+    webbrowser.open(url)
