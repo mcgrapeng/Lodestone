@@ -43,8 +43,8 @@ export function HeroStats({ snapshot, stats }: HeroStatsProps) {
       <div className="mx-auto max-w-7xl">
         <div className="mb-5">
           {/* 视觉审查修正：仪表盘不是落地页 — 标题一行、去副标题、去徽章行 */}
-          <h1 className="text-2xl font-semibold tracking-tight text-white">
-            <span className="gradient-text">Lodestone</span>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Lodestone
             <span className="ml-3 align-middle text-sm font-normal text-foreground-subtle">
               主流 AI 开源项目 · Skills · Plugins · 论文，{snapshot.categories.length} 个分类
             </span>
