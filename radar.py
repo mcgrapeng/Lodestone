@@ -147,6 +147,12 @@ _SKILL_PLATFORM_PATHS = _detect._SKILL_PLATFORM_PATHS
 
 
 if __name__ == "__main__":
+    # ponytail: 2026-09 — load project .env once at entry so every command
+    # (crawl/serve/web/today/audit) sees GH_TOKEN / FIRECRAWL_API_KEY /
+    # ANTHROPIC_API_KEY etc. Shell env wins (setdefault semantics in env_loader).
+    from env_loader import load_env
+    load_env()
+
     cmd = sys.argv[1] if len(sys.argv) > 1 else "today"
     if cmd == "crawl":
         crawl()

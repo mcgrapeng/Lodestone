@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """radar_pkg.translate — 翻译/README 摘要(持久缓存)。"""
+
 import datetime
 import json
 import re
@@ -10,16 +11,37 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from radar_pkg import core
+import db  # ponytail: get_readme_zh uses db._DB_OK guard; imported lazily at runtime via try/except elsewhere
 from radar_pkg.core import _repo_slug_from_url
 from radar_pkg.gh import _gh_repo_meta
 
 """radar_pkg.translate — 由 radar.py 搬移(2026-09 架构拆分)。"""
 _LANG_NAV_WORDS = (
-    "English", "Português", "简体中文", "繁体中文", "日本語", "日本语",
-    "한국어", "Türkçe", "Русский", "Français", "Deutsch", "Español", "Tiếng Việt",
+    "English",
+    "Português",
+    "简体中文",
+    "繁体中文",
+    "日本語",
+    "日本语",
+    "한국어",
+    "Türkçe",
+    "Русский",
+    "Français",
+    "Deutsch",
+    "Español",
+    "Tiếng Việt",
     # 翻译后的语言名（缓存里的中文版语言行）
-    "英语", "葡萄牙语", "日语", "韩语", "土耳其语", "俄语", "法语", "德语", "西班牙语",
+    "英语",
+    "葡萄牙语",
+    "日语",
+    "韩语",
+    "土耳其语",
+    "俄语",
+    "法语",
+    "德语",
+    "西班牙语",
 )
+
 
 def _clean_readme_text(md: str, max_chars: int = 600) -> str:
     """README → 干净摘要文本。
@@ -27,16 +49,18 @@ def _clean_readme_text(md: str, max_chars: int = 600) -> str:
     ① 去图片/链接/标题标记/强调/代码标记；② 跳过语言导航段；③ 取第一个 ≥40 字符的实质段落。"""
     if not md:
         return ""
-    s = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", md)          # 图片
-    s = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", s)        # 链接 → 文本
-    s = re.sub(r"^#{1,6}\s*", "", s, flags=re.M)           # 标题标记
-    s = re.sub(r"<[^>]+>", " ", s)                          # HTML 标签（徽章）
+    s = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", md)  # 图片
+    s = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", s)  # 链接 → 文本
+    s = re.sub(r"^#{1,6}\s*", "", s, flags=re.M)  # 标题标记
+    s = re.sub(r"<[^>]+>", " ", s)  # HTML 标签（徽章）
     s = s.replace("**", "").replace("__", "")
     s = re.sub(r"[`<>|]", " ", s)
     # GFM 警告标记 [!WARNING]/[!警告] 与语言切换括号 [ En 中 Fr 日 ] — 去前缀保留正文
     s = re.sub(
         r"^\s*\[\s*[!！]?\s*(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION|注意|重要|警告|提示)\s*\]\s*",
-        "", s, flags=re.M,
+        "",
+        s,
+        flags=re.M,
     )
     s = re.sub(r"^\s*\[[^\]\n]{0,24}\]\s+(?=\S)", "", s)
     # 段落级选择：跳过徽章/语言行/短导航，取第一个有实质内容的段落
@@ -61,6 +85,7 @@ def _clean_readme_text(md: str, max_chars: int = 600) -> str:
     # 全部段落都像导航/太短 → 取最长的一段（正文段几乎总是最长的）
     return (max(paragraphs, key=len) if paragraphs else "")[:max_chars]
 
+
 def _summary_from_entry(entry: dict, limit: int = 240) -> str:
     """从 readme_zh 缓存条目取摘要 — 句子边界截断，不切半句。"""
     text = _clean_readme_text(entry.get("text") or "", max_chars=limit + 60)
@@ -73,13 +98,217 @@ def _summary_from_entry(entry: dict, limit: int = 240) -> str:
             return cut[: idx + len(sep)].strip()
     return cut.rsplit(" ", 1)[0].strip()
 
+
+# ponytail: 2026-09 — README 结构化拆分。按 heading 文本映射到 (intro / can_do / benefit)
+# 三桶，凑齐卡片详介「是什么 / 能干什么 / 优势」。关键词中英文混排；不依赖 LLM —
+# Google Translate 是字面翻译，无法要求「生成三段式描述」。结构化靠 heading 提取 +
+# 关键词归类；README 没写这些 section 时降级到原文简介，前端按桶渲染（缺桶自然不显示）。
+_SECTION_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "intro": (
+        "what is",
+        "about",
+        "introduction",
+        "overview",
+        "description",
+        "简介",
+        "介绍",
+        "项目简介",
+        "是什么",
+        "概要",
+        "概述",
+    ),
+    "can_do": (
+        "features",
+        "what it does",
+        "what you can do",
+        "capabilities",
+        "usage",
+        "use cases",
+        "getting started",
+        "quickstart",
+        "examples",
+        "功能",
+        "特性",
+        "能力",
+        "使用",
+        "使用场景",
+        "示例",
+        "用法",
+        "怎么用",
+        "安装",
+        "快速开始",
+    ),
+    "benefit": (
+        "why",
+        "benefits",
+        "advantages",
+        "highlights",
+        "motivation",
+        "why use",
+        "why choose",
+        "key benefits",
+        "philosophy",
+        "优势",
+        "亮点",
+        "动机",
+        "背景",
+        "为什么",
+        "价值",
+        "特点",
+    ),
+}
+
+
+def _split_readme_sections(md: str) -> dict[str, str]:
+    """把 README 按 ## heading 拆段，关键词归类到 intro/can_do/benefit 三桶。
+    返回 {bucket: 第一个匹配的 section 首段(纯文本)}；无匹配返回空串。
+    ponytail: 第一个 heading 之前的内容算「preamble」— 没有 ## What is 时，
+    preamble 的首个实质段落充当 intro 段（README 标配：开头一段介绍，后面
+    才列 Features / Why 等）。"""
+    if not md:
+        return {"intro": "", "can_do": "", "benefit": ""}
+    blocks: list[tuple[str, str]] = []
+    preamble: list[str] = []
+    current_h = ""
+    current_body: list[str] = []
+    seen_heading = False
+    for line in md.splitlines():
+        h = re.match(r"^#{1,4}\s+(.+?)\s*$", line)
+        if h:
+            if not seen_heading:
+                seen_heading = True
+                blocks.append(("", "\n".join(preamble).strip()))
+            if current_h or current_body:
+                blocks.append((current_h, "\n".join(current_body).strip()))
+            current_h = h.group(1).strip()
+            current_body = []
+        else:
+            if seen_heading:
+                current_body.append(line)
+            else:
+                preamble.append(line)
+    if seen_heading and (current_h or current_body):
+        blocks.append((current_h, "\n".join(current_body).strip()))
+    if not seen_heading:
+        # 整篇没 heading → 整段当作 preamble
+        blocks.append(("", md.strip()))
+
+    out = {"intro": "", "can_do": "", "benefit": ""}
+    for heading, body in blocks:
+        body = re.sub(r"\s*##\s+.+\s*", "\n", body)
+        body = re.sub(r"[ \t]+", " ", body)
+        body_lines = [
+            ln.strip()
+            for ln in body.splitlines()
+            if ln.strip() and not ln.strip().startswith("#")
+        ]
+        body = "\n".join(body_lines).strip()
+        if len(body) < 20:
+            continue
+        h_low = heading.lower()
+        # 跳过纯装饰 heading（贡献 / 许可证 / 鸣谢等不进入「能干什么」）
+        if heading and any(
+            skip in h_low
+            for skip in (
+                "license",
+                "contribut",
+                "thanks",
+                "acknowledg",
+                "sponsor",
+                "donate",
+                "star history",
+                "appendix",
+            )
+        ):
+            continue
+        # preamble 段 — 没 heading 时归类到 intro
+        if not heading:
+            if not out["intro"]:
+                out["intro"] = re.sub(r"\s+", " ", body)[:600]
+            continue
+        for bucket, keywords in _SECTION_KEYWORDS.items():
+            if out[bucket]:
+                continue
+            if any(kw in h_low for kw in keywords):
+                # ponytail: 取首个 ≥20 字符的实质段；中文一句话常 20-40 字符。
+                first_para = ""
+                for p in re.split(r"\n+", body):
+                    p = p.strip()
+                    if len(p) >= 20:
+                        first_para = p[:600]
+                        break
+                if not first_para and len(body) >= 20:
+                    first_para = re.sub(r"\s+", " ", body)[:600]
+                if first_para:
+                    out[bucket] = first_para
+                break
+    return out
+
+
+def _build_sections_zh(readme_md: str) -> dict[str, str]:
+    """清洗 + 拆分 + 逐桶翻译 → {intro, can_do, benefit} 中文三段。
+    没找到的桶返回空串（前端按桶渲染，缺桶自然隐藏）。
+    ponytail: 串行翻译三桶 — Google Translate free 端点对并发请求不友好（实测
+    三路并发会触发 rate limit，部分桶返回原文被 _looks_translated 判定失败）。
+    单 repo 三段总耗时 ~3s，可接受。"""
+    if not readme_md:
+        return {"intro": "", "can_do": "", "benefit": ""}
+    clean = _light_clean_for_sections(readme_md)
+    if not clean:
+        return {"intro": "", "can_do": "", "benefit": ""}
+    sections = _split_readme_sections(clean)
+    out: dict[str, str] = {}
+    for bucket, text in sections.items():
+        if not text:
+            out[bucket] = ""
+            continue
+        # ponytail: chunked_translate 内部已按 280 字符分块串行 — 直接调用即可
+        zh = _chunked_translate(text)
+        out[bucket] = zh if _looks_translated(zh, text) else ""
+    return out
+
+
+def _light_clean_for_sections(md: str) -> str:
+    """section 拆分前的轻度清洗 — 不动 bullet/heading。
+    ponytail: _strip_markdown_to_text 太狠，会把 Features 段的 bullet 列表整段
+    当作噪声丢掉。这里只去图片/HTML/链接/语言表，保留 heading + bullet，交给
+    _split_readme_sections 处理。"""
+    s = md
+    # 去掉代码块（不影响分桶但占空间）
+    s = re.sub(r"```.*?```", "", s, flags=re.DOTALL)
+    # 去掉图片与纯装饰链接
+    s = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", s)
+    s = re.sub(r"\[(\s*)\]\(\s*\)", r"\1", s)
+    # 链接保留文本 [text](url) → text
+    s = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", s)
+    # 去掉 HTML 标签（徽章）
+    s = re.sub(r"<[^>]+>", " ", s)
+    # 去掉 pure-shields.io badge 行
+    s = re.sub(r"^\s*\[!\[.*?\]\(.*?\)\]\(.*?\)\s*$", "", s, flags=re.MULTILINE)
+    # 去掉 GFM 警告行
+    s = re.sub(r"^>\s*\[!\w+\].*$", "", s, flags=re.MULTILINE)
+    # 去掉语言切换行（`English | 中文 | ...`）
+    s = re.sub(
+        r"^\s*\[?[A-Z][a-z]+\s*\]?\s*\|\s*\[?[\u4e00-\u9fff].*$",
+        "",
+        s,
+        flags=re.MULTILINE,
+    )
+    # 截断到合理长度（防止单 repo README 几十 KB 拖慢 translate）
+    return s[:12000]
+
+
 def _build_summary_zh(repo: dict, cache: dict) -> None:
-    """为单个 repo 生成 summary_zh（详细中文描述）。
-    缓存命中 → 直接截取；未命中 → 拉 README 首段翻译并写回 cache。
-    非 GitHub 条目（HF/arXiv/MCP）用 desc_zh 兜底。失败静默降级。"""
+    """为单个 repo 生成 summary_zh（卡片 2 行预览）+ summary_sections（抽屉三段详介）。
+    缓存命中 → 直接复用；未命中 → 拉 README 拆分 + 翻译并写回 cache。
+    非 GitHub 条目（HF/arXiv/MCP）用 desc_zh 兜底。失败静默降级。
+    ponytail: 2026-09 升级。summary_sections = {intro, can_do, benefit} 三桶，
+    由 README 的 ## Features / ## What is / ## Why 等 heading 关键词归类，
+    每桶独立翻译，缺桶留空（前端按桶渲染自然隐藏）。"""
     full_name = repo.get("name") or ""
     fallback = repo.get("desc_zh") or repo.get("desc") or ""
     url = repo.get("url") or ""
+    repo["summary_sections"] = {"intro": "", "can_do": "", "benefit": ""}
     if "/" not in full_name or "github.com" not in url:
         repo["summary_zh"] = fallback
         return
@@ -90,6 +319,7 @@ def _build_summary_zh(repo: dict, cache: dict) -> None:
         # 缓存里是英文残留（旧抽屉时代翻译失败的原样缓存）→ 视为未命中重做
         if summary and any("一" <= ch <= "鿿" for ch in summary[:60]):
             repo["summary_zh"] = summary
+            repo["summary_sections"] = entry.get("sections") or repo["summary_sections"]
             return
         cache.pop(key, None)
     fetched = _fetch_readme_from_github(full_name)
@@ -99,17 +329,24 @@ def _build_summary_zh(repo: dict, cache: dict) -> None:
     raw_md, source_url = fetched
     clean = _clean_readme_text(raw_md)
     zh = _chunked_translate(clean) if clean else ""
+    sections_zh = _build_sections_zh(raw_md)
     if zh and _looks_translated(zh, clean):
         cache[key] = {
             "text": zh,
+            "sections": sections_zh,
+            "raw_md": raw_md[
+                :6000
+            ],  # ponytail: 2026-09 — 留原始 README 给后续 LLM 分析用（避免再拉一次）
             "source_url": source_url,
             "fetched_at": datetime.datetime.now().isoformat(timespec="seconds"),
             "translator": "google-translate-free",
         }
         repo["summary_zh"] = _summary_from_entry(cache[key]) or fallback
+        repo["summary_sections"] = sections_zh
     else:
         # 翻译失败不缓存、不展示英文 — 回退中文简介
         repo["summary_zh"] = fallback
+
 
 def enrich_summaries(repos: list, max_workers: int = 4) -> int:
     """爬取期为全部 repos 生成详细中文描述（summary_zh）。
@@ -121,9 +358,7 @@ def enrich_summaries(repos: list, max_workers: int = 4) -> int:
             cache = json.loads(core.README_ZH_CACHE.read_text())
         except Exception:
             cache = {}
-    github_repos = [
-        r for r in repos if "github.com" in (r.get("url") or "")
-    ]
+    github_repos = [r for r in repos if "github.com" in (r.get("url") or "")]
     print(
         f"[crawl] summaries: {len(github_repos)} GitHub repos "
         f"({sum(1 for r in github_repos if cache.get((r['name'] or '').lower(), {}).get('text'))} cached)"
@@ -135,13 +370,20 @@ def enrich_summaries(repos: list, max_workers: int = 4) -> int:
     for r in repos:
         if not r.get("summary_zh"):
             r["summary_zh"] = r.get("desc_zh") or r.get("desc") or ""
+        if not r.get("summary_sections"):
+            # 兜底：把整段 desc_zh 塞进 intro，让前端至少有一桶可渲染
+            intro = r.get("summary_zh") or r.get("desc_zh") or r.get("desc") or ""
+            r["summary_sections"] = {
+                "intro": intro[:400] if intro else "",
+                "can_do": "",
+                "benefit": "",
+            }
     try:
-        core.README_ZH_CACHE.write_text(
-            json.dumps(cache, ensure_ascii=False, indent=1)
-        )
+        core.README_ZH_CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=1))
     except Exception as e:
         print(f"  [warn] summary cache write failed: {e}", file=sys.stderr)
     return sum(1 for r in repos if r.get("summary_zh"))
+
 
 def translate_text(text, target="zh-CN"):
     """Google Translate free endpoint via urllib, falling back to system `curl` when
@@ -161,9 +403,7 @@ def translate_text(text, target="zh-CN"):
     # ponytail: try urllib first (zero deps); fall back to system curl which
     # uses the OS keychain and avoids macOS Python's missing-cert issue.
     try:
-        req = urllib.request.Request(
-            url, headers={"User-Agent": "Mozilla/5.0"}
-        )
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
         result = "".join(seg[0] for seg in data[0] if seg and seg[0])
@@ -174,10 +414,18 @@ def translate_text(text, target="zh-CN"):
     try:
         out = subprocess.run(
             [
-                "curl", "-q", "-sS", "--max-time", "10",
-                "-A", "Mozilla/5.0", url,
+                "curl",
+                "-q",
+                "-sS",
+                "--max-time",
+                "10",
+                "-A",
+                "Mozilla/5.0",
+                url,
             ],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         if out.returncode == 0 and out.stdout.strip():
             data = json.loads(out.stdout)
@@ -187,9 +435,14 @@ def translate_text(text, target="zh-CN"):
         pass
     return ""
 
+
 def translate_batch(pairs):
     """Translate (key, text) pairs in parallel, with persistent cache. Returns {key: translated}."""
-    cache = json.loads(core.TRANSLATE_CACHE.read_text()) if core.TRANSLATE_CACHE.exists() else {}
+    cache = (
+        json.loads(core.TRANSLATE_CACHE.read_text())
+        if core.TRANSLATE_CACHE.exists()
+        else {}
+    )
     out = {}
     todo = {}
     for k, v in pairs:
@@ -210,10 +463,15 @@ def translate_batch(pairs):
         core.TRANSLATE_CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2))
     return out
 
-def _fetch_readme_from_github(full_name: str, max_chars: int = 6000) -> tuple[str, str] | None:
+
+def _fetch_readme_from_github(
+    full_name: str, max_chars: int = 12000
+) -> tuple[str, str] | None:
     """Fetch README.md from GitHub raw for owner/repo. Returns (text, source_url) or None.
-    ponytail: try common README filenames in order — README.md / readme.md / README.rst.
-    Cap text at max_chars so Google Translate free endpoint (500 char limit) can chunk."""
+    ponytail: 2026-09 — cap raised 6KB → 12KB so we have room to grab the Features /
+    Why-use / 使用场景 sections AFTER the noisy preamble. Still capped so a giant
+    monorepo README doesn't blow the Google Translate free 500-char/chunk budget.
+    Try common README filenames in order — README.md / readme.md / README.rst."""
     candidates = ["README.md", "readme.md", "README.rst", "README.txt"]
     # ponytail: GitHub raw URL is owner/repo/HEAD/<file>. Use gh CLI to find the
     # default branch first, then raw URL.
@@ -235,9 +493,7 @@ def _fetch_readme_from_github(full_name: str, max_chars: int = 6000) -> tuple[st
         # ponytail: macOS Python lacks system certs (same issue as HF fetch).
         # Try urllib first, fall back to system curl which uses OS keychain.
         try:
-            req = urllib.request.Request(
-                url, headers={"User-Agent": "lodestone/1.0"}
-            )
+            req = urllib.request.Request(url, headers={"User-Agent": "lodestone/1.0"})
             with urllib.request.urlopen(req, timeout=20) as resp:
                 raw = resp.read().decode("utf-8", errors="replace")
             if raw.strip():
@@ -247,16 +503,25 @@ def _fetch_readme_from_github(full_name: str, max_chars: int = 6000) -> tuple[st
         try:
             out = subprocess.run(
                 [
-                    "curl", "-q", "-sSL", "--max-time", "20",
-                    "-A", "lodestone/1.0", url,
+                    "curl",
+                    "-q",
+                    "-sSL",
+                    "--max-time",
+                    "20",
+                    "-A",
+                    "lodestone/1.0",
+                    url,
                 ],
-                capture_output=True, text=True, timeout=25,
+                capture_output=True,
+                text=True,
+                timeout=25,
             )
             if out.returncode == 0 and out.stdout.strip():
                 return out.stdout[:max_chars], url
         except Exception:
             pass
     return None
+
 
 def _strip_markdown_to_text(md: str, max_chars: int = 4500) -> str:
     """Strip Markdown to clean prose for translation.
@@ -305,16 +570,12 @@ def _strip_markdown_to_text(md: str, max_chars: int = 4500) -> str:
         if re.match(r"^[A-Za-z][\w\s]*:\s*[\w\s|]+$", p) and len(p) < 200:
             continue
         # skip if more than 80% URLs / pipes
-        non_text = sum(
-            1 for c in p if c in "|[](){}<>#=*_`@"
-        )
+        non_text = sum(1 for c in p if c in "|[](){}<>#=*_`@")
         if non_text > len(p) * 0.4:
             continue
         # ponytail: skip the noisy preamble (links / nav menus) but keep all real prose
         if skipped_chars < noise_threshold and (
-            p.startswith("- ")
-            or p.startswith("*[")
-            or " | " in p[:200]
+            p.startswith("- ") or p.startswith("*[") or " | " in p[:200]
         ):
             skipped_chars += len(p)
             continue
@@ -322,6 +583,7 @@ def _strip_markdown_to_text(md: str, max_chars: int = 4500) -> str:
         if sum(len(x) for x in keep) > max_chars:
             break
     return "\n\n".join(keep)[:max_chars]
+
 
 def _chunked_translate(text: str, target: str = "zh-CN") -> str:
     """Translate long text by chunking at sentence boundaries (<= 280 chars per chunk).
@@ -358,6 +620,7 @@ def _chunked_translate(text: str, target: str = "zh-CN") -> str:
         cursor = end
     return "".join(parts)
 
+
 def _looks_translated(translated: str, original: str) -> bool:
     """Heuristic: a chunk is 'translated' if it has CJK chars AND less than 60% ASCII overlap
     with the source. Avoids keeping 'echoed English' as a translation result."""
@@ -368,12 +631,18 @@ def _looks_translated(translated: str, original: str) -> bool:
         return False  # < 5% CJK → not translated
     return True
 
+
 def get_readme_zh(full_name: str, force: bool = False) -> dict:
     """Get or build comprehensive Chinese description for a repo.
     Returns {text, source_url, fetched_at, translator, from_cache}.
     Falls back to short description (translated on the fly) if README fetch fails."""
     if not full_name or "/" not in full_name:
-        return {"text": "", "source_url": "", "from_cache": False, "error": "invalid name"}
+        return {
+            "text": "",
+            "source_url": "",
+            "from_cache": False,
+            "error": "invalid name",
+        }
     cache_key = full_name.lower()
 
     # Tier 1: PG
@@ -431,20 +700,30 @@ def get_readme_zh(full_name: str, force: bool = False) -> dict:
                 }
         except Exception:
             pass
-        return {"text": "", "source_url": "", "from_cache": False, "error": "fetch failed"}
+        return {
+            "text": "",
+            "source_url": "",
+            "from_cache": False,
+            "error": "fetch failed",
+        }
 
     raw_md, source_url = fetched
     clean = _strip_markdown_to_text(raw_md)
     zh_text = _chunked_translate(clean)
+    sections_zh = _build_sections_zh(raw_md)
     # ponytail: if translation truly failed, return the cleaned English content with
     # an explicit marker so the UI can show "（翻译失败 · 原文）" rather than confused text.
     if not zh_text:
         zh_text = (
-            "【自动翻译暂不可用 · 以下为英文原文 · 数据源：" + source_url + "】\n\n" + clean
+            "【自动翻译暂不可用 · 以下为英文原文 · 数据源："
+            + source_url
+            + "】\n\n"
+            + clean
         )
     now_iso = datetime.datetime.now().isoformat(timespec="seconds")
     entry = {
         "text": zh_text,
+        "sections": sections_zh,
         "source_url": source_url,
         "fetched_at": now_iso,
         "translator": "google-translate-free",
@@ -475,9 +754,7 @@ def get_readme_zh(full_name: str, force: bool = False) -> dict:
             else {}
         )
         cache[cache_key] = entry
-        core.README_ZH_CACHE.write_text(
-            json.dumps(cache, ensure_ascii=False, indent=2)
-        )
+        core.README_ZH_CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2))
     except OSError:
         pass
     return entry

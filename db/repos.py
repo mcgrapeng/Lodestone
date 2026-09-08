@@ -1,5 +1,6 @@
 """Repo-level CRUD + queries. All callers pass a pg8000 connection."""
 
+import json
 from typing import Iterable
 
 # ponytail: int IDs serve double duty as default sort column for /api/top
@@ -61,6 +62,13 @@ def upsert_repos(conn, repos: Iterable[dict]):
             r.get("updated") or None,
             bool(r.get("is_ai_relevant")),
             r.get("stars_today"),  # may be None — only trending scrape fills this
+            bool(r.get("is_skill")),  # 2026-09 — SKILL.md probe
+            json.dumps(r.get("summary_sections") or {})  # {intro, can_do, benefit}
+            if r.get("summary_sections")
+            else None,
+            json.dumps(r.get("analysis_5d") or {})  # 2026-09 — LLM 5 维度决策分析
+            if r.get("analysis_5d")
+            else None,
         )
         for r in repos
     ]
@@ -68,8 +76,9 @@ def upsert_repos(conn, repos: Iterable[dict]):
         """
         INSERT INTO repos (name, full_name, url, description, desc_zh,
                            stars, forks, lang, topics, best_category,
-                           pushed_at, updated_at, is_ai_relevant, stars_today)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                           pushed_at, updated_at, is_ai_relevant, stars_today,
+                           is_skill, summary_sections_json, analysis_5d_json)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         ON CONFLICT (name) DO UPDATE SET
           stars         = EXCLUDED.stars,
           forks         = EXCLUDED.forks,
@@ -84,6 +93,9 @@ def upsert_repos(conn, repos: Iterable[dict]):
           is_ai_relevant = EXCLUDED.is_ai_relevant,
           best_category = EXCLUDED.best_category,
           stars_today   = COALESCE(EXCLUDED.stars_today, repos.stars_today),
+          is_skill      = EXCLUDED.is_skill,
+          summary_sections_json = COALESCE(EXCLUDED.summary_sections_json, repos.summary_sections_json),
+          analysis_5d_json      = COALESCE(EXCLUDED.analysis_5d_json, repos.analysis_5d_json),
           last_seen_at  = NOW()
     """,
         rows,
@@ -146,7 +158,8 @@ def query_top_5k(conn, page: int = 1, size: int = 12, sort: str = "stars"):
     cur.execute(
         f"""
         SELECT name, url, description, desc_zh, stars, forks, lang, topics,
-               pushed_at, updated_at, trending, first_seen_at, stars_today
+               pushed_at, updated_at, trending, first_seen_at, stars_today,
+               is_skill, summary_sections_json, analysis_5d_json
         FROM repos
         WHERE is_ai_relevant AND stars >= 1000
         ORDER BY {sort_sql}
@@ -171,7 +184,8 @@ def query_hot_now(conn, limit: int = 40):
     cur.execute(
         """
         SELECT name, url, description, desc_zh, stars, forks, lang, topics,
-               pushed_at, updated_at, trending, first_seen_at, stars_today
+               pushed_at, updated_at, trending, first_seen_at, stars_today,
+               is_skill, summary_sections_json, analysis_5d_json
         FROM repos WHERE is_ai_relevant
         ORDER BY stars DESC LIMIT %s
     """,
@@ -192,7 +206,8 @@ def query_categories(conn):
         pass
     cur.execute("""
         SELECT best_category, name, url, description, desc_zh, stars, forks,
-               lang, topics, pushed_at, updated_at, trending, first_seen_at, stars_today
+               lang, topics, pushed_at, updated_at, trending, first_seen_at, stars_today,
+               is_skill, summary_sections_json, analysis_5d_json
         FROM repos
         WHERE is_ai_relevant AND best_category IS NOT NULL
         ORDER BY best_category, stars DESC

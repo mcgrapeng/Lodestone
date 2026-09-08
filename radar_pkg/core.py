@@ -4,6 +4,7 @@
 使用方一律 `from radar_pkg import core` + 属性访问(patch 穿透规约)。"""
 import datetime
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -17,13 +18,28 @@ ROOT = Path(__file__).resolve().parent.parent
 
 DATA = ROOT / "data"
 
-SKILLS_CACHE = Path.home() / ".cache" / "lodestone" / "skills"
+# ponytail: 2026-09 — AI_RADAR_HOME env override lets multi-user server deploys
+# (systemd unit, Docker) point skill-cache to a project-owned path instead of
+# $HOME. Default keeps the dev-machine layout ($HOME/.cache/lodestone/) for
+# zero-config local runs.
+_HOME = Path(os.environ.get("AI_RADAR_HOME") or Path.home() / ".cache" / "lodestone")
 
-SKILL_ORIGINS = Path.home() / ".cache" / "lodestone" / "origins.json"
+SKILLS_CACHE = _HOME / "skills"
+
+SKILL_ORIGINS = _HOME / "origins.json"
 
 TRANSLATE_CACHE = DATA / "zh_cache.json"
 
 README_ZH_CACHE = DATA / "readme_zh_cache.json"
+
+# ponytail: 2026-09 — SKILL.md 探测缓存。{owner/repo: {is_skill, probed_at, branch}}。
+# 增量：未命中才探测；raw.githubusercontent.com 无 API rate limit，可放心大批量。
+SKILL_PROBE_CACHE = DATA / "skill_probe_cache.json"
+
+# ponytail: 2026-09 — LLM 5 维度分析缓存。{owner/repo: {what, problem,
+# alternatives, pros, cons, when_to_use, _analyzed_at}}。按 stars 阈值过滤 +
+# cache 命中跳过，单 repo LLM 调一次永久复用。
+LLM_ANALYSIS_CACHE = DATA / "llm_analysis_cache.json"
 
 CATEGORIES = [
     {

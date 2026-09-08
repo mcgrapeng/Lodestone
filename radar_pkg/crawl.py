@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """radar_pkg.crawl — 爬取编排(分类/5k/新星/trending → 过滤 → 翻译 → 入库)。"""
+
 import datetime
 import json
 import os
@@ -29,8 +30,13 @@ from radar_pkg.core import (
 )
 from radar_pkg.detect import detect_local_skills
 from radar_pkg.gh import fetch_github_trending, gh_fetch_repo, gh_search, _search_pace
-from radar_pkg.match import _annotate_local_installed, _build_plugin_segs, _installed_segments
+from radar_pkg.match import (
+    _annotate_local_installed,
+    _build_plugin_segs,
+    _installed_segments,
+)
 from radar_pkg.translate import enrich_summaries, translate_batch
+
 
 def acquire_crawl_lock() -> bool:
     """True = acquired (caller must release); False = another crawl is running."""
@@ -48,8 +54,10 @@ def acquire_crawl_lock() -> bool:
             pass
         return False
 
+
 def release_crawl_lock():
     CRAWL_LOCK.unlink(missing_ok=True)
+
 
 def crawl_lock_held() -> bool:
     """Non-acquiring check for the API layer (returns 409 instead of spawning)."""
@@ -62,6 +70,7 @@ def crawl_lock_held() -> bool:
         return False
     return True
 
+
 def crawl():
     """Fetch all categories, dedupe, save. File-locked — one crawl at a time."""
     if not acquire_crawl_lock():
@@ -71,6 +80,7 @@ def crawl():
         return _crawl_inner()
     finally:
         release_crawl_lock()
+
 
 def _crawl_inner():
     """Fetch all categories, dedupe, save."""
@@ -97,9 +107,7 @@ def _crawl_inner():
     _all_gh_queries = [q for cat in CATEGORIES for q in cat.get("queries", [])]
     _batch: dict[str, list] = {}
     _new_star_queries: list[str] = []  # GraphQL 不可用时保持空(新星通道仅依赖 GraphQL)
-    _new_star_cutoff = (
-        datetime.date.today() - datetime.timedelta(days=14)
-    ).isoformat()
+    _new_star_cutoff = (datetime.date.today() - datetime.timedelta(days=14)).isoformat()
     try:
         from sources.github_graphql import gh_search_batch
 
@@ -107,9 +115,7 @@ def _crawl_inner():
             f"[crawl] GraphQL batch search: {len(_all_gh_queries)} category queries "
             f"+ {len(TOP_5K_QUERIES)} 5k+ queries…"
         )
-        _batch.update(
-            gh_search_batch(_all_gh_queries, per_page=30, batch_size=6)
-        )
+        _batch.update(gh_search_batch(_all_gh_queries, per_page=30, batch_size=6))
         _batch.update(
             gh_search_batch(
                 TOP_5K_QUERIES, per_page=50, batch_size=8, follow_page2=True
@@ -123,9 +129,7 @@ def _crawl_inner():
             f"stars:>50 created:>{_new_star_cutoff} topic:{t}"
             for t in ("llm", "ai-agent", "mcp-server", "claude-code", "ai-coding")
         ]
-        _batch.update(
-            gh_search_batch(_new_star_queries, per_page=30, batch_size=6)
-        )
+        _batch.update(gh_search_batch(_new_star_queries, per_page=30, batch_size=6))
     except Exception as e:
         print(
             f"  [warn] GraphQL batch unavailable ({e}); REST serial fallback "
@@ -159,7 +163,10 @@ def _crawl_inner():
                 repos = fetch_huggingface_trending(max_items=30)
             elif src == "hf_models":
                 try:
-                    from sources.huggingface_models import fetch_huggingface_models_trending
+                    from sources.huggingface_models import (
+                        fetch_huggingface_models_trending,
+                    )
+
                     repos = fetch_huggingface_models_trending(max_items=30)
                 except Exception as e:
                     print(f"  [warn] HF models fetcher failed: {e}", file=sys.stderr)
@@ -167,6 +174,7 @@ def _crawl_inner():
             elif src == "mcp_registry":
                 try:
                     from sources.mcp_registry import fetch_mcp_registry
+
                     repos = fetch_mcp_registry(max_items=30)
                 except Exception as e:
                     print(f"  [warn] MCP registry fetcher failed: {e}", file=sys.stderr)
@@ -174,6 +182,7 @@ def _crawl_inner():
             elif src == "arxiv":
                 try:
                     from sources.arxiv_papers import fetch_arxiv_recent
+
                     repos = fetch_arxiv_recent(max_items=30)
                 except Exception as e:
                     print(f"  [warn] arXiv fetcher failed: {e}", file=sys.stderr)
@@ -312,7 +321,11 @@ def _crawl_inner():
     installed_segs = {
         *installed_full,
         *(s.split("/")[-1] for s in installed_full),
-        *(p["name"].split("@")[0].lower() for p in (local.get("plugins") or []) if p.get("name")),
+        *(
+            p["name"].split("@")[0].lower()
+            for p in (local.get("plugins") or [])
+            if p.get("name")
+        ),
     }
     print(f"[crawl] local installed (full/seg): {len(installed_segs)}")
 
@@ -369,6 +382,16 @@ def _crawl_inner():
             r["trending"] = True
         deduped.append(r)
 
+    # ponytail: 2026-09 — SKILL.md 探测。不是所有 GitHub 项目都支持安装为 skill
+    # （只有含 SKILL.md / skill.md / SKILL.yaml 的才是）。在翻译前探测，结果写
+    # 入每个 repo 的 is_skill 字段，前端据此门控「安装为 Skill」按钮。
+    try:
+        from radar_pkg.skill_probe import annotate_repos
+
+        annotate_repos(deduped, max_workers=8)
+    except Exception as e:
+        print(f"  [warn] skill probe failed: {e}", file=sys.stderr)
+
     # ponytail: translate once, cache forever — descriptions don't change day-to-day
     print("[crawl] translating to Chinese…")
     pairs = [(f"{r['name']}::desc", r.get("desc", "")) for r in deduped]
@@ -394,6 +417,67 @@ def _crawl_inner():
         print(f"  [warn] summary enrichment failed: {e}", file=sys.stderr)
         for r in deduped:
             r.setdefault("summary_zh", r.get("desc_zh") or "")
+
+    # ponytail: 2026-09 — LLM 5 维度决策分析（什么 / 痛点 / 竞品 / 优缺 / 何时选）。
+    # 仅在配置 ANTHROPIC_API_KEY / OPENAI_API_KEY / OLLAMA_HOST 时启用；否则降级
+    # 到 summary_sections 三桶 README 摘要。增量分析 — cache 命中跳过。
+    try:
+        from radar_pkg.llm_analyze import analyze_many
+
+        # ponytail: 把已缓存的 raw README 喂给 LLM 模块 — 避免再走 GitHub
+        import json as _json
+
+        readme_cache: dict = {}
+        if core.README_ZH_CACHE.exists():
+            try:
+                readme_cache = _json.loads(core.README_ZH_CACHE.read_text())
+            except Exception:
+                readme_cache = {}
+        llm_inputs = []
+        for r in deduped:
+            entry = readme_cache.get((r.get("name") or "").lower()) or {}
+            r["analysis_5d"] = entry.get("analysis_5d") or readme_cache.get(
+                (r.get("name") or "").lower(), {}
+            ).get("analysis_5d")
+            if entry.get("raw_md"):
+                llm_inputs.append(
+                    {
+                        "name": r["name"],
+                        "readme": entry["raw_md"],
+                        "topics": r.get("topics") or [],
+                        "lang": r.get("lang"),
+                        "stars": r.get("stars") or 0,
+                    }
+                )
+        if llm_inputs:
+            n = analyze_many(llm_inputs, max_workers=4)
+            print(f"  ✓ llm analysis: {n} repos got 5d analysis")
+            # ponytail: 把分析结果回写到 readme_zh_cache（共享缓存文件，避免再开一个）
+            for inp in llm_inputs:
+                key = inp["name"].lower()
+                if key in readme_cache:
+                    # 重新加载刚写入的 llm cache，取最新
+                    try:
+                        from radar_pkg.llm_analyze import _load_cache as _load_llm_cache
+
+                        llm_cache = _load_llm_cache()
+                        if key in llm_cache:
+                            readme_cache[key]["analysis_5d"] = llm_cache[key]
+                            for r in deduped:
+                                if (r.get("name") or "").lower() == key:
+                                    r["analysis_5d"] = llm_cache[key]
+                                    break
+                    except Exception:
+                        pass
+            # 把 analysis_5d 落回 readme_zh_cache.json
+            try:
+                core.README_ZH_CACHE.write_text(
+                    _json.dumps(readme_cache, ensure_ascii=False, indent=1)
+                )
+            except Exception as e:
+                print(f"  [warn] write analysis_5d back to cache: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"  [warn] llm analysis failed: {e}", file=sys.stderr)
 
     failed = core.GH_SEARCH_STATS["failed"]
     if failed:
@@ -465,12 +549,9 @@ def _crawl_inner():
             + [
                 r
                 for r in deduped
-                if r.get("curated")
-                and r["name"] not in {x["name"] for x in top40}
+                if r.get("curated") and r["name"] not in {x["name"] for x in top40}
             ]
-        )(
-            sorted(deduped, key=lambda r: r.get("stars", 0), reverse=True)[:40]
-        ),
+        )(sorted(deduped, key=lambda r: r.get("stars", 0), reverse=True)[:40]),
         "categories": cat_results,
         # 2026-09：trending 专区数据 — 今日上榜的完整列表（带 stars_today），
         # 前端「趋势」tab 直接消费，不再用 hot_now 兜底。
@@ -490,6 +571,7 @@ def _crawl_inner():
     latest_file.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2))
     print(f"[crawl] saved → {latest_file} ({len(deduped)} repos, JSON mode)")
     return {"total_unique": len(deduped), "fallback": "json", "queries_failed": failed}
+
 
 def today():
     """Print today's top picks to terminal. PG first, latest.json fallback."""
@@ -533,6 +615,7 @@ def today():
     for cat in snap["categories"]:
         print(f"  · {cat['name']:<35} {cat['count']} repos")
 
+
 def audit():
     """数据质量审计 — 去重 / 金融过滤 / 来源分布 / AI 相关性抽样。
     供人工或 /loop 定期复查：`./radar.py audit`。"""
@@ -545,7 +628,9 @@ def audit():
     for c in d.get("categories", []):
         all_repos.extend(c.get("repos", []))
 
-    print(f"=== 数据质量审计 · {d.get('fetched_at', '?')} · {len(all_repos)} 条（含跨分类重复计数）")
+    print(
+        f"=== 数据质量审计 · {d.get('fetched_at', '?')} · {len(all_repos)} 条（含跨分类重复计数）"
+    )
 
     # 1) 去重规则：git 完整仓库地址
     keys: dict[str, list[str]] = {}
@@ -575,19 +660,26 @@ def audit():
     weak = [
         r["name"]
         for r in gh
-        if not is_ai_relevant(r) and not any(
-            t in AI_TOPIC_BLOCKLIST for t in (x.lower() for x in (r.get("topics") or []))
+        if not is_ai_relevant(r)
+        and not any(
+            t in AI_TOPIC_BLOCKLIST
+            for t in (x.lower() for x in (r.get("topics") or []))
         )
     ]
     # 注：分类条目允许过严格过滤（topics 变体），这里只报告数量供人工抽查
-    print(f"4) GitHub 条目未过严格 AI 过滤（分类口径允许，供抽查）: {len(weak)}/{len(gh)}")
+    print(
+        f"4) GitHub 条目未过严格 AI 过滤（分类口径允许，供抽查）: {len(weak)}/{len(gh)}"
+    )
     for n in weak[:8]:
         print(f"   {n}")
 
     # 5) 分类规模健康度
     cats = d.get("categories", [])
-    tiny = [(c["id"], len(c.get("repos", []))) for c in cats if len(c.get("repos", [])) < 5]
+    tiny = [
+        (c["id"], len(c.get("repos", []))) for c in cats if len(c.get("repos", [])) < 5
+    ]
     print(f"5) 分类数 {len(cats)} · 过小分类(<5): {tiny or '无 ✓'}")
+
 
 def fetch_huggingface_trending(max_items: int = 30, sort: str = "likes7d") -> list:
     """HuggingFace Trending Spaces — JSON API (no auth). Returns repo-shaped dicts so the
@@ -609,7 +701,10 @@ def fetch_huggingface_trending(max_items: int = 30, sort: str = "likes7d") -> li
     except Exception:
         VALID_SORTS = ("trending", "likes7d", "downloads", "downloads7d", "updated")
     if sort not in VALID_SORTS:
-        print(f"  [warn] HF spaces: invalid sort {sort!r}, falling back to likes7d", file=sys.stderr)
+        print(
+            f"  [warn] HF spaces: invalid sort {sort!r}, falling back to likes7d",
+            file=sys.stderr,
+        )
         sort = "likes7d"
     url = f"https://huggingface.co/api/spaces?sort={sort}&limit={max_items}"
     data = None
@@ -620,7 +715,10 @@ def fetch_huggingface_trending(max_items: int = 30, sort: str = "likes7d") -> li
         import httpx
 
         r = httpx.get(
-            url, timeout=20, headers={"User-Agent": "lodestone/1.0"}, follow_redirects=True
+            url,
+            timeout=20,
+            headers={"User-Agent": "lodestone/1.0"},
+            follow_redirects=True,
         )
         if r.status_code == 200 and r.text.strip():
             data = r.json()
@@ -641,7 +739,16 @@ def fetch_huggingface_trending(max_items: int = 30, sort: str = "likes7d") -> li
                 out = subprocess.run(
                     # ponytail: `-q` skips ~/.curlrc (which appends "HTTP %{http_code}…" that
                     # would break json.loads on the captured stdout). Public API, no auth.
-                    ["curl", "-q", "-sS", "--max-time", "20", "-A", "lodestone/1.0", url],
+                    [
+                        "curl",
+                        "-q",
+                        "-sS",
+                        "--max-time",
+                        "20",
+                        "-A",
+                        "lodestone/1.0",
+                        url,
+                    ],
                     capture_output=True,
                     text=True,
                     timeout=25,
@@ -656,7 +763,8 @@ def fetch_huggingface_trending(max_items: int = 30, sort: str = "likes7d") -> li
                     return []
             except Exception as e2:
                 print(
-                    f"  [warn] HF trending fetch failed: {e}; curl: {e2}", file=sys.stderr
+                    f"  [warn] HF trending fetch failed: {e}; curl: {e2}",
+                    file=sys.stderr,
                 )
                 return []
     out = []

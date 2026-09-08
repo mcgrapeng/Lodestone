@@ -9,9 +9,10 @@ export interface RepoCardProps {
 }
 
 export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
-  // ponytail: 详细中文描述优先（README 首段翻译，爬取期生成），
-  // 逐级回退：summary_zh → desc_zh → desc。
-  const displayName = repo.summary_zh || repo.desc_zh || repo.desc || '—'
+  // ponytail: 2026-09 — 三段摘要优先用 intro（最像「是什么」的段），回退 summary_zh。
+  // 逐级回退：summary_sections.intro → summary_zh → desc_zh → desc。
+  const intro = repo.summary_sections?.intro?.trim()
+  const displayName = intro || repo.summary_zh || repo.desc_zh || repo.desc || '—'
   const topics = (repo.topics ?? []).slice(0, 3)
 
   if (variant === 'row') {

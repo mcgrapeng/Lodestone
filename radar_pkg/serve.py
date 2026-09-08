@@ -997,19 +997,19 @@ def serve(port=8765):
                 )
             self.send_error(404)
 
-    # ponytail: bind loopback ONLY — this API can git-clone into your skills dirs;
-    # exposing it to the LAN would let anyone on the network install skills.
-    # ponytail: port auto-fallback — if the requested port is busy (another lodestone
-    # instance, stale process, OS-assigned random port from a previous dev run, ...),
-    # walk forward until we find a free one. dev.cjs parses the [serve-port] marker
-    # to learn the actual port so Vite's proxy target stays in sync.
+    # ponytail: bind host configurable via RADAR_HOST env (default 127.0.0.1).
+    # — local dev: keep loopback; — server deploy: set RADAR_HOST=0.0.0.0 and
+    #   put a reverse proxy (nginx/caddy) in front for TLS + auth.
+    # ponytail: 0.0.0.0 binding is intentionally opt-in — this API can git-clone
+    # into users' skill dirs, so the safe default stays loopback.
     import errno as _errno
+    bind_host = os.environ.get("RADAR_HOST", "127.0.0.1")
     actual_port = port
     httpd = None
     for offset in range(50):
         try_port = port + offset
         try:
-            httpd = socketserver.ThreadingTCPServer(("127.0.0.1", try_port), Handler)
+            httpd = socketserver.ThreadingTCPServer((bind_host, try_port), Handler)
         except OSError as e:
             if e.errno == _errno.EADDRINUSE:
                 continue

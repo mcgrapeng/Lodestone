@@ -1,195 +1,106 @@
-<div align="center">
+# ⚡ Lodestone
 
-# ⚡ Lodestone · AI 工具发现平台
+每日 AI 工具发现仪表盘 —— GitHub + HuggingFace + MCP Registry + arXiv，按 20 个用途分类，中文友好。
 
-**给 AI 应用工程师：每日 GitHub + HuggingFace + MCP Registry 三源聚合**
+给 AI 应用工程师找「本周值得关注的新工具 / 新模型 / 新协议」，不用刷十几个 RSS。
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB.svg)
-![Engines](https://img.shields.io/badge/4_Engines-Tiered_Fallback-blue.svg)
-![Skills](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet.svg)
+## 一图流
 
-[📖 使用手册](使用手册.md) · [📦 安装说明](安装说明.md) · [🤖 SKILL 源码](SKILL.md)
+```
+              5 个数据源                    4 级爬虫兜底
+GitHub ──┐                              ┌─ httpx（默认）── 大多数直接命中
+HF Spaces┤                              ├─ cloudscraper ── 破 Cloudflare
+HF Models┼─→ 抓 + 去重 + 过滤 ──→ AI 仪表盘  ├─ playwright_stealth ── 真浏览器
+MCP Reg  ┤     ↓                        └─ jina（云）── 本地 IP 被封时换出口
+arXiv   ─┘   中文翻译 + 摘要
+            ↓
+       Postgres（推荐） / JSON 回退
+            ↓
+       ┌─ 卡片墙（hot_now / 分类 / trending / 24h 星增）
+       ├─ 详细介绍（README 拆分 + LLM 5 维度决策）
+       └─ 一键安装为 skill（仅当仓库有 SKILL.md）
+```
 
-</div>
-
----
-
-## 🚀 30 秒上手
+## 30 秒上手
 
 ```bash
-# 1. 装为 Claude Code / Codex CLI 的 skill
+# 1. 装好 Python 3.10+ + Node 18+ + gh CLI（已登录）— 见 安装说明.md
+git clone <仓库> ~/lodestone && cd ~/lodestone
+
+# 2. 抓数据 + 起服务
+./radar.py crawl            # ~3-5 分钟（首次拉 + 翻译 1k+ repo）
+./radar.py web              # 后台起 serve + 自动开浏览器
+
+# 3. 装成 Claude Code skill（可选）
 ./install.sh install
-
-# 2. 完全退出 Claude Code（Cmd+Q）再重开
-
-# 3. 在 Claude Code 里说
-"刷一下 AI 雷达"
+# 完全退出 Claude Code 再重开
+# 然后说 "刷一下 AI 雷达" 就能用
 ```
 
-或者直接跑：
+## 这是给谁用的
+
+**主要用户**：AI 应用工程师，每天想花 5 分钟扫一眼「最近出了什么值得关注的新东西」。
+
+**解决的问题**：
+
+- GitHub Trending 噪音大 —— 每天 25 条只有 ~5 个跟 AI 有关
+- HuggingFace 主页不会主动推新模型
+- MCP 协议刚起步，没有「热门 MCP server」榜
+- arXiv 每天 100+ AI 论文，谁有空挨个翻
+
+## 5 个数据源覆盖什么
+
+| 源 | 抓什么 | 为什么不能少 |
+|---|---|---|
+| **GitHub** | 主流开源 AI 项目 | 90% 的 AI 工具在这里 |
+| **HuggingFace Spaces** | 社区精选 AI demo | 跑得起来的东西比 README 有用 |
+| **HuggingFace Models** | 模型权重排行 | 知道现在流行什么模型（Qwen / Llama / DeepSeek） |
+| **MCP Registry** | 官方 MCP server | MCP 协议生态入门 |
+| **arXiv** | 最新 AI 论文 | 模型权重还没出，论文先发 |
+
+GitHub 抗爬时其他 4 个源仍然工作 —— 你不会「今天啥都看不到」。
+
+## 关键能力
+
+| 能力 | 怎么实现的 |
+|---|---|
+| **4 级爬虫 fallback** | httpx → cloudscraper → playwright_stealth → jina，每天只有 httpx 在跑 |
+| **中文友好** | desc / README 自动翻译 + 结构化摘要（介绍 / 能干什么 / 优势） |
+| **Postgres + JSON 双模** | PG 优先（24h 星增、历史快照），PG 不可达回退 JSON |
+| **决策支持** | LLM 5 维度分析（是什么 / 痛点 / 同类 / 优缺 / 何时选），可选用 Claude / GPT / Ollama |
+| **Skill 一键安装** | 探测 `SKILL.md` → 标记 is_skill → 卡片显示装按钮（仅当仓库真的是 skill 格式） |
+| **20 个分类** | Agent / RAG / LLM / IDE / MCP / Voice / 安全 / 机器人 / arXiv 论文 … |
+
+## 文档导航
+
+| 你想看什么 | 跳到 |
+|---|---|
+| 🚀 装好跑起来 | [安装说明](安装说明.md) |
+| 📖 命令清单 / 故障排查 / 加新数据源 | [使用手册](使用手册.md) |
+| 🤖 Claude Code 触发入口 | [SKILL.md](SKILL.md) |
+
+## 技术栈
+
+- **后端**：Python 3.10+（stdlib + 可选 `pg8000`）
+- **数据库**：PostgreSQL（JSON 回退）
+- **爬虫**：4 引擎分级 fallback，stdlib + 可选依赖
+- **数据源**：5 个互补源（GitHub + HF × 2 + MCP + arXiv）
+- **前端**：React 19 + Vite 6 + Appica UI + Tailwind v4
+- **依赖**：`gh` CLI 已认证；翻译走 Google Translate；可选 LLM 走 Claude / OpenAI / Ollama
+
+## 部署
+
+本地默认 `127.0.0.1:8765`（安全：API 能 `git clone` 你的 skill 目录）。
+
+服务器部署需要 3 个改动（详见 [安装说明 § 部署到服务器](安装说明.md#部署到服务器)）：
 
 ```bash
-./radar.py crawl   # 爬取 + 翻译 + 入库（约 5-8 分钟）
-./radar.py today   # 终端看 Top 15 + 分类
+# .env
+RADAR_HOST=0.0.0.0          # 让 serve 监听外部接口（前面挂 nginx 做 TLS）
+AI_RADAR_HOME=/var/lib/lodestone   # skill 缓存重定向到项目目录（多用户）
+PGHOST=10.0.0.5            # PG 不在 localhost 时
 ```
 
-打开 **http://localhost:5173**（前端）—— 19 分类卡片 / 325 个 AI 工具 / 中文一句话总结。
-
----
-
-## 🤔 这是什么？
-
-**AI 工具发现助手** —— 每日自动从 GitHub / HuggingFace / 官方 MCP Registry 抓取主流 AI 应用开发工具（skills / plugins / agents / RAG / IDE / MCP / Voice / ...），按 19 个用途分类，中文友好展示。
-
-```
-触发："刷一下 AI 雷达"
-        │
-        ▼
-radar.py crawl:
-  🔍  GitHub Topics + Search API →  主流仓库
-  🔍  HuggingFace Spaces API    →  社区 demo
-  🔍  HuggingFace Models API    →  模型权重
-  🔍  MCP Registry API          →  MCP servers
-        │
-        ▼
-14 → 4 精选爬虫引擎分级 fallback（httpx → cloudscraper →
-  playwright_stealth → jina，本地轻 → 本地重 → 云端，质量门把关）
-        │
-        ▼
-  🌐 中文翻译（Google Translate）+ 一句话总结
-  🏷  best_category 推断 / local_installed 检测
-        │
-        ▼
-data/latest.json（327 个 AI 工具）：
-  ├── 19 分类卡片（Agent / RAG / MCP / HF / Voice / ...）
-  ├── 🔥 Top 24 全网最热
-  ├── 🚀 今日星增（24h trending）
-  └── 🌍 生态分布（15 语言 + 30 主题）
-```
-
----
-
-## 🎯 三大数据源
-
-| 源 | API | 价值 |
-|---|---|------|
-| **GitHub Topics + Search + Trending** | `gh api` + `github.com/trending` HTML | 主流开源 AI 项目主战场 |
-| **HuggingFace Spaces + Models** | `api/spaces?sort=trending` + `api/models?sort=likes7d` | 社区精选 AI demo + 模型权重 |
-| **MCP Server Registry** | `registry.modelcontextprotocol.io/v0/servers` | Model Context Protocol 官方注册表 |
-
-**GitHub 抗爬时仍能完整工作**（MCP / HF 源不依赖 GitHub）。
-
----
-
-## 🧰 4 精选爬虫引擎（2026-09 从 14 精简）
-
-引擎不在多，在精、互补、开源、主流 — 每级解决一种别的级解决不了的失败模式，
-分级 fallback：轻引擎过质量门即停，不过才升级更重的，日常爬取不启动浏览器：
-
-| 层级 | 引擎 | 解决的失败模式 |
-|------|------|---------------|
-| 1 · 本地纯 HTTP | httpx | 最快路径 — trending 是 SSR，多数直接命中 |
-| 2 · 本地 HTTP + 挑战破解 | cloudscraper | bot-check 中间页（Cloudflare challenge），无需浏览器 |
-| 3 · 本地真浏览器 | playwright_stealth | JS 渲染 / 严格指纹检测（Chromium + stealth 补丁） |
-| 4 · 云端渲染 | jina | 本地 IP 被封时逃生（r.jina.ai 免费层，换出口 IP） |
-
-- **质量门**：每级结果须通过「长度 + bot-check 特征 + 已知页面结构标记」（如 trending 须 ≥5 个 `Box-row`）才算数，bot 页自动升级下一级
-- **白名单**：`config.toml [orchestrator].priority` 是唯一引擎清单，其余 10 个适配器（firecrawl / crawl4ai / playwright / nodriver / crawlee / scrapy / agent_reach / trafilatura / beautifulsoup / drissionpage）已停用但保留，加回列表即可重启
-- **可选适配器**：`scrapers/<name>_scraper.py` 提供统一接口（`is_available()` + `scrape(url, timeout)`）；任意装上即可参与分级 — firecrawl（REST API，key 在 `.env`）、crawl4ai（`crawl4ai-setup`）、playwright（`playwright install chromium`），详情见 `requirements.txt`
-- **URL 调度**：`scrapers/url_dispatcher.py` 按 host 模式调整每类 URL 的引擎顺序
-- **旧行为**：`selection_strategy = "longest"` 可切回全引擎并行竞赛（调试用）
-
----
-
-## 📚 19 个分类
-
-| | 分类 | 来源 | query 数 |
-|---|---|---|---:|
-| 🤖 | AI Agent & Skills | GitHub | 4 |
-| 🧠 | RAG / Memory / Vector | GitHub | 4 |
-| 💬 | LLM Interface & Chat | GitHub | 4 |
-| ⚙️ | Code Generation & Dev Tools | GitHub | 4 |
-| 🔗 | Workflow & Orchestration | GitHub | 4 |
-| 🎨 | Multimodal (Vision / Audio / Video) | GitHub | 3 |
-| 🏋️ | Fine-tuning & Training | GitHub | 4 |
-| 📊 | Eval & Benchmark | GitHub | 3 |
-| 💻 | AI IDE & 编辑器 | GitHub | 7 |
-| 🌐 | LLM Gateway & Router | GitHub | 6 |
-| 🔍 | LLM 可观测 & Tracing | GitHub | 6 |
-| ⭐ | Awesome Lists & Plugins | GitHub | 7 |
-| 🔌 | MCP Servers & Clients | **MCP Registry + GitHub** | 9 |
-| 🎙 | Voice AI / Realtime | GitHub | 16 |
-| 🖥 | Browser Use / Computer | GitHub | 11 |
-| 🤗 | 🤗 HuggingFace 热门 Spaces | **HF API** | 0 |
-| 🤗 | 🤗 HuggingFace 热门 Models | **HF API** | 0 |
-| 🛡 | AI 安全 & 隐私 | GitHub | 14 |
-| 🤖 | 机器人 / Embodied AI | GitHub | 13 |
-
----
-
-## ✨ 数据快照长这样
-
-```
-data/latest.json（327 个 AI 工具）:
-  hot:  50（全字段完整，含 desc_zh / summary_zh / lang / topics）
-  cats: 19 × ~17 平均 = 291 unique
-  stars_today: 18 个 trending 仓库（已 gh API 二次 enrich）
-```
-
-每个 repo 字段：
-- `name` / `url` / `desc` / `desc_zh` / `summary_zh`（一句话中文）
-- `stars` / `forks` / `lang` / `topics`
-- `best_category`（基于关键词推断）/ `local_installed`（基于本机检测）
-- `trending` / `is_fresh`（14 天内 push）
-- `facts`（📚 lang · 🏷 topics · ⭐ stars）
-
----
-
-## 🆕 v0.2 · 前端重写 (2026-09)
-
-UI 已从 Vue 3 + Element Plus **全部替换**为 **React 19 + [Appica UI](https://github.com/appica-dev/appica-ui)** (Tailwind v4 + Base UI + Motion)。后端 `radar.py` + 4 个精选爬虫引擎（分级 fallback）,数据接口保持兼容 (`/api/data` · `/api/stats` · `/api/gain` · `/api/top` · `/api/repo/<name>/readme`)。
-
-**重写后保留的能力**
-- 🔥 GitHub Trending 横向卡片墙 + 入场 stagger 动画
-- 🗂 19 个分类总览卡 + 锚点跳转 + 单分类网格
-- 🚀 24h 星增(`/api/gain` 分页 + 缺失数据空态)
-- 📊 生态分布(`/api/stats` 编程语言 / 主题分布)
-- 📚 中文 README(`/api/repo/<name>/readme` 自动翻译)
-- 🔍 全局搜索(name / desc_zh / topic 跨全部仓库)
-- 🔄 30s 自动轮询 + 「刷新雷达」按钮触发后台 crawl
-
-**安装**
-```bash
-cd frontend
-npm install --no-audit --no-fund    # 拉 @appica/ui-react
-npm run dev                          # 同时拉起 radar.py serve (8765) + Vite (5173)
-```
-打开 http://localhost:5173 即可。
-
-## 📚 文档导航
-
-| 你想了解什么 | 看这里 |
-|---|---|
-| 🆕 第一次装 skill | | [📦 安装说明.md](安装说明.md) |
-| 🚀 装好后怎么用 / 命令清单 | | [📖 使用手册.md](使用手册.md) |
-| 🤖 skill 触发入口 | | [SKILL.md](SKILL.md) |
-| ❌ 出错了 | | [使用手册 § 6 FAQ](使用手册.md#6-faq--故障排查) |
-
----
-
-## 🔧 技术栈一览
-
-| 层 | 技术 |
-|---|---|
-| 🐍 后端 | Python 3.10+（stdlib + 可选 pgpg8000） |
-| 📊 数据库 | PostgreSQL（JSON 回退） |
-| 🕷️ 爬虫 | 4 引擎分级 fallback（httpx → cloudscraper → playwright_stealth → jina） |
-| 🌐 数据源 | GitHub + HuggingFace + MCP Registry |
-| 🎨 前端 | React 19 + Vite 6 + Appica UI + Tailwind v4 |
-| 🔄 依赖 | `gh` CLI 已认证；翻译走 Google Translate |
-
----
-
-## 📄 License
+## License
 
 MIT

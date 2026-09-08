@@ -36,6 +36,15 @@ ALTER TABLE repos ADD COLUMN IF NOT EXISTS readme_zh TEXT;
 ALTER TABLE repos ADD COLUMN IF NOT EXISTS readme_zh_source TEXT;
 ALTER TABLE repos ADD COLUMN IF NOT EXISTS readme_zh_at TIMESTAMPTZ;
 
+-- ponytail: 2026-09 — SKILL.md 探测 + 结构化中文摘要。
+-- is_skill = 仓库根或子目录含 SKILL.md / skill.md / SKILL.yaml（前端据此门控安装）。
+-- summary_sections_json = {intro, can_do, benefit} 三桶中文摘要（README 段落拆分翻译）。
+-- analysis_5d_json = LLM 5 维度决策分析 {what, problem, alternatives, pros, cons,
+-- when_to_use}。NULL 表示未调 LLM（无 key / 超阈值）；前端降级到 summary_sections。
+ALTER TABLE repos ADD COLUMN IF NOT EXISTS is_skill BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE repos ADD COLUMN IF NOT EXISTS summary_sections_json JSONB;
+ALTER TABLE repos ADD COLUMN IF NOT EXISTS analysis_5d_json JSONB;
+
 CREATE TABLE IF NOT EXISTS repo_categories (
   repo_name    TEXT NOT NULL REFERENCES repos(name) ON DELETE CASCADE,
   category_id  TEXT NOT NULL,

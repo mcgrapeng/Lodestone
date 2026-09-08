@@ -44,8 +44,14 @@ export function RepoDrawer({ repo, open, onClose, onRepoChanged }: RepoDrawerPro
     )
   }
 
-  // ponytail: GitHub 仓库才可装为 skill（HF/arXiv/MCP registry 条目没有可克隆的 repo）
-  const installable = repo ? sourceOf(repo) === 'github' : false
+  // ponytail: 2026-09 — 仅 SKILL.md/skill.md/SKILL.yaml 探测通过的 repo 才显示安装按钮。
+  // 不是所有 GitHub 项目都支持安装为 skill（agent framework、LLM gateway、IDE 插件等
+  // 都不是可装载的 skill 格式）。HF/arXiv/MCP 条目更不可能。双重门控：
+  //   1. sourceOf(repo) === 'github' — 必须是 GitHub 仓库
+  //   2. repo.is_skill === true — 后端 SKILL.md 探测通过
+  const installable = repo
+    ? sourceOf(repo) === 'github' && repo.is_skill === true
+    : false
 
   async function act(kind: Action) {
     if (!repo) return
@@ -256,21 +262,149 @@ export function RepoDrawer({ repo, open, onClose, onRepoChanged }: RepoDrawerPro
                 </div>
               )}
 
-              {/* 详细中文描述 — 爬取期生成（README 首段翻译），随数据就绪零等待。
-                  2026-09 取代旧的「中文详介」按需翻译。 */}
+              {/* 详细介绍 — 5 维度决策分析（LLM 生成：是什么 / 痛点 / 同类 / 优缺 / 何时选）。
+                  LLM 未配置或调用失败时降级到 README 三段（intro / can_do / benefit）—
+                  缺桶不渲染，最终兜底到 summary_zh 单段。 */}
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-white">详细介绍</h3>
-                <span className="text-[11px] text-foreground-subtle">README 自动摘要</span>
+                <span className="text-[11px] text-foreground-subtle">
+                  {repo.analysis_5d ? 'LLM 决策分析' : 'README 自动摘要'}
+                </span>
               </div>
-              <div className="card-surface p-4">
-                <p className="text-sm leading-relaxed text-foreground-muted">
-                  {repo.summary_zh || repo.desc_zh || repo.desc || '暂无详细描述'}
-                </p>
+              <div className="card-surface space-y-4 p-4">
+                <Analysis5dSection label="是什么" text={repo.analysis_5d?.what} />
+                <Analysis5dSection label="解决什么问题" text={repo.analysis_5d?.problem} />
+                <Analysis5dSection
+                  label="同类项目"
+                  items={repo.analysis_5d?.alternatives}
+                  renderItem={(name) => (
+                    <a
+                      href={`https://github.com/${name.includes('/') ? name : `search?q=${encodeURIComponent(name)}`}`}
+                      target="_blank"
+                      rel="noopener"
+                      className="inline-flex items-center gap-1 rounded-full bg-background-muted px-2.5 py-0.5 text-[11px] font-medium text-primary ring-1 ring-border-muted transition hover:bg-primary/15 hover:ring-primary/40"
+                    >
+                      {name}
+                    </a>
+                  )}
+                />
+                <Analysis5dSection
+                  label="优点"
+                  items={repo.analysis_5d?.pros}
+                  renderItem={(p) => (
+                    <span className="inline-flex items-start gap-1 text-sm text-foreground-muted">
+                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-success" />
+                      {p}
+                    </span>
+                  )}
+                  stacked
+                />
+                <Analysis5dSection
+                  label="局限"
+                  items={repo.analysis_5d?.cons}
+                  renderItem={(c) => (
+                    <span className="inline-flex items-start gap-1 text-sm text-foreground-muted">
+                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-warning" />
+                      {c}
+                    </span>
+                  )}
+                  stacked
+                />
+                <Analysis5dSection label="何时选它" text={repo.analysis_5d?.when_to_use} />
+                {/* LLM 没产出 5 维度分析时降级到 README 三段（intro / can_do / benefit） */}
+                {!repo.analysis_5d && (
+                  <>
+                    <div className="border-t border-border-muted/50 pt-3">
+                      <div className="mb-2 text-[10px] uppercase tracking-wider text-foreground-subtle">
+                        README 摘要（兜底）
+                      </div>
+                      <div className="space-y-3">
+                        <SummarySection label="介绍" text={repo.summary_sections?.intro} />
+                        <SummarySection label="能干什么" text={repo.summary_sections?.can_do} />
+                        <SummarySection label="优势" text={repo.summary_sections?.benefit} />
+                        {!repo.summary_sections?.intro &&
+                          !repo.summary_sections?.can_do &&
+                          !repo.summary_sections?.benefit && (
+                            <p className="text-sm leading-relaxed text-foreground-muted">
+                              {repo.summary_zh || repo.desc_zh || repo.desc || '暂无详细描述'}
+                            </p>
+                          )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
+
+              {/* 非 skill 的 GitHub 仓库 — 提示用户为何无安装按钮 */}
+              {sourceOf(repo) === 'github' && !repo.is_skill && (
+                <div className="mt-3 rounded-lg border border-border-muted/50 bg-background-muted/40 p-3 text-xs leading-relaxed text-foreground-subtle">
+                  ℹ️ 该项目未检测到 <code className="rounded bg-background-strong px-1 py-0.5 font-mono text-[11px]">SKILL.md</code> /
+                  <code className="ml-1 rounded bg-background-strong px-1 py-0.5 font-mono text-[11px]">skill.md</code> /
+                  <code className="ml-1 rounded bg-background-strong px-1 py-0.5 font-mono text-[11px]">SKILL.yaml</code>，
+                  不支持作为 skill 安装；可在 GitHub 单独使用。
+                </div>
+              )}
             </DrawerBody>
           </>
         ) : null}
       </DrawerContent>
     </Drawer>
   )
+}
+
+/** 单段详介的展示单元 — 缺桶不渲染，保留呼吸感 */
+function SummarySection({ label, text }: { label: string; text?: string }) {
+  if (!text || !text.trim()) return null
+  return (
+    <div>
+      <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+        <span className="h-1 w-1 rounded-full bg-primary" />
+        {label}
+      </div>
+      <p className="text-sm leading-relaxed text-foreground-muted">{text.trim()}</p>
+    </div>
+  )
+}
+
+/** 5 维度分析的单桶渲染 — 支持纯文本段落或列表（项目 / 优缺）。stacked=true 列表竖排。 */
+function Analysis5dSection({
+  label,
+  text,
+  items,
+  renderItem,
+  stacked,
+}: {
+  label: string
+  text?: string
+  items?: string[]
+  renderItem?: (item: string) => React.ReactNode
+  stacked?: boolean
+}) {
+  if (text && text.trim()) {
+    return (
+      <div>
+        <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+          <span className="h-1 w-1 rounded-full bg-primary" />
+          {label}
+        </div>
+        <p className="text-sm leading-relaxed text-foreground-muted">{text.trim()}</p>
+      </div>
+    )
+  }
+  if (items && items.length && renderItem) {
+    return (
+      <div>
+        <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+          <span className="h-1 w-1 rounded-full bg-primary" />
+          {label}
+        </div>
+        <div className={stacked ? 'space-y-1.5' : 'flex flex-wrap gap-1.5'}>
+          {items.map((it, i) => (
+            <div key={i}>{renderItem(it)}</div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+  return null
 }
