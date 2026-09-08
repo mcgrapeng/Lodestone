@@ -555,6 +555,45 @@ TOP_5K_QUERIES = [
     'stars:>500 "RAG" in:name,description',
     'stars:>500 "vector store" in:name,description',
     'stars:>500 "agent skill" in:name,description',
+    # ponytail: 2026-09 — 主要 AI 厂商 org 级查询. 新模型/新框架发布时
+    # 作者未必立即打 topic 标签,org: 抓全这家厂商所有仓库(含未打 tag 的).
+    # 单条 org: 查询 ≠ 主题查询: 一个 query 拉该 org 所有 stars:>500 仓库,
+    # 单 query 即覆盖整个厂商生态. 加 30 条 org 只多 5 个 GraphQL 请求,
+    # 换来主流 AI 厂商的新仓库 0 延迟覆盖.
+    # === 模型权重厂商 (国内 + 海外) ===
+    "org:deepseek-ai stars:>100",
+    "org:QwenLM stars:>100",
+    "org:meta-llama stars:>100",
+    "org:mistralai stars:>100",
+    "org:OpenBMB stars:>50",
+    "org:THUDM stars:>100",
+    "org:MiniMax stars:>100",
+    "org:baichuan-inc stars:>50",
+    "org:moonshotai stars:>50",
+    "org:inclusionAI stars:>50",
+    "org:OpenGVLab stars:>50",
+    "org:Tencent-Hunyuan stars:>50",
+    "org:Kwai-Kolors stars:>50",
+    # === 海外闭源模型 + Agent 平台 ===
+    "org:anthropics stars:>100",      # Claude / MCP SDK / 官方 skill
+    "org:openai stars:>100",          # Codex / openai-python / eval
+    "org:google-deepmind stars:>100",
+    "org:cohere-ai stars:>100",
+    "org:Stability-AI stars:>100",
+    "org:Black-Forest-Labs stars:>100",  # FLUX
+    "org:comfyanonymous stars:>100",     # ComfyUI
+    # === 推理 + Agent 框架 ===
+    "org:huggingface stars:>100",      # transformers / diffusers / smolagents
+    "org:ollama stars:>100",
+    "org:vllm-project stars:>100",
+    "org:ggerganov stars:>100",        # whisper.cpp / llama.cpp
+    "org:ggerganov-face stars:>100",
+    "org:ggerganov-ggml stars:>100",
+    "org:langchain-ai stars:>100",
+    "org:run-llama stars:>100",        # LlamaIndex
+    "org:openai-agents stars:>100",    # openai-agents SDK
+    "org:crewAIInc stars:>100",        # CrewAI 官方
+    "org:NVIDIA stars:>200",           # NeMo / TensorRT-LLM
     # === Awesome 列表 (大量 curated resources, 但 topic 通用) ===
     "stars:>5000 awesome-llm in:name",
     "stars:>5000 awesome-ai in:name",
@@ -758,6 +797,37 @@ NON_AI_DEV_DESC_BLOCKLIST = re.compile(
     re.IGNORECASE,
 )
 
+# ponytail: 2026-09 — 通用工具黑名单. 即便有 langchain/openai 等弱 AI topic,
+# 如果描述清楚说是通用工具, 一律拒绝. 实测 n8n/yt-dlp/markitdown 借
+# "AI capabilities" / "langchain integration" / "openai sdk" 等关键词蒙混
+# 进 AI 雷达 — 这是用户期待的「专注 AI 工具」平台的污染.
+# 三道闸门: ① finance 屏蔽(已有) ② 黑名单(本次新增) ③ 强 AI 信号
+# ponytail: 2026-09 — 通用工具黑名单,topic 级. 比描述正则更可靠:
+# 通用工具蹭 langchain/openai/claude topic 时 description 也常带 "AI",
+# 但它们的 topic 几乎稳定不变(downloader, youtube-dl, markdown, ...).
+# 一票命中即拒;白名单 (CURATED_ALLOWLIST) 仍可旁路.
+NON_AI_TOPIC_BLOCKLIST = frozenset(
+    {
+        # 媒体下载/处理
+        "downloader", "video-downloader", "youtube-dl", "yt-dlp",
+        "video-converter", "audio-converter", "media-converter",
+        "subtitle-downloader", "media-downloader",
+        # 文档/Markdown/Office 转换 — markitdown 这类
+        "markdown-converter", "pdf-converter", "document-converter",
+        "office-document", "file-converter",
+        "microsoft-office",  # markitdown / Word 转换工具
+        "docx", "pptx", "xlsx",  # Office 文档处理(常见于转换工具)
+        # 工作流自动化 (n8n 这类)
+        "ipaas", "workflow-automation", "workflow-engine",
+        # 包管理 / 版本管理 / CLI 通用工具
+        "version-manager", "package-manager", "cli-app",
+        # 通用 chat UI 库
+        "chat-ui", "chat-component",
+        # 通用 GUI 框架
+        "gui-framework", "ui-framework",
+    }
+)
+
 _SEARCH_PACE = {"sleep": 2.0}
 
 GH_SEARCH_STATS = {"failed": 0}
@@ -781,19 +851,29 @@ def is_finance_blocked(repo):
     return bool(NON_AI_DEV_DESC_BLOCKLIST.search(desc))
 
 def is_ai_relevant(repo):
-    """Strict AI filter — requires at least one HARD topic, OR an AI phrase in name/description.
-    ponytail: bare 'ai' topic alone is no longer enough — that caught dbeaver/netdata.
-    2026-09：先过金融领域屏蔽（is_finance_blocked），再做 AI 判定。
-    注意：分类查询的结果不要用这个函数整体过滤 — category query 本身就是 AI
-    信号（topic:llm / topic:langgraph...），只需 is_finance_blocked；严格过滤
-    用于来源宽泛的 5k 大池（"stars:>500 xxx" 这类）。"""
+    """Strict AI filter — three gates (any failure → reject):
+      Gate 1: not in finance/crypto blacklist (is_finance_blocked)
+      Gate 2: topics don't match NON_AI_TOPIC_BLOCKLIST (通用工具黑名单)
+      Gate 3: name is in CURATED_ALLOWLIST (whitelist bypass) OR
+               has at least one AI_TOPIC_HARD topic OR
+               name+description contains a strong AI_TEXT_HINTS phrase
+
+    ponytail: 2026-09 — three-gate rewrite. 此前只有 ① + ③ → yt-dlp/n8n/markitdown
+    这类「蹭 AI topic 标签」的通用工具滑进 hot_now 前 10. Gate 2 用 topic 黑名单
+    (download/markdown-converter/workflow-automation 等)拦截,topic 比描述更稳定.
+    注意:分类查询的结果不要用这个函数整体过滤 — category query 本身就是 AI
+    信号(topic:llm / topic:langgraph...), 只需 is_finance_blocked;严格过滤
+    用于来源宽泛的 5k 大池("stars:>500 xxx" 这类)."""
     if is_finance_blocked(repo):
         return False
-    # ponytail: 用户精选赛道白名单（CURATED_ALLOWLIST 在上方定义）— agent 基建类
-    # 项目 topics 无 AI 关键词但属于雷达定位，豁免 AI 相关性判定（金融拦截不豁免）。
+    # ponytail: 用户精选赛道白名单(CURATED_ALLOWLIST 在上方定义)— agent 基建类
+    # 项目 topics 无 AI 关键词但属于雷达定位,豁免 AI 相关性判定(金融拦截不豁免).
     if (repo.get("name") or "").lower() in CURATED_ALLOWLIST:
         return True
     topics = [t.lower() for t in (repo.get("topics") or [])]
+    # Gate 2: 通用工具 topic 黑名单. 一票命中即拒 (除白名单外).
+    if topics and any(t in NON_AI_TOPIC_BLOCKLIST for t in topics):
+        return False
     blob_topics = " ".join(topics)
     if any(h in blob_topics for h in AI_TOPIC_HARD):
         return True
