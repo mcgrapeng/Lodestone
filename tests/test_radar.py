@@ -37,7 +37,7 @@ def test_install_skill_from_github_accepts_owner_repo():
             patch("radar.Path.home", return_value=tmp),
             patch("radar_pkg.detect._SKILL_PLATFORM_PATHS", _platforms_at(tmp)),
         ):
-            with patch("radar.subprocess.run") as mock_run:
+            with patch("radar_pkg.install.subprocess.run") as mock_run:
                 mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
                 # Pre-create the cache target so the function skips git clone
                 target = cache / "superpowers"

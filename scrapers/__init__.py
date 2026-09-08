@@ -60,12 +60,12 @@ from .url_dispatcher import content_hint, quality_marker, select_engines  # noqa
 # ponytail: bot-check 中间页特征 — 命中任意一条即质量门不通过（升级下一级引擎）。
 # 只查前 5000 字符：这类页面通常又短又靠前，避免大页面上的多余扫描。
 _BOT_CHECK_MARKERS = (
-    "just a moment",                  # Cloudflare challenge
-    "checking your browser",          # Cloudflare legacy
-    "attention required",             # Cloudflare block
+    "just a moment",  # Cloudflare challenge
+    "checking your browser",  # Cloudflare legacy
+    "attention required",  # Cloudflare block
     "enable javascript and cookies",  # generic bot wall
-    "unusual traffic",                # Google-style block
-    "sign in to your account",        # auth-wall served instead of content
+    "unusual traffic",  # Google-style block
+    "sign in to your account",  # auth-wall served instead of content
 )
 
 
@@ -222,7 +222,11 @@ async def fetch_html_parallel_async(url: str, timeout: int = 60) -> tuple:
         if hint == "markdown":
             markdown_engines = {"jina", "trafilatura", "agent_reach"}
             md_winner = next(
-                (r for r in successes if r["scraper"] in markdown_engines and len(r["html"]) >= 200),
+                (
+                    r
+                    for r in successes
+                    if r["scraper"] in markdown_engines and len(r["html"]) >= 200
+                ),
                 None,
             )
             if md_winner:
@@ -318,7 +322,9 @@ def fetch_html_tiered(
             file=sys.stderr,
         )
     elif tried:
-        print(f"  [scrape] tiered: ladder exhausted ({'+'.join(tried)})", file=sys.stderr)
+        print(
+            f"  [scrape] tiered: ladder exhausted ({'+'.join(tried)})", file=sys.stderr
+        )
     return best_rejected
 
 

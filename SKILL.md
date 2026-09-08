@@ -86,6 +86,13 @@ httpx → cloudscraper → playwright_stealth → jina（本地轻 → 本地重
 日常爬取不启动浏览器。引擎清单见 `config.toml [orchestrator].priority`（唯一
 白名单，其余 10 个适配器停用但保留）。详细策略见 [使用手册 § 4](使用手册.md#4-爬虫引擎4-精选分级-fallback)。
 
+可选适配器（在 `scrapers/` 里有统一 `is_available()` + `scrape()` 接口，装上即
+可加入白名单启动）：
+
+- **firecrawl** — REST API（远程云端渲染），无需本地浏览器，最快
+- **crawl4ai** — 开源本地浏览器爬虫，`pip install crawl4ai && crawl4ai-setup`
+- **playwright** — Chromium 真浏览器，`pip install playwright && playwright install chromium`
+
 ## 数据存储（Postgres 优先）
 
 - **PG 模式**（`pip install pg8000` + `.env` 配置）：表 `repos` / `repo_categories` / `repo_stars_history` / `crawl_log`（含 `queries_zh` 字段、`scrapers_failed` 数据质量字段）。首次 crawl 自动建库建表。

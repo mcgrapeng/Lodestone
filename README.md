@@ -95,6 +95,7 @@ data/latest.json（327 个 AI 工具）：
 
 - **质量门**：每级结果须通过「长度 + bot-check 特征 + 已知页面结构标记」（如 trending 须 ≥5 个 `Box-row`）才算数，bot 页自动升级下一级
 - **白名单**：`config.toml [orchestrator].priority` 是唯一引擎清单，其余 10 个适配器（firecrawl / crawl4ai / playwright / nodriver / crawlee / scrapy / agent_reach / trafilatura / beautifulsoup / drissionpage）已停用但保留，加回列表即可重启
+- **可选适配器**：`scrapers/<name>_scraper.py` 提供统一接口（`is_available()` + `scrape(url, timeout)`）；任意装上即可参与分级 — firecrawl（REST API，key 在 `.env`）、crawl4ai（`crawl4ai-setup`）、playwright（`playwright install chromium`），详情见 `requirements.txt`
 - **URL 调度**：`scrapers/url_dispatcher.py` 按 host 模式调整每类 URL 的引擎顺序
 - **旧行为**：`selection_strategy = "longest"` 可切回全引擎并行竞赛（调试用）
 
