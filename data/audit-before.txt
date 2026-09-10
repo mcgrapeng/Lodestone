@@ -1,0 +1,14 @@
+oracle 可还原 GitHub 全名: 8
+卡片总数: 836, 其中已装: 15
+
+[漏报] 装了但卡片未标已装(0):
+
+[卡片外] oracle 命中但不在当前卡片集(5):
+    firecrawl/firecrawl-claude-plugin
+    lodestone/hallmark
+    obra/superpowers
+    octocat/hello-world
+    vercel/vercel-plugin
+
+[无法还原-目录](501): ~dir~/claude/agent-architecture-audit ~dir~/claude/agent-introspection-debugging ~dir~/claude/ai-regression-testing ~dir~/claude/anti-sycophancy-code-discipline ~dir~/claude/api-design ~dir~/claude/api-design-reviewer ~dir~/claude/architecture-decision-records ~dir~/claude/backend-patterns ~dir~/claude/benchmark-optimization-loop ~dir~/claude/blast-radius-preview ~dir~/claude/book-a-philosophy-of-software-design ~dir~/claude/book-clean-architecture ~dir~/claude/book-clean-code ~dir~/claude/book-code-complete ~dir~/claude/book-designing-data-intensive-applications
+[无法还原-插件](35): ~plugin~/anthropic-agent-skills/document-skills ~plugin~/anthropic-agent-skills/example-skills ~plugin~/claude-plugins-official/claude-code-setup ~plugin~/claude-plugins-official/claude-md-management ~plugin~/claude-plugins-official/code-review ~plugin~/claude-plugins-official/code-simplifier ~plugin~/claude-plugins-official/context7 ~plugin~/claude-plugins-official/feature-dev ~plugin~/claude-plugins-official/frontend-design ~plugin~/claude-plugins-official/gopls-lsp ~plugin~/claude-plugins-official/playground ~plugin~/claude-plugins-official/playwright ~plugin~/claude-plugins-official/pr-review-toolkit ~plugin~/claude-plugins-official/pyright-lsp ~plugin~/claude-plugins-official/ralph-loop

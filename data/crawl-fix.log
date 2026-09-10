@@ -1,0 +1,135 @@
+  · graphql r1 batch: 6/6 aliases, 68 repos
+  · graphql r1 batch: 6/6 aliases, 154 repos
+  · graphql r1 batch: 6/6 aliases, 180 repos
+  · graphql r1 batch: 6/6 aliases, 67 repos
+  · graphql r1 batch: 6/6 aliases, 69 repos
+  · graphql r1 batch: 5/6 aliases, 20 repos
+  · graphql r1 batch: 6/6 aliases, 161 repos
+  · graphql r1 batch: 6/6 aliases, 180 repos
+  · graphql r1 batch: 6/6 aliases, 87 repos
+  · graphql r1 batch: 6/6 aliases, 93 repos
+  · graphql r1 batch: 6/6 aliases, 146 repos
+  · graphql r1 batch: 6/6 aliases, 140 repos
+  · graphql r1 batch: 5/6 aliases, 83 repos
+  · graphql r1 batch: 5/6 aliases, 127 repos
+  · graphql r1 batch: 5/6 aliases, 64 repos
+  · graphql r1 batch: 5/6 aliases, 102 repos
+  · graphql r1 batch: 5/6 aliases, 39 repos
+  · graphql r1 batch: 5/6 aliases, 118 repos
+  · graphql r1 batch: 6/6 aliases, 175 repos
+  · graphql r1 batch: 5/6 aliases, 134 repos
+  · graphql r1 batch: 5/6 aliases, 119 repos
+  · graphql r1 batch: 6/6 aliases, 180 repos
+  · graphql r1 batch: 6/6 aliases, 12 repos
+  · graphql r1 batch: 5/6 aliases, 10 repos
+  · graphql r1 batch: 6/6 aliases, 55 repos
+  · graphql r1 batch: 5/6 aliases, 135 repos
+  · graphql r1 batch: 5/6 aliases, 21 repos
+  · graphql r1 batch: 5/6 aliases, 27 repos
+  · graphql r1 batch: 6/6 aliases, 42 repos
+  · graphql r1 batch: 5/6 aliases, 75 repos
+  · graphql r1 batch: 6/6 aliases, 133 repos
+  · graphql r1 batch: 6/6 aliases, 121 repos
+  · graphql r1 batch: 6/6 aliases, 164 repos
+  · graphql r1 batch: 4/4 aliases, 120 repos
+  · graphql sweep: 14 partial/failed queries re-run, 188/202 total
+  [warn] graphql r1 batch failed (8 queries) — splitting: gh api graphql exit 1: Post "https://api.github.com/graphql": EOF
+  [warn] graphql r1 batch failed (8 queries) — splitting: gh api graphql exit 1: gh: Resource limits for this query exceeded.
+Resource limits for this query e
+  · graphql r1 batch: 7/8 aliases, 172 repos
+  [warn] graphql r1 batch failed (8 queries) — splitting: gh api graphql exit 1: gh: HTTP 502
+  · graphql r1 batch: 8/8 aliases, 102 repos
+  · graphql r1 batch: 5/8 aliases, 78 repos
+  · graphql r1 batch: 8/8 aliases, 194 repos
+  · graphql r1 batch: 6/8 aliases, 172 repos
+  · graphql r1 batch: 5/5 aliases, 81 repos
+  [warn] graphql r1 batch failed (8 queries) — splitting: gh api graphql exit 1: gh: HTTP 502
+  [warn] graphql r1 batch failed (8 queries) — splitting: gh api graphql exit 1: gh: Resource limits for this query exceeded.
+Resource limits for this query e
+  · graphql r2 batch: 4/4 aliases, 79 repos
+  · graphql r2 batch: 4/4 aliases, 200 repos
+  · graphql r2 batch: 4/4 aliases, 171 repos
+  · graphql r2 batch: 4/4 aliases, 183 repos
+  · graphql r2 batch: 4/4 aliases, 171 repos
+  · graphql r2 batch: 4/4 aliases, 200 repos
+  · graphql r2 batch: 3/4 aliases, 90 repos
+  · graphql r2 batch: 3/4 aliases, 150 repos
+  · graphql r2 batch: 4/4 aliases, 166 repos
+  · graphql r2 batch: 4/4 aliases, 153 repos
+  · graphql sweep: 8 partial/failed queries re-run, 77/85 total
+  [warn] graphql page2 batch failed: gh api graphql exit 1: gh: Resource limits for this query exceeded.
+Resource lim
+  [warn] graphql page2 batch failed: gh api graphql exit 1: gh: HTTP 502
+  [warn] graphql page2 batch failed: gh api graphql exit 1: gh: HTTP 502
+  [warn] graphql page2 batch failed: gh api graphql exit 1: gh: HTTP 502
+  · graphql page2: 35 full pages followed, +134 repos
+  · graphql r1 batch: 5/5 aliases, 90 repos
+  ✓ MCP registry: 30 active servers (16 pages, 170 unique)
+  ✓ HuggingFace: 30 trending spaces
+  [warn] HF models: fetch failed (sort=trending)
+  [warn] category 'hf_models': source 'hf_models' returned 0 items
+  ✓ arXiv: 30 recent AI papers
+  [scrape] httpx ✓ 658118 chars (quality gate passed)
+  [scrape] httpx ✓ 636878 chars (quality gate passed)
+  [scrape] httpx ✓ 644109 chars (quality gate passed)
+  [scrape] httpx ✓ 661799 chars (quality gate passed)
+  [scrape] httpx ✓ 699456 chars (quality gate passed)
+  [scrape] httpx ✓ 691429 chars (quality gate passed)
+  · translating 96 descriptions…
+  · translating 430 descriptions…
+  [warn] PG write failed ({'S': 'ERROR', 'V': 'ERROR', 'C': '23503', 'M': 'insert or update on table "repo_categories" violates foreign key constraint "repo_categories_repo_name_fkey"', 'D': 'Key (repo_name)=(registry/ai.aislabs__gateway) is not present in table "repos".', 's': 'public', 't': 'repo_categories', 'n': 'repo_categories_repo_name_fkey', 'F': 'ri_triggers.c', 'L': '2772', 'R': 'ri_ReportViolation'}); falling back to JSON snapshot
+[crawl] 2026-09-07 — 27 categories
+[crawl] scrapers: httpx, cloudscraper, playwright_stealth, jina
+[crawl] GraphQL batch search: 202 category queries + 85 5k+ queries…
+  ✓ AI Agent & Skills: 30 repos
+  ✓ RAG / Memory / Vector: 30 repos
+  ✓ LLM Interface & Chat: 30 repos
+  ✓ Code Generation & Dev Tools: 30 repos
+  ✓ Workflow & Orchestration: 30 repos
+  ✓ Multimodal (Vision / Audio / Video): 30 repos
+  ✓ Fine-tuning & Training: 30 repos
+  ✓ Eval & Benchmark: 30 repos
+  ✓ AI IDE & 编辑器: 30 repos
+  ✓ LLM Gateway & Router: 30 repos
+  ✓ LLM 可观测 & Tracing: 30 repos
+  ✓ Awesome Lists & Plugins & 资源合集: 30 repos
+  ✓ MCP Servers(官方注册表): 30 repos
+  ✓ MCP 开发与自托管: 30 repos
+  ✓ Voice AI / Realtime: 30 repos
+  ✓ Browser Use / Computer Use: 30 repos
+  ✓ 🤗 HuggingFace 热门 Spaces: 30 repos
+  ✓ 🤗 HuggingFace 热门 Models: 0 repos
+  ✓ 📄 arXiv 论文: 30 repos
+  ✓ ⚙️ 推理服务与部署: 30 repos
+  ✓ 🕸 代码理解与知识图谱: 17 repos
+  ✓ 🔍 搜索与数据获取: 30 repos
+  ✓ 💬 聊天前端: 19 repos
+  ✓ 📄 文档解析: 30 repos
+  ✓ 🎨 AI UI 组件库: 29 repos
+  ✓ AI 安全 & 隐私: 30 repos
+  ✓ 机器人 / Embodied AI: 30 repos
+[crawl] 5k+ pass (85 queries)…
+  ✓ 5k+ pass: 1528 repos after AI filter (search phase 399s)
+  ✓ manual seed: lllyasviel/Fooocus (52873 ⭐)
+  ✓ manual seed: SWivid/F5-TTS (15208 ⭐)
+  ✓ manual seed: all-hands-ai/openhands (86397 ⭐)
+  ✓ manual seed: coderamp-labs/gitingest (15400 ⭐)
+  ✓ manual seed: lodestone/ai-agent-book (0 ⭐)
+  ✓ manual seed: funstory-ai/BabelDOC (9479 ⭐)
+  ✓ manual seed: GaoSSR/best-claude-hud (722 ⭐)
+  ✓ manual seed: letta-ai/letta (24638 ⭐)
+  ✓ manual seed: msitarzewski/agency-agents (150546 ⭐)
+[crawl] GitHub trending (6 routes: daily/weekly × all-lang + python/ts/rust/go)…
+  · trending html via httpx
+  · trending html via httpx
+  · trending html via httpx
+  · trending html via httpx
+  · trending html via httpx
+  · trending html via httpx
+  ✓ trending: 18 daily + 21 weekly + 69 lang-variant → 95 unique → 50 AI-relevant → merged into 5k+ pool
+[crawl] local installed (full/seg): 76
+  ✓ new-star pass: 73 low-star repos (created>2026-08-24)
+[crawl] translating to Chinese…
+[crawl] summaries: 1111 GitHub repos (623 cached)
+  ✓ summaries: 1161/1197 repos with zh summary
+[crawl] saved → /Users/zhangpeng/workspace/liaohe/youzi/lodestone/data/latest.json (1197 repos, JSON mode)
