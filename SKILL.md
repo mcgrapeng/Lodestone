@@ -1,6 +1,6 @@
 ---
-name: zp
-description: 当用户想了解 GitHub + HuggingFace + MCP Registry + arXiv 上最新的 AI 工具/Skills/项目（如 superpowers、agent-memory、LangChain、Coze 等）时触发。Lodestone（命令 /zp）是专门发现主流 AI 工具的多源聚合平台 — 自动聚合 GitHub AI 趋势（GraphQL 批量搜索 + 4 引擎分级爬取）+ HuggingFace Trending（Spaces + Models）+ 官方 MCP Server Registry + arXiv 最新论文，按 20 个用途分类（Agent/RAG/代码生成/MCP/Voice/Security/Robotics/论文 等），生成中文友好仪表盘。触发命令：「/zp」。触发短语：「看看最新AI项目」「AI radar」「GitHub AI趋势」「刷一下AI雷达」「最近有什么火的AI项目」。
+name: yz-ai
+description: 当用户想了解 GitHub + HuggingFace + MCP Registry + arXiv 上最新的 AI 工具/Skills/项目（如 superpowers、agent-memory、LangChain、Coze 等）时触发。Lodestone（命令 /yz:ai）是专门发现主流 AI 工具的多源聚合平台 — 自动聚合 GitHub AI 趋势（GraphQL 批量搜索 + 4 引擎分级爬取）+ HuggingFace Trending（Spaces + Models）+ 官方 MCP Server Registry + arXiv 最新论文，按 20 个用途分类（Agent/RAG/代码生成/MCP/Voice/Security/Robotics/论文 等），生成中文友好仪表盘。**触发 /yz:ai 后，skill 会调用宿主模型（Claude Code CLI / Codex CLI / OpenCode / EasyCode）直接为每张卡片生成 5 桶中文详细介绍（是什么 / 能干什么 / 解决什么问题 / 同类竞品 / 何时选它），无需外部 LLM API key、无翻译限额**。触发短语：「/yz:ai」「看看最新AI项目」「AI radar」「GitHub AI趋势」「刷一下AI雷达」「最近有什么火的AI项目」。
 allowed-tools: Bash, Read, Write, Edit
 ---
 
@@ -8,7 +8,7 @@ allowed-tools: Bash, Read, Write, Edit
 
 每日 GitHub AI 热门仓库 + HuggingFace Trending（Spaces + Models）+ 官方 MCP Server Registry 自动聚合 · 已为 AI 应用工程师分类整理 · 中文友好
 
-> **跨平台**：本 skill 同时兼容 **Claude Code** (`~/.claude/skills/`) 和 **Codex CLI** (`~/.codex/skills/`)。`SKILL.md` 格式两边相同，通过 `./install.sh` 一次安装双端可用。
+> **跨平台**：本 skill 同时兼容 **Claude Code** (`~/.claude/skills/`)、**Codex CLI** (`~/.codex/skills/`)、**OpenCode** (`~/.config/opencode/skills/`)、**EasyCode** (`~/.easycode/skills/`)。`SKILL.md` 格式两边相同，通过 `./install.sh` 一次安装多端可用。
 
 ## 何时使用本 skill
 
@@ -18,17 +18,40 @@ allowed-tools: Bash, Read, Write, Edit
 - 用户想看 superpowers 这种 skills 的最新同类项目
 - 用户想找最新的 MCP server / 浏览器代理 / 语音 agent 等细分赛道
 - 用户想看 HuggingFace 上今天最火的模型权重
+- 用户希望每张卡片都有 5 桶详细中文介绍（直接由宿主 LLM 生成，无外部 API key）
 
-## 一键执行
+## `/yz:ai` 命令流程
+
+`/yz:ai` 是用户的入口命令。**触发后，宿主 LLM（Claude Code / Codex / OpenCode / EasyCode 调用的模型）**自动执行以下步骤：
+
+1. **检测 serve**：若 `http://127.0.0.1:8765/api/data` 不可达，运行 `<project_root>/radar.py web` 一键拉起 serve + 浏览器
+2. **拉数据**：`GET http://127.0.0.1:8765/api/data` 拿到全部 repo 列表
+3. **批量生成 5 桶中文介绍**：对每张卡片（首推 hot_now + gainers），按下面的 JSON schema 生成：
+   ```json
+   {
+     "intro": "是什么 — 一句话定位",
+     "can_do": "能干什么 — 3-5 个具体能力",
+     "problem": "解决什么问题 — 用户痛点",
+     "competitive": "同类项目:A、B、C（按 topic 匹配）",
+     "when_to_use": "何时选它 — 决策建议"
+   }
+   ```
+4. **回写**：`POST http://127.0.0.1:8765/api/save_summary_batch`，body:
+   ```json
+   {"items":[{"name":"owner/repo","sections":{...}}, ...]}
+   ```
+5. **告诉用户**：总共填了多少张卡、各 5 桶平均字数、哪些卡还需他补充
+
+> **核心设计**：不再依赖 Google Translate 或外部 LLM API。模型就是调用 skill 的宿主 LLM — 读仓库名 + topics + lang + stars + 已有的 desc/desc_zh 就能生成优质介绍，无 API 限额、无翻译噪声、可部署到任意服务器。
+
+## 一键执行（手动命令）
 
 ```bash
 # skill 安装后，从任意 cwd 都可调用
-~/.claude/skills/zp/radar.py web      # 一键仪表盘：后台起 serve + 自动打开浏览器（已在跑则直接打开）
-~/.claude/skills/zp/radar.py crawl    # 爬取 + 入库（约 5-8 分钟，含限速等待）
-~/.claude/skills/zp/radar.py today    # 终端直接看 Top 15 + 分类概览
+~/.claude/skills/yz-ai/radar.py web      # 一键仪表盘：后台起 serve + 自动打开浏览器（已在跑则直接打开）
+~/.claude/skills/yz-ai/radar.py crawl    # 爬取 + 入库（约 5-8 分钟，含限速等待）
+~/.claude/skills/yz-ai/radar.py today    # 终端直接看 Top 15 + 分类概览
 ```
-
-> **`/zp` 默认流程**：先执行 `radar.py web`（自动打开浏览器仪表盘），再用 `radar.py today` 在终端补充 Top 15 摘要；数据超过 6 小时可先 `crawl`。
 
 > 安装器创建的是 symlink（不是复制），所以两个路径指向同一个源目录，编辑一处即时生效。
 
@@ -37,13 +60,13 @@ allowed-tools: Bash, Read, Write, Edit
 | 命令 | 作用 |
 |------|------|
 | `radar.py web [port]` | 一键仪表盘：检测到 serve 已在跑就直接开浏览器，否则后台拉起（detached）再开。幂等，重复执行无副作用 |
-| `radar.py crawl` | 拉取 GitHub（分类 + 5k 补捞 + trending + manual seed）+ HuggingFace Spaces + HuggingFace Models + MCP Registry → 翻译 → 写入 Postgres（无 PG 时回退 `data/latest.json`） |
+| `radar.py crawl` | 拉取 GitHub（分类 + 5k 补捞 + trending + manual seed）+ HuggingFace Spaces + HuggingFace Models + MCP Registry → 写入 Postgres（无 PG 时回退 `data/latest.json`） |
 | `radar.py today` | 终端打印 Top 15 + 分类概览（PG 优先，latest.json 回退） |
-| `radar.py serve [port]` | 起 JSON API + 静态托管 `frontend/dist`（默认 8765，**仅绑定 127.0.0.1**；前端 dev 模式仍走 `cd frontend && npm run dev`） |
+| `radar.py serve [port]` | 起 JSON API + 静态托管 `frontend/dist`（默认 8765，**RADAR_HOST 控制绑定地址**；默认 127.0.0.1 安全） |
 
-crawl 全程持文件锁（`data/crawl.lock`），并发触发会自动拒绝，不会互相打爆 GitHub 限流。
+crawl 全程持文件锁（`data/crawl.lock`），并发触发会自动拒绝，不互相打爆 GitHub 限流。
 
-## 数据源（4 个 — 互补且独立）
+## 数据源（5 个 — 互补且独立）
 
 | 源 | API | 价值 |
 |---|-----|------|
@@ -51,8 +74,7 @@ crawl 全程持文件锁（`data/crawl.lock`），并发触发会自动拒绝，
 | **HuggingFace Spaces Trending** | `api/spaces?sort=trending` | 社区精选 AI 应用 demo |
 | **HuggingFace Models Trending** | `api/models?sort=likes7d` | 模型权重排行（Qwen / Llama / DeepSeek） |
 | **MCP Server Registry** | `registry.modelcontextprotocol.io/v0/servers` | Model Context Protocol 官方注册表 |
-
-新增源（MCP Registry + HF Models）不依赖 GitHub — 即使 GitHub 抗爬也能完整覆盖 MCP 与模型权重。
+| **arXiv 论文** | `export.arxiv.org/api/query` | cs.AI / cs.CL / cs.LG 最新提交 |
 
 ## 20 个分类
 
@@ -77,7 +99,7 @@ crawl 全程持文件锁（`data/crawl.lock`），并发触发会自动拒绝，
 | 17 | 🤗 HuggingFace 热门 Models（7 天 likes 排行） |
 | 18 | 🛡 AI 安全 & 隐私（prompt injection 防御 / 红队 / 水印） |
 | 19 | 🤖 机器人 / Embodied AI（具身智能 / sim-to-real / 机器人学习） |
-| 20 | 📄 arXiv 论文（cs.AI / cs.CL / cs.LG 最新提交，官方 Atom API） |
+| 20 | 📄 arXiv 论文（cs.AI / cs.CL / cs.LG 最新提交） |
 
 ## 4 精选爬虫引擎 · 分级 fallback
 
@@ -99,17 +121,16 @@ httpx → cloudscraper → playwright_stealth → jina（本地轻 → 本地重
 - **JSON 回退**（无 pg8000 或 PG 不可达）：写 `data/latest.json`，`serve`/`today` 自动回退读取。
 - 凭据放 `.env`（参照 `.env.example`），**不进 git**。
 
+## 部署到任意服务器
+
+- 默认绑 `127.0.0.1`（安全：API 能 `git clone` 你的 skill 目录，不暴露到内网）
+- 服务器部署：`.env` 里设 `RADAR_HOST=0.0.0.0`，前面套 nginx 做 TLS
+- skill 缓存重定向：`AI_RADAR_HOME=/var/lib/lodestone`（多用户服务器）
+- PG 部署：`PGHOST=10.0.0.5` 等标准 PG* 环境变量
+- `gh` CLI 必须已认证（服务器部署前 `gh auth login`）
+
 ## 已知限制
 
 - GitHub Search secondary rate limit：30 req/min。所有 search 查询间已加 2s 间隔 + 限流自动退避；MCP / HF 源不占 Search 配额。
-- 翻译质量依赖 Google Translate（无 LLM 介入），是字面翻译不是 AI 总结；`summary_zh` 字段提取首句作为一句话中文。
-- 分类基于 topic/name 关键词 + AI hints 兜底，不读 README 语义判断。
+- 5 桶中文介绍由宿主 LLM（运行 skill 的模型）实时生成 — 不需要 API key，但需要 LLM 上下文可用（即用户必须通过 `/yz:ai` 或在 skill 里触发）。
 - 24h 增长（`/api/gain`）需要连续多天定时 crawl 积累快照，冷启动首日无数据（UI 有提示）。
-
-## 升级路径
-
-- 接 LLM 做语义解读 + 摘要（每个 repo 一句话）—— 需要接 Claude/GPT API
-- 多日数据对比，识别"昨天新冒出的项目项目"
-- 自动 PR / 周报推送（基于 hot_now 增量）
-- 跨源信号融合：同一 repo 在 GitHub + MCP Registry + HF 都出现时加权
-- 实时监控 daemon（分钟分钟级发现，而非每日）

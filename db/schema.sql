@@ -38,9 +38,13 @@ ALTER TABLE repos ADD COLUMN IF NOT EXISTS readme_zh_at TIMESTAMPTZ;
 
 -- ponytail: 2026-09 — SKILL.md 探测 + 结构化中文摘要。
 -- is_skill = 仓库根或子目录含 SKILL.md / skill.md / SKILL.yaml（前端据此门控安装）。
--- summary_sections_json = {intro, can_do, benefit} 三桶中文摘要（README 段落拆分翻译）。
--- analysis_5d_json = LLM 5 维度决策分析 {what, problem, alternatives, pros, cons,
--- when_to_use}。NULL 表示未调 LLM（无 key / 超阈值）；前端降级到 summary_sections。
+-- summary_sections_json = README 拆分的中文 5 桶（无 LLM 也可用）:
+--   {intro, can_do, problem, competitive, when_to_use}
+--   intro / can_do / problem 来自 README heading 关键词分类翻译.
+--   competitive = 同类竞品列表（来自快照同 topic 仓库匹配）.
+--   when_to_use = 决策建议.
+-- analysis_5d_json = LLM 生成的同 schema 5 桶（含 alternatives 带 pros/cons）.
+-- 前端 detail drawer 优先读 analysis_5d_json，回退 summary_sections_json.
 ALTER TABLE repos ADD COLUMN IF NOT EXISTS is_skill BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE repos ADD COLUMN IF NOT EXISTS summary_sections_json JSONB;
 ALTER TABLE repos ADD COLUMN IF NOT EXISTS analysis_5d_json JSONB;

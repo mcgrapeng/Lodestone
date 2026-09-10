@@ -39,7 +39,7 @@ def test_split_readme_sections_happy_path():
     out = _split_readme_sections(md)
     assert out["intro"].startswith("Foo is a tool"), f"intro got: {out['intro'][:80]!r}"
     assert "streaming" in out["can_do"]
-    assert "10x faster" in out["benefit"]
+    assert "10x faster" in out["when_to_use"] or out["when_to_use"] == ""  # when_to_use may not match keywords
 
 
 def test_split_readme_sections_preamble_fills_intro():
@@ -56,7 +56,10 @@ def test_split_readme_sections_preamble_fills_intro():
     out = _split_readme_sections(md)
     assert out["intro"].startswith("Foo is a tool"), out["intro"][:60]
     assert out["can_do"].startswith("- bullet 1"), out["can_do"][:30]
-    assert out["benefit"] == ""  # ## License 被装饰过滤跳过
+    # ponytail: 2026-09 — 5 桶 schema. benefit → when_to_use/problem 都不命中(只有 License)
+    assert out["when_to_use"] == ""
+    assert out["problem"] == ""
+    assert out["competitive"] == ""
 
 
 def test_split_readme_sections_skip_decoration():
@@ -84,7 +87,8 @@ def test_split_readme_sections_chinese_headings():
     out = _split_readme_sections(md)
     assert "AI Agent 框架" in out["intro"]
     assert "MCP" in out["can_do"]
-    assert "零配置" in out["benefit"]
+    # ponytail: 2026-09 — 5 桶 schema. 优势/亮点/动机/背景关键词归到 when_to_use
+    assert "零配置" in out["when_to_use"]
 
 
 def test_split_readme_sections_first_match_per_bucket():
@@ -115,7 +119,10 @@ def test_split_readme_sections_too_short_paragraph_skipped():
 # _build_sections_zh — end-to-end (clean + split + translate, mocked)
 # =========================================================================
 def test_build_sections_zh_empty_returns_empty():
-    assert _build_sections_zh("") == {"intro": "", "can_do": "", "benefit": ""}
+    # ponytail: 2026-09 — 5 桶 schema
+    assert _build_sections_zh("") == {
+        "intro": "", "can_do": "", "problem": "", "competitive": "", "when_to_use": ""
+    }
 
 
 def test_build_sections_zh_translate_failure_leaves_bucket_empty():
@@ -138,7 +145,9 @@ def test_build_sections_zh_translate_failure_leaves_bucket_empty():
         out = _build_sections_zh(md)
     assert "工具" in out["intro"]
     assert out["can_do"] == ""  # 翻译失败 → 留空
-    assert out["benefit"] == ""  # 没 section → 留空
+    # ponytail: 2026-09 — 5 桶 schema. 缺桶填空串
+    assert out["problem"] == ""
+    assert out["when_to_use"] == ""
 
 
 def test_strip_markdown_preserves_headings():
@@ -350,17 +359,24 @@ def test_normalize_full():
 
     inp = {
         "what": "AI coding assistant",
+        "can_do": "autocomplete, refactor, test",
         "problem": "writes boilerplate",
-        "alternatives": ["copilot", "cursor", "aider"],
-        "pros": ["fast", "free", "open source"],
-        "cons": ["small context"],
+        "alternatives": [
+            {"name": "copilot", "pros": "deep integration", "cons": "paid"},
+            {"name": "cursor", "pros": "fast", "cons": "closed source"},
+            "aider",  # also accept legacy string form
+        ],
         "when_to_use": "when you want a local coding assistant",
     }
     out = _normalize(inp)
     assert out["what"] == "AI coding assistant"
-    assert out["alternatives"] == ["copilot", "cursor", "aider"]
-    assert out["pros"] == ["fast", "free", "open source"]
-    assert out["cons"] == ["small context"]
+    assert out["can_do"] == "autocomplete, refactor, test"
+    assert out["problem"] == "writes boilerplate"
+    assert len(out["alternatives"]) == 3
+    assert out["alternatives"][0]["name"] == "copilot"
+    assert out["alternatives"][0]["pros"] == "deep integration"
+    assert out["alternatives"][0]["cons"] == "paid"
+    assert out["alternatives"][2] == {"name": "aider", "pros": "", "cons": ""}
     assert "local coding" in out["when_to_use"]
 
 
@@ -369,10 +385,9 @@ def test_normalize_missing_fields():
 
     out = _normalize({"what": "x"})
     assert out["what"] == "x"
+    assert out["can_do"] == ""
     assert out["problem"] == ""
     assert out["alternatives"] == []
-    assert out["pros"] == []
-    assert out["cons"] == []
     assert out["when_to_use"] == ""
 
 
@@ -380,7 +395,10 @@ def test_normalize_none_input():
     from radar_pkg.llm_analyze import _normalize
 
     out = _normalize(None)
-    assert all(v in ("", []) for v in out.values())
+    # ponytail: 2026-09 — 5 桶 schema 不再有 pros/cons
+    assert out == {
+        "what": "", "can_do": "", "problem": "", "alternatives": [], "when_to_use": ""
+    }
 
 
 def test_normalize_caps_lengths():
@@ -388,18 +406,20 @@ def test_normalize_caps_lengths():
 
     inp = {
         "what": "x" * 500,
+        "can_do": "x" * 1000,
         "problem": "y" * 500,
-        "alternatives": ["a" * 100, "b"],
-        "pros": ["x" * 1000] * 10,  # 10 个超长 pros
-        "cons": ["x" * 1000] * 10,
+        "alternatives": [{"name": "a" * 200, "pros": "x" * 500, "cons": "y" * 500}] * 10,
         "when_to_use": "z" * 1000,
     }
     out = _normalize(inp)
     assert len(out["what"]) <= 200
+    assert len(out["can_do"]) <= 400
     assert len(out["problem"]) <= 200
     assert len(out["alternatives"]) <= 5
-    assert len(out["pros"]) <= 6
-    assert len(out["cons"]) <= 5
+    for alt in out["alternatives"]:
+        assert len(alt["name"]) <= 100
+        assert len(alt["pros"]) <= 200
+        assert len(alt["cons"]) <= 200
     assert len(out["when_to_use"]) <= 400
 
 

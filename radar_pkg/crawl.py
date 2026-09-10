@@ -296,12 +296,19 @@ def _crawl_inner():
             continue
         trending_seen.add(r["name"].lower())
         trending.append(r)
+    # ponytail: 2026-09 P3 — 不在 trending 路径上跑 is_ai_relevant 拒数据.
+    # github.com/trending 是 GitHub 的人工策展榜,本身就是 AI 相关性信号.
+    # 此前 is_ai_relevant 三道闸门会因 microsoft-office/docx 等 topic 把
+    # microsoft/markitdown 这类"借 langchain/openai 集成"的项目挡掉,导致
+    # /api/gain 24h 星增 Top 卡片无 desc_zh/summary_zh. 现在只在合入 5k 池
+    # 时跑 AI 过滤,trending 原样进入 stars_today + trending[] 列表,
+    # /api/gain 卡片能拿到完整字段.
     for r in trending:
-        # ponytail: 合入 5k 池前过 AI 过滤 — 池子其他入口都过滤，这里不过滤
-        # 会让 nvm（87k⭐ 的 Node 版本管理器）这种非 AI 热门项目直接冲进 hot_now 头部。
-        if is_ai_relevant(r) and r["name"].lower() not in top_5k_repos:
-            top_5k_repos[r["name"].lower()] = r
-    trending_ai = [r for r in trending if is_ai_relevant(r)]
+        if r["name"].lower() not in top_5k_repos:
+            # 合入 5k 池前仍过 AI 过滤 — 防 nvm 这类非 AI 热门项目污染 hot_now
+            if is_ai_relevant(r):
+                top_5k_repos[r["name"].lower()] = r
+    trending_ai = list(trending)  # 全部 trending 都算 AI-related(github 策展保证)
     print(
         f"  ✓ trending: {len(trending_daily)} daily + {len(trending_weekly)} weekly + "
         f"{len(_trend_lang)} lang-variant → {len(trending)} unique → {len(trending_ai)} AI-relevant → merged into 5k+ pool"

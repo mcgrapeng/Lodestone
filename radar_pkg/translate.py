@@ -99,10 +99,133 @@ def _summary_from_entry(entry: dict, limit: int = 240) -> str:
     return cut.rsplit(" ", 1)[0].strip()
 
 
-# ponytail: 2026-09 — README 结构化拆分。按 heading 文本映射到 (intro / can_do / benefit)
-# 三桶，凑齐卡片详介「是什么 / 能干什么 / 优势」。关键词中英文混排；不依赖 LLM —
-# Google Translate 是字面翻译，无法要求「生成三段式描述」。结构化靠 heading 提取 +
-# 关键词归类；README 没写这些 section 时降级到原文简介，前端按桶渲染（缺桶自然不显示）。
+# ponytail: 2026-09 — ZH-aware section extractor. 用于从已翻译的 README 文本
+# 提取 5 桶内容（intro / can_do / problem / competitive / when_to_use）。
+# 与 _split_readme_sections(从原文 raw_md 拆分)互补,后者依赖英文 heading
+# 关键词,前者用中文 + 数字列表 + 段落长度启发式. 两者并行,任何一个出结果都行.
+_ZH_HEADING_KEYWORDS = {
+    "intro": ("什么是", "项目简介", "简介", "项目概述", "概述",
+              "项目背景", "概览", "是什么", "About", "What is", "Introduction"),
+    "can_do": ("功能", "特性", "能力", "主要特点", "快速入门", "快速开始",
+               "使用方法", "示例", "用法", "使用场景", "Features"),
+    "problem": ("问题", "痛点", "问题背景", "挑战", "难题", "动机", "现状",
+                "为什么做", "Problem", "Motivation"),
+    "competitive": ("对比", "同类", "竞品", "Comparison", "vs", "Alternatives"),
+    "when_to_use": ("为什么", "优势", "亮点", "特点", "适用", "场景", "何时",
+                    "选择", "为什么选", "为什么使用", "适用场景",
+                    "Advantages", "Highlights", "When to use", "Why"),
+}
+_ZH_PHRASE_TO_BUCKET: dict[str, str] = {}
+for _b, _kws in _ZH_HEADING_KEYWORDS.items():
+    for _kw in _kws:
+        _ZH_PHRASE_TO_BUCKET[_kw.lower()] = _b
+
+
+def _is_zh_heading(line: str) -> bool:
+    return bool(re.match(r"^#{1,4}\s+\S", line))
+
+
+def _clean_zh_heading(text: str) -> str:
+    t = re.sub(r"^#+\s*", "", text).strip()
+    return re.sub(r"[:：]+\s*$", "", t).strip()
+
+
+def _classify_zh_heading(heading_text: str) -> str | None:
+    h_low = heading_text.lower()
+    for phrase in sorted(_ZH_PHRASE_TO_BUCKET, key=len, reverse=True):
+        if phrase in h_low:
+            return _ZH_PHRASE_TO_BUCKET[phrase]
+    return None
+
+
+def _is_zh_trivial(p: str) -> bool:
+    s = p.strip()
+    if not s:
+        return True
+    if _is_zh_heading(s):
+        return True
+    if re.fullmatch(r"(\[[^\]]*\]\([^)]*\)\s*[|·•,]?\s*)+", s):
+        return True
+    if re.fullmatch(r"^[\s\d.·•—✓>*-]+$", s):
+        return True
+    return False
+
+
+def derive_sections_from_text(text: str) -> dict[str, str]:
+    """ZH-aware 5 桶提取,纯从 translated text 入手,无需 raw_md.
+    ponytail: 当 cache 没有 raw_md(老条目 / 缓存破坏 / 翻译失败)时回退路径.
+    与 _split_readme_sections 互补 — 一个从原文 heading 拆,一个从译文字段拆."""
+    out = {"intro": "", "can_do": "", "problem": "",
+           "competitive": "", "when_to_use": ""}
+    if not text or len(text.strip()) < 30:
+        return out
+
+    # 1. Try heading-based classification
+    blocks: list[tuple[str, str]] = []
+    cur_h = ""
+    cur_body: list[str] = []
+
+    def flush():
+        nonlocal cur_body
+        body = "\n".join(cur_body).strip()
+        cur_body = []
+        if body:
+            blocks.append((cur_h, body))
+
+    for raw in text.split("\n"):
+        line = raw.rstrip()
+        if _is_zh_heading(line):
+            flush()
+            cur_h = _clean_zh_heading(line)
+        elif line.strip() == "":
+            flush()
+        else:
+            cur_body.append(line)
+    flush()
+
+    for heading, body in blocks:
+        if not heading:
+            continue
+        bucket = _classify_zh_heading(heading)
+        if bucket and not out[bucket]:
+            for para in re.split(r"\n\s*\n", body):
+                if not _is_zh_trivial(para):
+                    out[bucket] = para.strip()[:600]
+                    break
+
+    # 2. Fallback: no heading matched → split whole text into paragraphs
+    if not any(out.values()):
+        paragraphs = [
+            re.sub(r"^#+\s*", "", p).strip()
+            for p in re.split(r"\n\s*\n", text)
+        ]
+        paragraphs = [p for p in paragraphs if p and not _is_zh_trivial(p)]
+        if paragraphs:
+            for p in paragraphs:
+                if len(p) >= 50:
+                    out["intro"] = p[:600]
+                    break
+            if not out["intro"] and paragraphs:
+                out["intro"] = paragraphs[0][:600]
+            # can_do: numbered / bullet list paragraph
+            for p in paragraphs:
+                if re.match(r"^[\d①②③④⑤⑥⑦⑧⑨•\-*]\s*", p) and len(p) >= 30:
+                    out["can_do"] = p[:600]
+                    break
+            if not out["can_do"] and len(paragraphs) > 1:
+                out["can_do"] = paragraphs[1][:600]
+            # when_to_use: last paragraph if different
+            if len(paragraphs) > 1 and paragraphs[-1] != paragraphs[0]:
+                out["when_to_use"] = paragraphs[-1][:600]
+    return out
+
+
+# ponytail: 2026-09 — README 结构化拆分。按 heading 文本映射到 5 桶：
+#   intro / can_do / problem / competitive / when_to_use
+# 凑齐卡片详介「是什么 / 能干什么 / 解决什么问题 / 同类竞品 / 何时选它」。
+# 关键词中英文混排；不依赖 LLM — Google Translate 是字面翻译，无法要求「生成
+# 三段式描述」。结构化靠 heading 提取 + 关键词归类;competitive 桶无 README 来源,
+# 走同 topic 仓库匹配(由 _attach_competitive 注入). 前端按桶渲染,缺桶自然不显示。
 _SECTION_KEYWORDS: dict[str, tuple[str, ...]] = {
     "intro": (
         "what is",
@@ -138,35 +261,71 @@ _SECTION_KEYWORDS: dict[str, tuple[str, ...]] = {
         "安装",
         "快速开始",
     ),
-    "benefit": (
+    "problem": (
+        "problem",
+        "pain point",
+        "motivation and goals",
+        "why we built",
+        "challenge",
+        "问题",
+        "痛点",
+        "问题背景",
+        "为什么做",
+        "挑战",
+    ),
+    "competitive": (
+        "comparison",
+        "compare",
+        "alternatives",
+        "vs",
+        "vs.",
+        "benchmark",
+        "对比",
+        "同类",
+        "竞品",
+        "对比一下",
+        "性能对比",
+        "benchmark",
+    ),
+    "when_to_use": (
         "why",
-        "benefits",
-        "advantages",
-        "highlights",
-        "motivation",
         "why use",
         "why choose",
-        "key benefits",
-        "philosophy",
+        "motivation",
+        "background",
+        "when to use",
+        "use cases",
+        "when not to use",
+        "适合谁",
+        "何时",
+        "场景",
+        "适用",
+        "何时使用",
         "优势",
         "亮点",
         "动机",
         "背景",
-        "为什么",
-        "价值",
         "特点",
+        "价值",
     ),
 }
 
 
 def _split_readme_sections(md: str) -> dict[str, str]:
-    """把 README 按 ## heading 拆段，关键词归类到 intro/can_do/benefit 三桶。
+    """把 README 按 ## heading 拆段，关键词归类到 5 桶。
     返回 {bucket: 第一个匹配的 section 首段(纯文本)}；无匹配返回空串。
     ponytail: 第一个 heading 之前的内容算「preamble」— 没有 ## What is 时，
     preamble 的首个实质段落充当 intro 段（README 标配：开头一段介绍，后面
-    才列 Features / Why 等）。"""
+    才列 Features / Why 等）。competitive 桶由 _attach_competitive 单独注入,
+    这里只产 4 桶 + 留空 competitive。"""
     if not md:
-        return {"intro": "", "can_do": "", "benefit": ""}
+        return {
+            "intro": "",
+            "can_do": "",
+            "problem": "",
+            "competitive": "",
+            "when_to_use": "",
+        }
     blocks: list[tuple[str, str]] = []
     preamble: list[str] = []
     current_h = ""
@@ -193,7 +352,13 @@ def _split_readme_sections(md: str) -> dict[str, str]:
         # 整篇没 heading → 整段当作 preamble
         blocks.append(("", md.strip()))
 
-    out = {"intro": "", "can_do": "", "benefit": ""}
+    out = {
+        "intro": "",
+        "can_do": "",
+        "problem": "",
+        "competitive": "",
+        "when_to_use": "",
+    }
     for heading, body in blocks:
         body = re.sub(r"\s*##\s+.+\s*", "\n", body)
         body = re.sub(r"[ \t]+", " ", body)
@@ -252,10 +417,22 @@ def _build_sections_zh(readme_md: str) -> dict[str, str]:
     三路并发会触发 rate limit，部分桶返回原文被 _looks_translated 判定失败）。
     单 repo 三段总耗时 ~3s，可接受。"""
     if not readme_md:
-        return {"intro": "", "can_do": "", "benefit": ""}
+        return {
+            "intro": "",
+            "can_do": "",
+            "problem": "",
+            "competitive": "",
+            "when_to_use": "",
+        }
     clean = _light_clean_for_sections(readme_md)
     if not clean:
-        return {"intro": "", "can_do": "", "benefit": ""}
+        return {
+            "intro": "",
+            "can_do": "",
+            "problem": "",
+            "competitive": "",
+            "when_to_use": "",
+        }
     sections = _split_readme_sections(clean)
     out: dict[str, str] = {}
     for bucket, text in sections.items():
@@ -308,29 +485,46 @@ def _build_summary_zh(repo: dict, cache: dict) -> None:
     full_name = repo.get("name") or ""
     fallback = repo.get("desc_zh") or repo.get("desc") or ""
     url = repo.get("url") or ""
-    repo["summary_sections"] = {"intro": "", "can_do": "", "benefit": ""}
+    repo["summary_sections"] = {
+        "intro": "",
+        "can_do": "",
+        "problem": "",
+        "competitive": "",
+        "when_to_use": "",
+    }
     if "/" not in full_name or "github.com" not in url:
         repo["summary_zh"] = fallback
         return
     key = full_name.lower()
     entry = cache.get(key)
     if entry and entry.get("text"):
-        summary = _summary_from_entry(entry)
-        # 缓存里是英文残留（旧抽屉时代翻译失败的原样缓存）→ 视为未命中重做
-        if summary and any("一" <= ch <= "鿿" for ch in summary[:60]):
-            repo["summary_zh"] = summary
-            repo["summary_sections"] = entry.get("sections") or repo["summary_sections"]
-            return
+        # ponytail: 2026-09 — 缓存阈值。旧 cleaner 把 28KB README 砍到 21-50
+        # 字符,缓存里残留大量短摘要(<200 字符)。text_len ≥ 200 才视为有效.
+        # 短缓存视为损坏/旧版本,丢弃重抓 README + 重翻译.
+        if len(entry["text"]) >= 200:
+            summary = _summary_from_entry(entry)
+            if summary and any("一" <= ch <= "鿿" for ch in summary[:60]):
+                repo["summary_zh"] = summary
+                repo["summary_sections"] = (
+                    entry.get("sections") or repo["summary_sections"]
+                )
+                return
         cache.pop(key, None)
     fetched = _fetch_readme_from_github(full_name)
     if not fetched:
         repo["summary_zh"] = fallback
         return
     raw_md, source_url = fetched
-    clean = _clean_readme_text(raw_md)
-    zh = _chunked_translate(clean) if clean else ""
+    # ponytail: 2026-09 — 全文翻译走 _strip_markdown_to_text(4.5KB 上限),不要用
+    # _clean_readme_text(只取第一段 600 字符). 此前 _clean_readme_text 把 28KB
+    # README 砍到 21-50 字符,导致 summary_zh 极短,sections 几乎全空. README
+    # 大段描述都是被 _clean_readme_text 误杀掉的.
+    full_clean = _strip_markdown_to_text(raw_md, max_chars=4500)
+    zh = _chunked_translate(full_clean) if full_clean else ""
+    # ponytail: 短摘要走 _summary_from_entry(cache) — 缓存里就是干净的 zh 文本
+    # (取首段). sections 单独走 _light_clean_for_sections(保留 heading + bullet)
     sections_zh = _build_sections_zh(raw_md)
-    if zh and _looks_translated(zh, clean):
+    if zh and _looks_translated(zh, full_clean):
         cache[key] = {
             "text": zh,
             "sections": sections_zh,
@@ -348,9 +542,50 @@ def _build_summary_zh(repo: dict, cache: dict) -> None:
         repo["summary_zh"] = fallback
 
 
+def _attach_competitive(repos: list, max_per_repo: int = 4) -> int:
+    """给每个 repo 的 summary_sections.competitive 注入同类项目。
+    ponytail: 2026-09 — 不靠 LLM,从我们自己的快照里按 topic 重叠度找.
+    逻辑:
+      1. 建 name → repo 索引(去掉自己)
+      2. 对每个 repo,按 topic 重叠数 + stars 排序,取 top N
+      3. 写入 summary_sections.competitive 字符串("同类项目: A、B、C(覆盖 topic 标签)")
+    返回注入了 competitive 的 repo 数。
+    """
+    pool = [r for r in repos if r.get("name") and r.get("topics")]
+    by_name = {r["name"].lower(): r for r in pool}
+    filled = 0
+    for r in repos:
+        if not r.get("name") or not r.get("topics"):
+            continue
+        my_topics = set(t.lower() for t in r["topics"])
+        my_name = r["name"].lower()
+        candidates = []
+        for other in pool:
+            if other["name"].lower() == my_name:
+                continue
+            other_topics = set(t.lower() for t in other.get("topics", []))
+            overlap = len(my_topics & other_topics)
+            if overlap == 0:
+                continue
+            candidates.append((overlap, other.get("stars", 0), other))
+        # sort by (overlap desc, stars desc); take top N
+        candidates.sort(key=lambda x: (-x[0], -x[1]))
+        chosen = [c[2] for c in candidates[:max_per_repo]]
+        if not chosen:
+            continue
+        # competitive 是字符串(中文友好列表),不要 list of dict(避免误读为 pros/cons)
+        names = [c["name"] for c in chosen]
+        sec = r.get("summary_sections") or {}
+        sec["competitive"] = "同类项目:" + "、".join(names)
+        r["summary_sections"] = sec
+        filled += 1
+    return filled
+
+
 def enrich_summaries(repos: list, max_workers: int = 4) -> int:
-    """爬取期为全部 repos 生成详细中文描述（summary_zh）。
+    """爬取期为全部 repos 生成详细中文描述（summary_zh + 5 桶 sections）。
     README 拉取 + 翻译 4 线程并发；缓存读写只做一次（整文件）。
+    完成后调用 _attach_competitive 注入同类项目桶（基于 snapshot 同 topic 匹配）。
     返回生成数量。任何失败不阻塞爬取主流程。"""
     cache: dict = {}
     if core.README_ZH_CACHE.exists():
@@ -371,15 +606,24 @@ def enrich_summaries(repos: list, max_workers: int = 4) -> int:
         if not r.get("summary_zh"):
             r["summary_zh"] = r.get("desc_zh") or r.get("desc") or ""
         if not r.get("summary_sections"):
-            # 兜底：把整段 desc_zh 塞进 intro，让前端至少有一桶可渲染
+            # 兜底:把整段 desc_zh 塞进 intro,让前端至少有一桶可渲染
             intro = r.get("summary_zh") or r.get("desc_zh") or r.get("desc") or ""
             r["summary_sections"] = {
                 "intro": intro[:400] if intro else "",
                 "can_do": "",
-                "benefit": "",
+                "problem": "",
+                "competitive": "",
+                "when_to_use": "",
             }
+    # ponytail: 2026-09 — 注入同类项目桶。从我们自己的快照里找同 topic 仓库,
+    # 无需 LLM,纯本地匹配。competitive 是字符串而非 list(drawer 当文字段落渲染).
+    n_comp = _attach_competitive(repos)
+    print(f"[crawl] competitive: filled for {n_comp} repos")
     try:
-        core.README_ZH_CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=1))
+        # ponytail: 原子写(tmp + rename)避免多 worker 并发时覆盖其他 worker 的更新
+        tmp = core.README_ZH_CACHE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(cache, ensure_ascii=False, indent=1))
+        tmp.replace(core.README_ZH_CACHE)
     except Exception as e:
         print(f"  [warn] summary cache write failed: {e}", file=sys.stderr)
     return sum(1 for r in repos if r.get("summary_zh"))
@@ -746,7 +990,11 @@ def get_readme_zh(full_name: str, force: bool = False) -> dict:
         except Exception:
             pass
 
-    # Persist to JSON cache
+    # Persist to JSON cache (atomic write — load-merge-rename).
+    # ponytail: 多线程 enrich_summaries 4 worker 并发时,读-改-写会有 lost update
+    # 问题(一个 worker 写回的 cache 是基于过期内存 dict,覆盖其他 worker 的更新).
+    # 这里只用单进程 fetch 路径,entrich_summaries 的批写覆盖此处;但 fetch+批写
+    # 之间仍可能 race — 用 .tmp + rename 保证原子性.
     try:
         cache = (
             json.loads(core.README_ZH_CACHE.read_text())
@@ -754,7 +1002,9 @@ def get_readme_zh(full_name: str, force: bool = False) -> dict:
             else {}
         )
         cache[cache_key] = entry
-        core.README_ZH_CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2))
+        tmp = core.README_ZH_CACHE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(cache, ensure_ascii=False, indent=2))
+        tmp.replace(core.README_ZH_CACHE)
     except OSError:
         pass
     return entry

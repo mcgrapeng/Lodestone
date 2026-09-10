@@ -262,77 +262,54 @@ export function RepoDrawer({ repo, open, onClose, onRepoChanged }: RepoDrawerPro
                 </div>
               )}
 
-              {/* 详细介绍 — 5 维度决策分析（LLM 生成：是什么 / 痛点 / 同类 / 优缺 / 何时选）。
-                  LLM 未配置或调用失败时降级到 README 三段（intro / can_do / benefit）—
-                  缺桶不渲染，最终兜底到 summary_zh 单段。 */}
+              {/* 详细介绍 — 统一 5 桶渲染（是什么 / 能干什么 / 解决什么问题 / 同类竞品 / 何时选它）。
+                  优先用 LLM 生成的 analysis_5d（含 alternatives 各自的优缺点），
+                  降级到 summary_sections（README 拆分 + 同 topic 匹配），缺桶不渲染。 */}
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-white">详细介绍</h3>
                 <span className="text-[11px] text-foreground-subtle">
-                  {repo.analysis_5d ? 'LLM 决策分析' : 'README 自动摘要'}
+                  {repo.analysis_5d ? 'LLM 决策分析' : 'README 智能摘要'}
                 </span>
               </div>
               <div className="card-surface space-y-4 p-4">
-                <Analysis5dSection label="是什么" text={repo.analysis_5d?.what} />
-                <Analysis5dSection label="解决什么问题" text={repo.analysis_5d?.problem} />
-                <Analysis5dSection
-                  label="同类项目"
-                  items={repo.analysis_5d?.alternatives}
-                  renderItem={(name) => (
-                    <a
-                      href={`https://github.com/${name.includes('/') ? name : `search?q=${encodeURIComponent(name)}`}`}
-                      target="_blank"
-                      rel="noopener"
-                      className="inline-flex items-center gap-1 rounded-full bg-background-muted px-2.5 py-0.5 text-[11px] font-medium text-primary ring-1 ring-border-muted transition hover:bg-primary/15 hover:ring-primary/40"
-                    >
-                      {name}
-                    </a>
-                  )}
+                <DetailBucket
+                  label="是什么"
+                  source={repo.analysis_5d}
+                  fallback={repo.summary_sections?.intro}
+                  field="what"
                 />
-                <Analysis5dSection
-                  label="优点"
-                  items={repo.analysis_5d?.pros}
-                  renderItem={(p) => (
-                    <span className="inline-flex items-start gap-1 text-sm text-foreground-muted">
-                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-success" />
-                      {p}
-                    </span>
-                  )}
-                  stacked
+                <DetailBucket
+                  label="能干什么"
+                  source={repo.analysis_5d}
+                  fallback={repo.summary_sections?.can_do}
+                  field="can_do"
                 />
-                <Analysis5dSection
-                  label="局限"
-                  items={repo.analysis_5d?.cons}
-                  renderItem={(c) => (
-                    <span className="inline-flex items-start gap-1 text-sm text-foreground-muted">
-                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-warning" />
-                      {c}
-                    </span>
-                  )}
-                  stacked
+                <DetailBucket
+                  label="解决什么问题"
+                  source={repo.analysis_5d}
+                  fallback={repo.summary_sections?.problem}
+                  field="problem"
                 />
-                <Analysis5dSection label="何时选它" text={repo.analysis_5d?.when_to_use} />
-                {/* LLM 没产出 5 维度分析时降级到 README 三段（intro / can_do / benefit） */}
-                {!repo.analysis_5d && (
-                  <>
-                    <div className="border-t border-border-muted/50 pt-3">
-                      <div className="mb-2 text-[10px] uppercase tracking-wider text-foreground-subtle">
-                        README 摘要（兜底）
-                      </div>
-                      <div className="space-y-3">
-                        <SummarySection label="介绍" text={repo.summary_sections?.intro} />
-                        <SummarySection label="能干什么" text={repo.summary_sections?.can_do} />
-                        <SummarySection label="优势" text={repo.summary_sections?.benefit} />
-                        {!repo.summary_sections?.intro &&
-                          !repo.summary_sections?.can_do &&
-                          !repo.summary_sections?.benefit && (
-                            <p className="text-sm leading-relaxed text-foreground-muted">
-                              {repo.summary_zh || repo.desc_zh || repo.desc || '暂无详细描述'}
-                            </p>
-                          )}
-                      </div>
-                    </div>
-                  </>
-                )}
+                <DetailAlternatives
+                  richAlternatives={repo.analysis_5d?.alternatives}
+                  flatString={repo.summary_sections?.competitive}
+                />
+                <DetailBucket
+                  label="何时选它"
+                  source={repo.analysis_5d}
+                  fallback={repo.summary_sections?.when_to_use}
+                  field="when_to_use"
+                />
+                {!repo.analysis_5d &&
+                  !repo.summary_sections?.intro &&
+                  !repo.summary_sections?.can_do &&
+                  !repo.summary_sections?.problem &&
+                  !repo.summary_sections?.competitive &&
+                  !repo.summary_sections?.when_to_use && (
+                    <p className="text-sm leading-relaxed text-foreground-muted">
+                      {repo.summary_zh || repo.desc_zh || repo.desc || '暂无详细描述'}
+                    </p>
+                  )}
               </div>
 
               {/* 非 skill 的 GitHub 仓库 — 提示用户为何无安装按钮 */}
@@ -401,6 +378,123 @@ function Analysis5dSection({
         <div className={stacked ? 'space-y-1.5' : 'flex flex-wrap gap-1.5'}>
           {items.map((it, i) => (
             <div key={i}>{renderItem(it)}</div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+  return null
+}
+
+/** 单桶文本(来源:LLM analysis_5d → 降级 summary_sections).
+ * 统一处理"什么字段优先用哪个数据源"的逻辑,缺桶不渲染。 */
+function DetailBucket({
+  label,
+  source,
+  fallback,
+  field,
+}: {
+  label: string
+  source?: Record<string, unknown> | null
+  fallback?: string
+  field: string
+}) {
+  // ponytail: 2026-09 — 三级 fallback chain:
+  //   1. analysis_5d[field]    (LLM 决策分析)
+  //   2. summary_sections[field] (README 拆分 + 同 topic 匹配)
+  //   3. 完全无内容 → 返回 null(抽屉该桶不渲染)
+  const src = source && typeof source === 'object' ? (source as Record<string, unknown>) : null
+  const srcVal = src ? src[field] : undefined
+  const fb = fallback && fallback.trim() ? fallback.trim() : ''
+  const text =
+    (typeof srcVal === 'string' && srcVal.trim()) || fb || ''
+  if (!text) return null
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+        <span className="h-1 w-1 rounded-full bg-primary" />
+        {label}
+      </div>
+      <p className="text-sm leading-relaxed text-foreground-muted">{text}</p>
+    </div>
+  )
+}
+
+/** 同类竞品 — 两种来源:
+ * 1. analysis_5d.alternatives = [{name, pros, cons}, ...] — LLM 生成,带每个竞品的优缺点
+ * 2. summary_sections.competitive = "同类项目: A、B、C" — README 拆分 + 同 topic 匹配(纯字符串)
+ */
+function DetailAlternatives({
+  richAlternatives,
+  flatString,
+}: {
+  richAlternatives?: Array<{ name: string; pros: string; cons: string }>
+  flatString?: string
+}) {
+  // LLM 路径:列表含 name/pros/cons,渲染为竞品卡片网格
+  if (richAlternatives && richAlternatives.length > 0) {
+    return (
+      <div>
+        <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+          <span className="h-1 w-1 rounded-full bg-primary" />
+          同类项目
+        </div>
+        <div className="space-y-2">
+          {richAlternatives.map((alt, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-border-muted/40 bg-background-muted/30 p-2.5"
+            >
+              <a
+                href={`https://github.com/${alt.name.includes('/') ? alt.name : `search?q=${encodeURIComponent(alt.name)}`}`}
+                target="_blank"
+                rel="noopener"
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                {alt.name}
+              </a>
+              {alt.pros && (
+                <div className="mt-1 text-[12px] leading-relaxed text-foreground-muted">
+                  <span className="mr-1 font-semibold text-success">✓</span>
+                  {alt.pros}
+                </div>
+              )}
+              {alt.cons && (
+                <div className="text-[12px] leading-relaxed text-foreground-muted">
+                  <span className="mr-1 font-semibold text-warning">✗</span>
+                  {alt.cons}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+  // 降级路径:字符串 "同类项目: A、B、C",解析成链接 chip
+  if (flatString && flatString.trim()) {
+    const cleaned = flatString
+      .replace(/^同类项目[:：]\s*/, '')
+      .trim()
+    const names = cleaned.split(/[、,，\s]+/).filter(Boolean)
+    if (names.length === 0) return null
+    return (
+      <div>
+        <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+          <span className="h-1 w-1 rounded-full bg-primary" />
+          同类项目
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {names.map((n, i) => (
+            <a
+              key={i}
+              href={`https://github.com/${n.includes('/') ? n : `search?q=${encodeURIComponent(n)}`}`}
+              target="_blank"
+              rel="noopener"
+              className="inline-flex items-center rounded-full bg-background-muted px-2.5 py-0.5 text-[11px] font-medium text-primary ring-1 ring-border-muted transition hover:bg-primary/15 hover:ring-primary/40"
+            >
+              {n}
+            </a>
           ))}
         </div>
       </div>

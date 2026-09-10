@@ -39,6 +39,120 @@ from radar_pkg.match import _annotate_local_installed, _build_plugin_segs, _inst
 from radar_pkg.translate import enrich_summaries, get_readme_zh, translate_batch
 
 """radar_pkg.serve — 由 radar.py 搬移(2026-09 架构拆分)。"""
+# ponytail: 2026-09 — /api/health 用的进程级启动时间戳(模块加载即设定一次)
+_SERVE_STARTED_AT = time.time()
+
+
+# ponytail: 2026-09 — /yz:ai skill 触发的服务端重启工具。流程:
+#   1. 找占住目标端口的进程 PID (lsof -iTCP:port)
+#   2. SIGTERM 让它优雅退出; 5s 后还活着就 SIGKILL
+#   3. 端口空闲后用 Popen(start_new_session=True) 启动新 serve,日志接到 data/serve.log
+#   4. 轮询 /api/health 探活,直到新进程 listen 上为止(最多 10s)
+#   5. 返回 {killed_pids, new_pid, port, old_pid} 供 skill 立即重连
+def _restart_serve(port: int = 8765) -> dict:
+    """Restart the radar serve on `port` (default 8765). Safe to call via /api/restart.
+
+    Returns {killed_pids, new_pid, port, old_pid}. Raises on timeout."""
+    import signal as _signal
+
+    def _pid_using_port(p: int) -> int | None:
+        try:
+            r = subprocess.run(
+                ["lsof", "-nP", f"-iTCP:{p}", "-sTCP:LISTEN", "-t"],
+                capture_output=True, text=True, timeout=5,
+            )
+        except Exception:
+            return None
+        for line in r.stdout.splitlines():
+            line = line.strip()
+            if line.isdigit():
+                return int(line)
+        return None
+
+    def _pids_running_radar_serve() -> list:
+        try:
+            r = subprocess.run(
+                ["pgrep", "-f", "radar.py serve"],
+                capture_output=True, text=True, timeout=5,
+            )
+        except Exception:
+            return []
+        return [
+            int(line.strip())
+            for line in r.stdout.splitlines()
+            if line.strip().isdigit() and int(line.strip()) != os.getpid()
+        ]
+
+    old_pid = _pid_using_port(port)
+    candidates = set(_pids_running_radar_serve() + ([old_pid] if old_pid else []))
+    killed: list = []
+    for pid in candidates:
+        try:
+            os.kill(pid, _signal.SIGTERM)
+            killed.append(pid)
+        except (ProcessLookupError, PermissionError):
+            pass
+
+    # 2. Wait for port to free up
+    deadline = time.time() + 5.0
+    while time.time() < deadline:
+        if _pid_using_port(port) is None:
+            break
+        time.sleep(0.1)
+    else:
+        # Stragglers → SIGKILL
+        for pid in candidates:
+            try:
+                os.kill(pid, _signal.SIGKILL)
+            except Exception:
+                pass
+        time.sleep(0.5)
+        if _pid_using_port(port) is not None:
+            raise RuntimeError(f"port {port} still busy after kill")
+
+    # 3. Spawn new detached serve
+    log_fd = os.open(
+        DATA / "serve.log",
+        os.O_WRONLY | os.O_CREAT | os.O_APPEND,
+        0o644,
+    )
+    proc = subprocess.Popen(
+        [sys.executable, str(Path(__file__).resolve()), "serve", str(port)],
+        cwd=str(Path(__file__).parent.resolve()),
+        stdout=log_fd,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+        close_fds=True,
+    )
+    os.close(log_fd)
+
+    # 4. Wait for new serve to be alive
+    def _alive(p: int) -> bool:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        try:
+            with opener.open(f"http://127.0.0.1:{p}/api/health", timeout=1) as r:
+                return r.status == 200
+        except Exception:
+            return False
+
+    deadline = time.time() + 10.0
+    while time.time() < deadline:
+        if _alive(port):
+            break
+        time.sleep(0.1)
+    else:
+        raise RuntimeError(
+            f"new serve did not come up at :{port} after 10s (see data/serve.log)"
+        )
+
+    return {
+        "killed_pids": killed,
+        "new_pid": proc.pid,
+        "port": port,
+        "old_pid": old_pid,
+    }
+
+
 def serve(port=8765):
     """Pure JSON API server — Vite (5173) proxies /api/* here.
     Endpoints:
@@ -147,6 +261,26 @@ def serve(port=8765):
             self.wfile.write(body)
 
         def do_GET(self):
+            # ponytail: 2026-09 — /api/health 给 /yz:ai skill 用于探测 serve 存活。
+            # 返回 {ok, port, pid, uptime_seconds} — skill 据此决定是否要 /api/restart 杀旧进程。
+            if self.path == "/api/health":
+                self._json({
+                    "ok": True,
+                    "port": self.server.server_address[1],
+                    "pid": os.getpid(),
+                    "uptime_seconds": round(time.time() - _SERVE_STARTED_AT, 1),
+                })
+                return
+            # ponytail: 2026-09 — /api/restart 给 /yz:ai skill 一键重启.
+            # 杀掉当前端口的旧 serve 进程,启动新 detached serve,等就绪后返回.
+            # 旧进程仍能继续响应本请求(200 返回后自杀).
+            if self.path == "/api/restart":
+                try:
+                    result = _restart_serve()
+                    self._json({"ok": True, **result})
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=500)
+                return
             if self.path == "/api/data":
                 if db._DB_OK:
                     try:

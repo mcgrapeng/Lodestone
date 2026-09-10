@@ -108,7 +108,9 @@ def detect_provider() -> str | None:
 
 
 def _build_prompt(name: str, readme: str, topics: list[str], lang: str | None) -> str:
-    """构造 5-dimension 分析 prompt。中文输出，与卡片其他中文描述一致。"""
+    """构造 5-dimension 分析 prompt。中文输出，与卡片其他中文描述一致。
+    ponytail: 2026-09 — 5 桶对齐用户需求: 是什么 / 能干什么 / 解决什么问题 /
+    同类竞品(每个竞品含优缺点) / 何时选它."""
     # 截断 README 到 ~3000 字符 — Haiku 上下文 200k，限制只为省钱 + 提速
     excerpt = (readme or "")[:3000]
     topic_str = ", ".join(topics or []) or "—"
@@ -124,20 +126,24 @@ README 摘录：
 {excerpt}
 \"\"\"
 
-输出 schema：
+输出 schema（**严格按此 5 个字段输出**）：
 {{
   "what": "一句话定位这个项目是什么（30 字内，动词+对象+特色）",
-  "problem": "解决什么用户痛点（30 字内）",
-  "alternatives": ["同类项目 1（owner/repo 或产品名）", "同类项目 2", "同类项目 3"],
-  "pros": ["优点 1", "优点 2", "优点 3"],
-  "cons": ["局限 1", "局限 2"],
+  "can_do": "能干什么：列出 3-5 个具体能力/特性（80 字内，逗号分隔）",
+  "problem": "解决什么问题：用户痛点是什么（50 字内）",
+  "alternatives": [
+    {{"name": "同类项目 1（owner/repo 或产品名）", "pros": "这个竞品的主要优点（30 字内）", "cons": "这个竞品的主要缺点（30 字内）"}},
+    {{"name": "同类项目 2", "pros": "...", "cons": "..."}},
+    {{"name": "同类项目 3", "pros": "...", "cons": "..."}}
+  ],
   "when_to_use": "什么场景下选它（不选它的场景亦可一并提及，60 字内）"
 }}
 
 约束：
-- alternatives 必须是 GitHub 上真实存在的项目，或行业公认的产品名（不允许编造）
-- pros / cons 来自 README 客观描述，不要无中生有；README 没提 cons 时可基于项目定位推断常见局限（如 "小项目，生态有限"）
-- 只输出 JSON，不要任何前后缀文字"""
+- alternatives 必须是 GitHub 上真实存在的项目,或行业公认的产品名（不允许编造）
+- pros/cons 来自客观事实或 README 描述,不要无中生有;每个竞品的优缺点各 1 句话
+- when_to_use 面向决策者（"选它如果 X,选 Y 如果 Z"）
+- 只输出 JSON,不要任何前后缀文字"""
 
 
 def _extract_json(text: str) -> dict | None:
@@ -170,20 +176,29 @@ def _normalize(d: dict | None) -> dict:
     if not isinstance(d, dict):
         return {
             "what": "",
+            "can_do": "",
             "problem": "",
             "alternatives": [],
-            "pros": [],
-            "cons": [],
             "when_to_use": "",
         }
+    alts_raw = d.get("alternatives") or []
+    alts_norm = []
+    for a in alts_raw[:5]:
+        if isinstance(a, dict):
+            alts_norm.append(
+                {
+                    "name": str(a.get("name") or "").strip()[:100],
+                    "pros": str(a.get("pros") or "").strip()[:200],
+                    "cons": str(a.get("cons") or "").strip()[:200],
+                }
+            )
+        elif isinstance(a, str) and a.strip():
+            alts_norm.append({"name": a.strip()[:100], "pros": "", "cons": ""})
     return {
         "what": str(d.get("what") or "").strip()[:200],
+        "can_do": str(d.get("can_do") or "").strip()[:400],
         "problem": str(d.get("problem") or "").strip()[:200],
-        "alternatives": [
-            str(x).strip() for x in (d.get("alternatives") or []) if str(x).strip()
-        ][:5],
-        "pros": [str(x).strip() for x in (d.get("pros") or []) if str(x).strip()][:6],
-        "cons": [str(x).strip() for x in (d.get("cons") or []) if str(x).strip()][:5],
+        "alternatives": alts_norm,
         "when_to_use": str(d.get("when_to_use") or "").strip()[:400],
     }
 
