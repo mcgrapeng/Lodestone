@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# install.sh — install lodestone as a skill for Claude Code AND Codex CLI
+# install.sh — install lodestone (formerly lodestone / yz-ai) as a skill for
+# Claude Code / Codex CLI / OpenCode / EasyCode.
+#
+# Strategy: symlink (not copy) — single source of truth, no duplication
 #
 # Strategy: symlink (not copy) — single source of truth, no duplication
 # of data/, node_modules/, etc. Both ~/.claude/skills/ and ~/.codex/skills/
@@ -7,9 +10,11 @@
 
 set -e
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# ponytail: 2026-09 — skill 名从 zp 改为 yz-ai; /yz:ai 命令暴露.
-# 旧的 ~/.claude/skills/zp 仍可通过同名 symlink 保留.
-NAME="yz-ai"
+# ponytail: 2026-09 — project name 从 yz-ai 改为 lodestone; /lodestone 命令暴露.
+# /lodestone 是航海家用磁石导航 — 这个 skill 是 AI 工程师的"磁石":
+# 穿过 4 个数据洋流 (GitHub/HF/MCP/arXiv),把你引到该用的人工工具上.
+# 旧的 ~/.claude/skills/zp / yz-ai 仍可通过同名 symlink 保留.
+NAME="lodestone"
 
 CLAUDE_DIR="${HOME}/.claude/skills"
 CODEX_DIR="${HOME}/.codex/skills"
@@ -45,16 +50,19 @@ link_one() {
     fi
     ln -s "$HERE" "$dir/$NAME"
     ok "symlinked"
-    # legacy zp symlink for backwards compat
-    if [ -n "$legacy" ] && [ ! -e "$dir/$legacy" ]; then
-        ln -s "$HERE" "$dir/$legacy" 2>/dev/null && ok "legacy $legacy 也建好" || true
+    # legacy 名称 symlink 兼容老用户(zp / yz-ai 都指向新 lodestone)
+    if [ -n "$legacy1" ] && [ ! -e "$dir/$legacy1" ]; then
+        ln -s "$HERE" "$dir/$legacy1" 2>/dev/null && ok "legacy $legacy1 也建好" || true
+    fi
+    if [ -n "$legacy2" ] && [ ! -e "$dir/$legacy2" ]; then
+        ln -s "$HERE" "$dir/$legacy2" 2>/dev/null && ok "legacy $legacy2 也建好" || true
     fi
 }
 
-link_one "Claude Code"  "$CLAUDE_DIR"   "zp"
-link_one "Codex CLI"    "$CODEX_DIR"    "zp"
-link_one "OpenCode"     "$OPENCODE_DIR" "zp"
-link_one "EasyCode"     "$EASYCODE_DIR" "zp"
+link_one "Claude Code"  "$CLAUDE_DIR"   "zp" "yz-ai"
+link_one "Codex CLI"    "$CODEX_DIR"    "zp" "yz-ai"
+link_one "OpenCode"     "$OPENCODE_DIR" "zp" "yz-ai"
+link_one "EasyCode"     "$EASYCODE_DIR" "zp" "yz-ai"
 
 echo ""
 echo "🎉 安装完成!"

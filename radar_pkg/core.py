@@ -18,11 +18,15 @@ ROOT = Path(__file__).resolve().parent.parent
 
 DATA = ROOT / "data"
 
-# ponytail: 2026-09 — AI_RADAR_HOME env override lets multi-user server deploys
+# ponytail: 2026-09 — LODESTONE_HOME env override lets multi-user server deploys
 # (systemd unit, Docker) point skill-cache to a project-owned path instead of
 # $HOME. Default keeps the dev-machine layout ($HOME/.cache/lodestone/) for
-# zero-config local runs.
-_HOME = Path(os.environ.get("AI_RADAR_HOME") or Path.home() / ".cache" / "lodestone")
+# zero-config local runs. 兼容旧名 AI_RADAR_HOME — 老用户 .env 不必改.
+_HOME = Path(
+    os.environ.get("LODESTONE_HOME")
+    or os.environ.get("AI_RADAR_HOME")
+    or Path.home() / ".cache" / "lodestone"
+)
 
 SKILLS_CACHE = _HOME / "skills"
 

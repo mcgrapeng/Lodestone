@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# uninstall.sh — remove lodestone symlinks from both skills dirs
+# uninstall.sh — remove lodestone (formerly lodestone / yz-ai) symlinks from skills dirs
 set -e
 NAME="zp"
 for D in "${HOME}/.claude/skills" "${HOME}/.codex/skills"; do

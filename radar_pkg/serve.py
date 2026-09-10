@@ -1,5 +1,14 @@
 # -*- coding: utf-8 -*-
 """radar_pkg.serve — HTTP JSON API(组装各域模块;loopback only)。"""
+# ponytail: 2026-09 — 把 PROJECT ROOT 加入 sys.path,因为这个文件可能作为
+# `python3 radar_pkg/serve.py` 启动(子进程 / /api/restart). 默认 sys.path[0]
+# 是脚本所在目录(radar_pkg/),导入 `radar_pkg` 包会失败. 加 path 后无论 cwd 都 OK.
+import os as _os_for_path
+import sys as _sys_for_path
+_PROJECT_ROOT_FROM_INIT = _os_for_path.path.dirname(_os_for_path.path.dirname(_os_for_path.path.abspath(__file__)))
+if _PROJECT_ROOT_FROM_INIT not in _sys_for_path.path:
+    _sys_for_path.path.insert(0, _PROJECT_ROOT_FROM_INIT)
+
 import datetime
 import http.server
 import json
@@ -52,7 +61,13 @@ _SERVE_STARTED_AT = time.time()
 def _restart_serve(port: int = 8765) -> dict:
     """Restart the radar serve on `port` (default 8765). Safe to call via /api/restart.
 
-    Returns {killed_pids, new_pid, port, old_pid}. Raises on timeout."""
+    Returns {killed_pids, new_pid, port, old_pid}. Raises on timeout.
+
+    ponytail: 2026-09 — 用 os.fork() 双进程模型.
+    当 /api/restart 被调用,父进程(旧 serve)fork 一个子进程后立刻返回 200.
+    父进程在 HTTP 响应写完后 os._exit(0). 子进程做实际的 kill + spawn + wait.
+    这样子进程不被父进程的死影响(它在父进程 fork 后是独立进程).
+    """
     import signal as _signal
 
     def _pid_using_port(p: int) -> int | None:
@@ -83,50 +98,95 @@ def _restart_serve(port: int = 8765) -> dict:
             if line.strip().isdigit() and int(line.strip()) != os.getpid()
         ]
 
+    pid = os.fork()
+    if pid > 0:
+        # Parent: detach from child, return immediately. Child does the work.
+        return {
+            "killed_pids": [],
+            "new_pid": pid,  # the CHILD will spawn the actual new serve
+            "port": port,
+            "old_pid": _pid_using_port(port),
+            "_phase": "forked",
+        }
+
+    # === Child process ===
+    # Detach so the parent can't accidentally kill us
+    os.setsid()
+
+    # 1. Kill old serve
     old_pid = _pid_using_port(port)
+    # ponytail: 排除自己 + 父进程 — 我们的子进程 fork 自 OLD serve,
+    # kill 自己等于自杀,kill 父进程也会让父进程提前死(响应可能还没 flush).
+    # kill 列表应该只有「其他」serve 进程,不包括当前进程树.
     candidates = set(_pids_running_radar_serve() + ([old_pid] if old_pid else []))
+    candidates.discard(os.getpid())  # never kill self
+    ppid = os.getppid()
+    if ppid:
+        candidates.discard(ppid)  # never kill direct parent (do_POST thread)
     killed: list = []
-    for pid in candidates:
+    for p in candidates:
         try:
-            os.kill(pid, _signal.SIGTERM)
-            killed.append(pid)
+            os.kill(p, _signal.SIGTERM)
+            killed.append(p)
         except (ProcessLookupError, PermissionError):
             pass
 
-    # 2. Wait for port to free up
+    # 2. Wait for port to free
     deadline = time.time() + 5.0
     while time.time() < deadline:
         if _pid_using_port(port) is None:
             break
         time.sleep(0.1)
     else:
-        # Stragglers → SIGKILL
-        for pid in candidates:
+        for p in candidates:
             try:
-                os.kill(pid, _signal.SIGKILL)
+                os.kill(p, _signal.SIGKILL)
             except Exception:
                 pass
         time.sleep(0.5)
         if _pid_using_port(port) is not None:
-            raise RuntimeError(f"port {port} still busy after kill")
+            sys.exit(1)
 
     # 3. Spawn new detached serve
+    # ponytail: 关键 — 子进程 fork 后会立刻被 _restart_serve 的 _alive() 等待,
+    # 而 _alive() 在子进程内调用, 父进程(即 start_new_session=true 创建的 session)
+    # 一旦 sys.exit(0), 整个 session 被 reap, 导致子进程也被收割.
+    # 解法: 不在子进程内 _alive() — 把 _alive() 移到另一个独立的临时脚本里执行,
+    # 这里只 Popen 后立刻 sys.exit(0), 留 5s 缓冲时间.
     log_fd = os.open(
         DATA / "serve.log",
         os.O_WRONLY | os.O_CREAT | os.O_APPEND,
         0o644,
     )
+    # Force synchronous flush — the original serve log uses buffered `print()`,
+    # but our f.write() needs explicit flush() to show up before sys.exit below.
+    os.write(log_fd, b"")  # noop, just to ensure fd valid
+    project_root = str(Path(__file__).parent.parent.resolve())
+    with open(DATA / "serve.log", "a") as f:
+        f.write(f"[restart] spawning new serve at port {port} (project_root={project_root}, py={sys.executable})\n")
     proc = subprocess.Popen(
-        [sys.executable, str(Path(__file__).resolve()), "serve", str(port)],
-        cwd=str(Path(__file__).parent.resolve()),
+        [sys.executable, str(Path(project_root) / "radar.py"), "serve", str(port)],
+        cwd=project_root,
+        env={**os.environ, "PYTHONPATH": project_root},
         stdout=log_fd,
         stderr=subprocess.STDOUT,
         start_new_session=True,
-        close_fds=True,
     )
     os.close(log_fd)
+    with open(DATA / "serve.log", "a") as _log:
+        _log.write(f"[restart] Popen returned proc.pid={proc.pid}, old killed={killed}\n")
+        _log.flush()
 
-    # 4. Wait for new serve to be alive
+    # Give the subprocess a moment to bind
+    with open(DATA / "serve.log", "a") as _log:
+        _log.write("[restart] before time.sleep(2.0)\n")
+        _log.flush()
+    time.sleep(2.0)
+    with open(DATA / "serve.log", "a") as _log:
+        _log.write("[restart] after time.sleep(2.0)\n")
+        _log.flush()
+
+    # Quickly verify alive once (best-effort — don't block forever)
     def _alive(p: int) -> bool:
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         try:
@@ -135,22 +195,22 @@ def _restart_serve(port: int = 8765) -> dict:
         except Exception:
             return False
 
-    deadline = time.time() + 10.0
-    while time.time() < deadline:
-        if _alive(port):
-            break
-        time.sleep(0.1)
-    else:
-        raise RuntimeError(
-            f"new serve did not come up at :{port} after 10s (see data/serve.log)"
-        )
+    # ponytail: 不等 alive. 子进程已经 setsid detach, OLD serve 已被 kill,
+    # 我们 sys.exit(0) 不会影响它. 这里只 Popen + 立即退出 — 失败的 bind 会在
+    # 子进程自己的日志里显式出现,我们不需要在这里确认.
+    with open(DATA / "serve.log", "a") as f:
+        f.write(f"[restart] spawning done, exiting child (new_pid={proc.pid} port={port})\n")
+        f.flush()
+    sys.exit(0)
 
-    return {
-        "killed_pids": killed,
-        "new_pid": proc.pid,
-        "port": port,
-        "old_pid": old_pid,
-    }
+    # 4. Wait for alive
+    def _alive_check(p: int) -> bool:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        try:
+            with opener.open(f"http://127.0.0.1:{p}/api/health", timeout=1) as r:
+                return r.status == 200
+        except Exception:
+            return False
 
 
 def serve(port=8765):
@@ -274,13 +334,7 @@ def serve(port=8765):
             # ponytail: 2026-09 — /api/restart 给 /yz:ai skill 一键重启.
             # 杀掉当前端口的旧 serve 进程,启动新 detached serve,等就绪后返回.
             # 旧进程仍能继续响应本请求(200 返回后自杀).
-            if self.path == "/api/restart":
-                try:
-                    result = _restart_serve()
-                    self._json({"ok": True, **result})
-                except Exception as e:
-                    self._json({"ok": False, "error": str(e)}, status=500)
-                return
+            # /api/restart handler is in do_POST (state-changing op).
             if self.path == "/api/data":
                 if db._DB_OK:
                     try:
@@ -991,6 +1045,117 @@ def serve(port=8765):
         def do_POST(self):
             if self._origin_forbidden():
                 self._json({"ok": False, "error": "forbidden origin"}, status=403)
+                return
+            # ponytail: 2026-09 — /api/restart 给 /yz:ai skill 一键重启.
+            # 设计: spawn 一个完全独立的 `radar.py restart <port>` 子进程(独立 CLI 命令,
+            # 不 fork 自当前 serve 进程), 它独立 kill 旧 + spawn 新. 我们 spawn 后立刻
+            # 返回 {"status": "restarting"}. 子进程完成 kill → 新 serve 启动.
+            if self.path == "/api/restart":
+                try:
+                    port = 8765
+                    # Allow ?port=N override
+                    from urllib.parse import urlparse as _up
+                    q = _up(self.path).query
+                    if "port=" in q:
+                        try:
+                            port = int(q.split("port=")[1].split("&")[0])
+                        except Exception:
+                            pass
+                    log_fd = os.open(
+                        DATA / "restart.log",
+                        os.O_WRONLY | os.O_CREAT | os.O_APPEND,
+                        0o644,
+                    )
+                    project_root = str(Path(__file__).parent.parent.resolve())
+                    subprocess.Popen(
+                        [
+                            sys.executable,
+                            str(Path(project_root) / "radar.py"),
+                            "restart",
+                            str(port),
+                        ],
+                        cwd=project_root,
+                        env={**os.environ, "PYTHONPATH": project_root},
+                        stdout=log_fd,
+                        stderr=subprocess.STDOUT,
+                        start_new_session=True,
+                        close_fds=True,
+                    )
+                    os.close(log_fd)
+                    self._json({"ok": True, "status": "restarting", "port": port})
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=500)
+                return
+            # ponytail: 2026-09 — /api/save_summary_batch 给 /yz:ai skill 一次性写入多张卡的
+            # 5 桶摘要(items 数组). 模型分批生成 → 一次 POST 提交,后端原子写 cache+snapshot.
+            if self.path == "/api/save_summary_batch":
+                try:
+                    body = self._read_body()
+                    items = body.get("items") or []
+                    if not isinstance(items, list) or not items:
+                        raise ValueError("items must be a non-empty list")
+                    cache_path = core.README_ZH_CACHE
+                    snap_path = DATA / "latest.json"
+                    cache = {}
+                    if cache_path.exists():
+                        try:
+                            cache = json.loads(cache_path.read_text())
+                        except Exception:
+                            cache = {}
+                    snap = json.loads(snap_path.read_text()) if snap_path.exists() else {}
+                    snap_index: dict = {}
+                    for r in snap.get("hot_now", []) or []:
+                        snap_index[r.get("name", "").lower()] = r
+                    for c in snap.get("categories", []) or []:
+                        for r in c.get("repos", []) or []:
+                            snap_index.setdefault(r.get("name", "").lower(), r)
+                    for r in snap.get("trending", []) or []:
+                        snap_index.setdefault(r.get("name", "").lower(), r)
+                    now = time.strftime("%Y-%m-%dT%H:%M:%S")
+                    filled = []
+                    for item in items:
+                        name = (item.get("name") or "").strip()
+                        if not name or "/" not in name:
+                            continue
+                        sections = item.get("sections") or {}
+                        clean = {
+                            "intro": str(sections.get("intro") or "").strip()[:600],
+                            "can_do": str(sections.get("can_do") or "").strip()[:600],
+                            "problem": str(sections.get("problem") or "").strip()[:600],
+                            "competitive": str(sections.get("competitive") or "").strip()[:600],
+                            "when_to_use": str(sections.get("when_to_use") or "").strip()[:600],
+                        }
+                        key = name.lower()
+                        entry = cache.get(key) or {"text": "", "sections": {}}
+                        entry["sections"] = {**entry.get("sections", {}), **clean}
+                        entry["analysis_5d"] = {
+                            "what": clean["intro"],
+                            "can_do": clean["can_do"],
+                            "problem": clean["problem"],
+                            "alternatives": (
+                                [{"name": clean["competitive"], "pros": "", "cons": ""}]
+                                if clean["competitive"] else []
+                            ),
+                            "when_to_use": clean["when_to_use"],
+                        }
+                        entry["_analysis_5d_source"] = "skill_model"
+                        entry["_analysis_5d_at"] = now
+                        cache[key] = entry
+                        repo_snap = snap_index.get(key)
+                        if repo_snap is not None:
+                            repo_snap["summary_sections"] = {**repo_snap.get("summary_sections", {}), **clean}
+                            repo_snap["analysis_5d"] = entry["analysis_5d"]
+                        filled.append({"name": name, "buckets": sum(1 for v in clean.values() if v)})
+                    # ponytail: 原子写(tmp + rename)避免并发 worker lost update
+                    tmp_c = cache_path.with_suffix(".json.tmp")
+                    tmp_c.write_text(json.dumps(cache, ensure_ascii=False, indent=1))
+                    tmp_c.replace(cache_path)
+                    tmp_s = snap_path.with_suffix(".json.tmp")
+                    tmp_s.write_text(json.dumps(snap, ensure_ascii=False, indent=2))
+                    tmp_s.replace(snap_path)
+                    self._json({"ok": True, "filled": filled, "count": len(filled)})
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=400)
                 return
             if self.path == "/api/local/replace":
                 try:

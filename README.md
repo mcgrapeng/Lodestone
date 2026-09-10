@@ -97,7 +97,7 @@ GitHub 抗爬时其他 4 个源仍然工作 —— 你不会「今天啥都看�
 ```bash
 # .env
 RADAR_HOST=0.0.0.0          # 让 serve 监听外部接口（前面挂 nginx 做 TLS）
-AI_RADAR_HOME=/var/lib/lodestone   # skill 缓存重定向到项目目录（多用户）
+AI_RADAR_HOME=/var/lib/lodestone   # 兼容旧名（推荐改用 LODESTONE_HOME）
 PGHOST=10.0.0.5            # PG 不在 localhost 时
 ```
 

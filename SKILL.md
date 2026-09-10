@@ -1,6 +1,6 @@
 ---
-name: yz-ai
-description: 当用户想了解 GitHub + HuggingFace + MCP Registry + arXiv 上最新的 AI 工具/Skills/项目（如 superpowers、agent-memory、LangChain、Coze 等）时触发。Lodestone（命令 /yz:ai）是专门发现主流 AI 工具的多源聚合平台 — 自动聚合 GitHub AI 趋势（GraphQL 批量搜索 + 4 引擎分级爬取）+ HuggingFace Trending（Spaces + Models）+ 官方 MCP Server Registry + arXiv 最新论文，按 20 个用途分类（Agent/RAG/代码生成/MCP/Voice/Security/Robotics/论文 等），生成中文友好仪表盘。**触发 /yz:ai 后，skill 会调用宿主模型（Claude Code CLI / Codex CLI / OpenCode / EasyCode）直接为每张卡片生成 5 桶中文详细介绍（是什么 / 能干什么 / 解决什么问题 / 同类竞品 / 何时选它），无需外部 LLM API key、无翻译限额**。触发短语：「/yz:ai」「看看最新AI项目」「AI radar」「GitHub AI趋势」「刷一下AI雷达」「最近有什么火的AI项目」。
+name: lodestone
+description: 当用户想了解 GitHub + HuggingFace + MCP Registry + arXiv 上最新的 AI 工具/Skills/项目（如 superpowers、agent-memory、LangChain、Coze 等）时触发。Lodestone（命令 /lodestone）是发现主流 AI 工具的多源聚合平台 — 自动聚合 GitHub AI 趋势（GraphQL 批量搜索 + 4 引擎分级爬取）+ HuggingFace Trending（Spaces + Models）+ 官方 MCP Server Registry + arXiv 最新论文，按 20 个用途分类（Agent/RAG/代码生成/MCP/Voice/Security/Robotics/论文 等），生成中文友好仪表盘。**触发 /lodestone 后，skill 会调用宿主模型（Claude Code CLI / Codex CLI / OpenCode / EasyCode）直接为每张卡片生成 5 桶中文详细介绍（是什么 / 能干什么 / 解决什么问题 / 同类竞品 / 何时选它），无需外部 LLM API key、无翻译限额**。「lodestone」（磁石）：航海家用磁石导航 — 这个 skill 把 AI 工程师引到该用的人工工具上。触发短语：「/lodestone」「看看最新AI项目」「AI radar」「GitHub AI趋势」「刷一下AI雷达」「最近有什么火的AI项目」。
 allowed-tools: Bash, Read, Write, Edit
 ---
 
@@ -8,25 +8,31 @@ allowed-tools: Bash, Read, Write, Edit
 
 每日 GitHub AI 热门仓库 + HuggingFace Trending（Spaces + Models）+ 官方 MCP Server Registry 自动聚合 · 已为 AI 应用工程师分类整理 · 中文友好
 
+> **Lodestone**（磁石 / 罗盘石）：古代航海家用天然磁铁矿导航 — 指向正确方向。**这个 skill 是 AI 工程师的"磁石"**：穿过 GitHub / HuggingFace / MCP / arXiv 的数据洋流，把你引到该用的人工工具上。
+>
 > **跨平台**：本 skill 同时兼容 **Claude Code** (`~/.claude/skills/`)、**Codex CLI** (`~/.codex/skills/`)、**OpenCode** (`~/.config/opencode/skills/`)、**EasyCode** (`~/.easycode/skills/`)。`SKILL.md` 格式两边相同，通过 `./install.sh` 一次安装多端可用。
 
 ## 何时使用本 skill
 
 - 用户问"最近 GitHub 上有什么火的 AI 项目？"
 - 用户想了解某个 AI 领域（agent / RAG / 微调…）的最新开源工具
-- 用户想刷新一次雷达数据
+- 用户想刷新一次数据
 - 用户想看 superpowers 这种 skills 的最新同类项目
 - 用户想找最新的 MCP server / 浏览器代理 / 语音 agent 等细分赛道
 - 用户想看 HuggingFace 上今天最火的模型权重
 - 用户希望每张卡片都有 5 桶详细中文介绍（直接由宿主 LLM 生成，无外部 API key）
 
-## `/yz:ai` 命令流程
+## `/lodestone` 命令流程
 
-`/yz:ai` 是用户的入口命令。**触发后，宿主 LLM（Claude Code / Codex / OpenCode / EasyCode 调用的模型）**自动执行以下步骤：
+`/lodestone` 是用户的入口命令。**触发后，宿主 LLM（Claude Code / Codex / OpenCode / EasyCode 调用的模型）**自动执行以下步骤：
 
-1. **检测 serve**：若 `http://127.0.0.1:8765/api/data` 不可达，运行 `<project_root>/radar.py web` 一键拉起 serve + 浏览器
-2. **拉数据**：`GET http://127.0.0.1:8765/api/data` 拿到全部 repo 列表
-3. **批量生成 5 桶中文介绍**：对每张卡片（首推 hot_now + gainers），按下面的 JSON schema 生成：
+1. **检测 serve 是否在跑**：`GET http://127.0.0.1:8765/api/health` → 看 `uptime_seconds` 判断
+2. **如在跑 → 杀掉旧进程重启**：`POST http://127.0.0.1:8765/api/restart`
+   - 后端独立子进程执行 kill + spawn 新 serve,旧进程安全死掉
+   - 返回 `{"ok": true, "status": "restarting"}` 给 skill
+   - 新 serve 大约 5s 内 listen 上 `/api/health`
+3. **拉数据**：`GET http://127.0.0.1:8765/api/data` 拿到全部 repo 列表
+4. **批量生成 5 桶中文介绍**：对每张卡片（首推 hot_now + gainers），按下面的 JSON schema 生成：
    ```json
    {
      "intro": "是什么 — 一句话定位",
@@ -36,21 +42,23 @@ allowed-tools: Bash, Read, Write, Edit
      "when_to_use": "何时选它 — 决策建议"
    }
    ```
-4. **回写**：`POST http://127.0.0.1:8765/api/save_summary_batch`，body:
+5. **回写**：`POST http://127.0.0.1:8765/api/save_summary_batch`，body:
    ```json
    {"items":[{"name":"owner/repo","sections":{...}}, ...]}
    ```
-5. **告诉用户**：总共填了多少张卡、各 5 桶平均字数、哪些卡还需他补充
+6. **告诉用户**：总共填了多少张卡、各 5 桶平均字数、哪些卡还需他补充
 
 > **核心设计**：不再依赖 Google Translate 或外部 LLM API。模型就是调用 skill 的宿主 LLM — 读仓库名 + topics + lang + stars + 已有的 desc/desc_zh 就能生成优质介绍，无 API 限额、无翻译噪声、可部署到任意服务器。
+
+> **为什么先检查+重启**？如果旧 serve 跑着旧代码（无 5 桶字段），skill 拉到的数据里 `analysis_5d` 全是 null,生成的摘要只能写到 `summary_sections`,刷新无效。重启确保代码与新功能一致。
 
 ## 一键执行（手动命令）
 
 ```bash
 # skill 安装后，从任意 cwd 都可调用
-~/.claude/skills/yz-ai/radar.py web      # 一键仪表盘：后台起 serve + 自动打开浏览器（已在跑则直接打开）
-~/.claude/skills/yz-ai/radar.py crawl    # 爬取 + 入库（约 5-8 分钟，含限速等待）
-~/.claude/skills/yz-ai/radar.py today    # 终端直接看 Top 15 + 分类概览
+~/.claude/skills/lodestone/radar.py web      # 一键仪表盘：后台起 serve + 自动打开浏览器（已在跑则直接打开）
+~/.claude/skills/lodestone/radar.py crawl    # 爬取 + 入库（约 5-8 分钟，含限速等待）
+~/.claude/skills/lodestone/radar.py today    # 终端直接看 Top 15 + 分类概览
 ```
 
 > 安装器创建的是 symlink（不是复制），所以两个路径指向同一个源目录，编辑一处即时生效。
@@ -63,6 +71,7 @@ allowed-tools: Bash, Read, Write, Edit
 | `radar.py crawl` | 拉取 GitHub（分类 + 5k 补捞 + trending + manual seed）+ HuggingFace Spaces + HuggingFace Models + MCP Registry → 写入 Postgres（无 PG 时回退 `data/latest.json`） |
 | `radar.py today` | 终端打印 Top 15 + 分类概览（PG 优先，latest.json 回退） |
 | `radar.py serve [port]` | 起 JSON API + 静态托管 `frontend/dist`（默认 8765，**RADAR_HOST 控制绑定地址**；默认 127.0.0.1 安全） |
+| `radar.py restart [port]` | **杀掉端口上的旧 serve + 启动新 detached serve + 等就绪**。`/lodestone` skill 自动调此（或通过 `POST /api/restart` HTTP endpoint）。 |
 
 crawl 全程持文件锁（`data/crawl.lock`），并发触发会自动拒绝，不互相打爆 GitHub 限流。
 
