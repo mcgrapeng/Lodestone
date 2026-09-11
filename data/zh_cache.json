@@ -1937,5 +1937,6 @@
   "Junhan2/oh-my-fable::desc": "克劳德寓言5.1提示指南为克劳德代码技巧（KO/EN/ZH）。 Opus 5 和 Sonnet 5 的输出质量也有所提高。",
   "hsandhu/mobilecode::desc": "mobilecode 是 opencode 的一个分支，用于构建和预览 iOS 和 Android 项目",
   "ewsun22/codex-manager::desc": "OpenAI Codex 的本地优先桌面控制中心 — 会话、模型、令牌、帐户、提供商和 AGENTS.md。",
-  "humanizer": "|\n  重写听起来像人工智能的文本，使其读起来像作者一样，而不改变其内容。\n  在编辑或审查 AI 散文时使用：不是 X 而是 Y 对比、一行\n  结束语、分阶段的开场白、强迫三合会、到处都是破折号、夸大的索赔、销售\n  语言、AI 常用词、粗体标签或填充符。基于维基百科的“人工智能写作的标志”。"
+  "humanizer": "|\n  重写听起来像人工智能的文本，使其读起来像作者一样，而不改变其内容。\n  在编辑或审查 AI 散文时使用：不是 X 而是 Y 对比、一行\n  结束语、分阶段的开场白、强迫三合会、到处都是破折号、夸大的索赔、销售\n  语言、AI 常用词、粗体标签或填充符。基于维基百科的“人工智能写作的标志”。",
+  "lodestone": "当用户想了解 GitHub + HuggingFace + MCP Registry + arXiv 上最新的 AI 工具/Skills/项目（如 superpowers、agent-memory、LangChain、Coze 等）时触发。Lodestone（命令 /lodestone）是发现主流 AI 工具的多源聚合平台 — 自动聚合 GitHub AI 趋势（GraphQL 批量搜索 + 4 引擎分级爬取）+ HuggingFace Trending（Spaces + Models）+ 官方 MCP Server Registry + arXiv 最新论文，按 20 个用途分类（Agent/RAG/代码生成/MCP/Voice/Security/Robotics/论文 等），生成中文友好仪表盘。**触发 /lodestone 后，skill 会调用宿主模型（Claude Code CLI / Codex CLI / OpenCode / EasyCode）直接为每张卡片生成 5 桶中文详细介绍（是什么 / 能干什么 / 解决什么问题 / 同类竞品 / 何时选它），无需外部 LLM"
 }

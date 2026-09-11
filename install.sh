@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# install.sh — install lodestone (formerly lodestone / yz-ai) as a skill for
+# install.sh — install lodestone (formerly lodestone / yz-ai / zp) as a skill for
 # Claude Code / Codex CLI / OpenCode / EasyCode.
 #
 # Strategy: symlink (not copy) — single source of truth, no duplication
+# of data/, node_modules/, etc. Skills point back to this project directory.
 #
-# Strategy: symlink (not copy) — single source of truth, no duplication
-# of data/, node_modules/, etc. Both ~/.claude/skills/ and ~/.codex/skills/
-# point back to this project directory.
+# OpenCode 还需要 command/<name>.md 包装文件才能注册 /lodestone 斜杠命令
+# (OpenCode 的 skills/ 与 commands/ 是两个目录，不像 Claude 那样合一).
 
 set -e
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,7 +18,8 @@ NAME="lodestone"
 
 CLAUDE_DIR="${HOME}/.claude/skills"
 CODEX_DIR="${HOME}/.codex/skills"
-OPENCODE_DIR="${HOME}/.config/opencode/skills"
+OPENCODE_SKILLS_DIR="${HOME}/.config/opencode/skills"
+OPENCODE_COMMAND_DIR="${HOME}/.config/opencode/command"
 EASYCODE_DIR="${HOME}/.easycode/skills"
 
 ok()   { printf "  \033[32m✓\033[0m %s\n" "$*"; }
@@ -26,7 +27,7 @@ warn() { printf "  \033[33m!\033[0m %s\n" "$*"; }
 fail() { printf "  \033[31m✗\033[0m %s\n" "$*"; exit 1; }
 
 echo ""
-echo "⚡ Lodestone · /yz:ai skill (Claude Code + Codex + OpenCode + EasyCode)"
+echo "⚡ Lodestone · /lodestone skill (Claude Code + Codex + OpenCode + EasyCode)"
 echo "   源目录: $HERE"
 echo ""
 
@@ -35,8 +36,10 @@ echo ""
 [ -x "$HERE/radar.py" ] || chmod +x "$HERE/radar.py"
 
 # --- helper: symlink one CLI target, ignore if dir doesn't exist ---
+# Args: label, dir, legacy1, legacy2
 link_one() {
-    local label="$1"; local dir="$2"; local legacy="$3"
+    local label="$1"; local dir="$2"
+    local legacy1="$3"; local legacy2="$4"
     echo ""
     echo "📦 $label ($dir/$NAME)"
     mkdir -p "$dir" 2>/dev/null || true
@@ -59,19 +62,56 @@ link_one() {
     fi
 }
 
-link_one "Claude Code"  "$CLAUDE_DIR"   "zp" "yz-ai"
-link_one "Codex CLI"    "$CODEX_DIR"    "zp" "yz-ai"
-link_one "OpenCode"     "$OPENCODE_DIR" "zp" "yz-ai"
-link_one "EasyCode"     "$EASYCODE_DIR" "zp" "yz-ai"
+# --- helper: install OpenCode slash-command wrappers ---
+# OpenCode 需要独立的 command/<name>.md 文件才能注册 /<name> 命令,
+# skill 本身在 skills/<name>/SKILL.md,两边缺一不可.
+install_opencode_commands() {
+    local cmd_dir="$1"; local legacy1="$2"; local legacy2="$3"
+    echo ""
+    echo "📦 OpenCode slash commands ($cmd_dir)"
+    mkdir -p "$cmd_dir" 2>/dev/null || true
+    [ -d "$cmd_dir" ] || { warn "目录不存在,跳过 ($cmd_dir)"; return 0; }
+    install_one_command() {
+        local name="$1"
+        local src="$HERE/command/$name.md"
+        local dst="$cmd_dir/$name.md"
+        [ -f "$src" ] || { warn "工程里缺 $src,跳过"; return 0; }
+        if [ -e "$dst" ]; then
+            if cmp -s "$src" "$dst"; then
+                ok "$name.md 已就位且一致"
+            else
+                warn "$dst 已存在且内容不同,备份为 ${dst}.bak.$(date +%s)"
+                mv "$dst" "${dst}.bak.$(date +%s)"
+                cp "$src" "$dst"
+                ok "$name.md 已更新"
+            fi
+        else
+            cp "$src" "$dst"
+            ok "$name.md 已建好"
+        fi
+    }
+    install_one_command "$NAME"
+    [ -n "$legacy1" ] && install_one_command "$legacy1"
+    [ -n "$legacy2" ] && install_one_command "$legacy2"
+}
+
+link_one "Claude Code"  "$CLAUDE_DIR"          "zp" "yz-ai"
+link_one "Codex CLI"    "$CODEX_DIR"           "zp" "yz-ai"
+link_one "OpenCode"     "$OPENCODE_SKILLS_DIR" "zp" "yz-ai"
+link_one "EasyCode"     "$EASYCODE_DIR"        "zp" "yz-ai"
+install_opencode_commands "$OPENCODE_COMMAND_DIR" "zp" "yz-ai"
 
 echo ""
 echo "🎉 安装完成!"
 echo ""
 echo "触发方式:"
-echo "  Claude Code → 输入: /yz:ai"
-echo "  Codex CLI   → 输入: /yz:ai"
-echo "  OpenCode    → 输入: /yz:ai"
-echo "  EasyCode    → 输入: /yz:ai"
+echo "  Claude Code → /lodestone   (旧名 /yz:ai / /zp 仍可触发)"
+echo "  Codex CLI   → \$lodestone  (Codex 用 \$ 前缀,不是 /)"
+echo "  OpenCode    → /lodestone   (旧名 /yz:ai / /zp 仍可触发)"
+echo "  EasyCode    → /lodestone"
+echo ""
+echo "自然语言触发(三家都支持,不用记命令):"
+echo "  「看看最新AI项目」/「AI radar」/「刷一下AI雷达」/「最近有什么火的AI项目」"
 echo ""
 echo "手动调用:"
 echo "  $HERE/radar.py web      # 一键仪表盘(后台起 serve + 打开浏览器)"
