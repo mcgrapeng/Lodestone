@@ -38,6 +38,10 @@ SKILL_PROBE_CACHE = DATA / "skill_probe_cache.json"
 # cache 命中跳过，单 repo LLM 调一次永久复用。
 LLM_ANALYSIS_CACHE = DATA / "llm_analysis_cache.json"
 
+# ponytail: 2026-09 — LLM settings UI 持久化（gitignore 中）。crawl 读这文件获取
+# provider + endpoint + key + model。
+SETTINGS_PATH = DATA / "settings.json"
+
 CATEGORIES = [
     {
         "id": "agent",

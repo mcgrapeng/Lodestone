@@ -1,0 +1,19 @@
+# ponytail: 2026-09 — LLM settings UI 持久化 (含明文 API key, 不入 git)
+data/settings.json
+data/.settings.json.tmp
+
+# ponytail: 以下条目是历史遗留的 pre-existing debt, 本次不改。_pycache__ 早被
+# 误入 git,清理需 git rm -r --cached,留待后续统一整理。
+__pycache__/
+*.pyc
+.venv/
+frontend/node_modules/
+frontend/dist/
+data/serve.log
+data/restart.log
+data/crawl.lock
+data/crawl.lock.stale-*
+data/serve.log.*
+graphify-out/
+.idea/
+.serena/
