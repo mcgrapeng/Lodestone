@@ -19,7 +19,9 @@ import sys
 import threading
 import time
 import webbrowser
+import urllib.error
 import urllib.parse
+import urllib.request
 from pathlib import Path
 
 from radar_pkg import core, detect
@@ -1078,6 +1080,72 @@ def serve(port=8765):
                         return
                     _settings.save(body)
                     self._json({"ok": True})
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=500)
+                return
+            if self.path == "/api/llm/test":
+                # ponytail: 用前端提供的 provider + fields 临时测一次。
+                # 不持久化，只为「连通性 + 模型存在」反馈。
+                # SSRF note: 接受任意 URL, threat model 是 loopback-only serve。
+                try:
+                    body = self._read_body()
+                    from radar_pkg import settings as _settings
+                    provider = body.get("provider", "")
+                    if provider not in _settings._VALID_PROVIDERS:
+                        self._json({"ok": False, "error": f"provider must be one of {sorted(_settings._VALID_PROVIDERS)}"}, status=400)
+                        return
+                    fields = body.get(provider, {})
+                    # Build minimal test request per provider
+                    if provider == "anthropic":
+                        if not fields.get("api_key"):
+                            self._json({"ok": False, "error": "anthropic.api_key required"}); return
+                        payload = {"model": fields.get("model", "claude-3-5-haiku-latest"), "max_tokens": 5, "messages": [{"role": "user", "content": "hi"}]}
+                        req = urllib.request.Request(
+                            "https://api.anthropic.com/v1/messages",
+                            data=json.dumps(payload).encode(),
+                            headers={"x-api-key": fields["api_key"], "anthropic-version": "2023-06-01", "Content-Type": "application/json"},
+                            method="POST",
+                        )
+                    elif provider == "openai":
+                        if not fields.get("api_key"):
+                            self._json({"ok": False, "error": "openai.api_key required"}); return
+                        base = (fields.get("base_url") or "https://api.openai.com/v1").rstrip("/")
+                        payload = {"model": fields.get("model", "gpt-4o-mini"), "max_tokens": 5, "messages": [{"role": "user", "content": "hi"}]}
+                        req = urllib.request.Request(
+                            # ponytail: 2026-09 — base already includes /v1 (industry convention;
+                            # OpenAI SDK + Together + Groq all use form ".../v1"). No extra /v1 here.
+                            f"{base}/chat/completions",
+                            data=json.dumps(payload).encode(),
+                            headers={"Authorization": f"Bearer {fields['api_key']}", "Content-Type": "application/json"},
+                            method="POST",
+                        )
+                    else:  # ollama
+                        host = (fields.get("host") or "http://127.0.0.1:11434").rstrip("/")
+                        req = urllib.request.Request(f"{host}/api/tags", method="GET")
+                    try:
+                        with urllib.request.urlopen(req, timeout=10) as resp:
+                            if resp.status >= 400:
+                                self._json({"ok": False, "error": f"upstream {resp.status}"})
+                                return
+                            body_text = resp.read()
+                            # Try to extract model from response (best-effort)
+                            model = fields.get("model", "")
+                            try:
+                                parsed = json.loads(body_text)
+                                if provider == "openai":
+                                    model = (parsed.get("model") or model)
+                                elif provider == "anthropic":
+                                    model = parsed.get("model", model) or model
+                                # ollama: tags response doesn't echo a single model — keep as-is
+                            except Exception:
+                                pass
+                            self._json({"ok": True, "model": model})
+                    except urllib.error.HTTPError as e:
+                        # Upstream 4xx/5xx — return as {ok: false, error}, not 500
+                        body_text = e.read().decode("utf-8", errors="replace")[:200]
+                        self._json({"ok": False, "error": f"upstream {e.code}: {body_text}"})
+                    except Exception as e:
+                        self._json({"ok": False, "error": str(e)})
                 except Exception as e:
                     self._json({"ok": False, "error": str(e)}, status=500)
                 return

@@ -41,7 +41,11 @@ def _post_json(url: str, body: dict, timeout: float = 5) -> tuple[int, dict]:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.status, json.loads(r.read())
     except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read() or b"{}")
+        raw = e.read() or b"{}"
+        try:
+            return e.code, json.loads(raw)
+        except Exception:
+            return e.code, {"_raw": raw.decode("utf-8", errors="replace")[:200]}
 
 
 def _get(url: str, timeout: float = 5) -> tuple[int, dict]:
@@ -49,7 +53,11 @@ def _get(url: str, timeout: float = 5) -> tuple[int, dict]:
         with urllib.request.urlopen(url, timeout=timeout) as r:
             return r.status, json.loads(r.read())
     except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read() or b"{}")
+        raw = e.read() or b"{}"
+        try:
+            return e.code, json.loads(raw)
+        except Exception:
+            return e.code, {"_raw": raw.decode("utf-8", errors="replace")[:200]}
 
 
 def _spawn_serve(tmp_settings: Path) -> tuple[subprocess.Popen, int]:
@@ -172,6 +180,39 @@ def test_post_validates_provider():
         time.sleep(0.5)
         body = {"provider": "unknown_provider"}
         status, resp = _post_json(f"http://127.0.0.1:{port}/api/settings", body)
+        assert status == 400
+    finally:
+        _stop(p)
+        _real_settings_restore(backup)
+
+
+def test_llm_test_with_invalid_key_returns_error_not_500():
+    backup = _real_settings_backup()
+    Path("data/settings.json").unlink(missing_ok=True)
+    p, port = _spawn_serve(Path("data/settings.json"))
+    try:
+        time.sleep(0.5)
+        body = {
+            "provider": "anthropic",
+            "anthropic": {"api_key": "sk-ant-fake-for-test", "model": "claude-3-5-haiku-latest"},
+        }
+        status, resp = _post_json(f"http://127.0.0.1:{port}/api/llm/test", body)
+        assert status == 200, f"expected 200 even on upstream fail, got {status}: {resp}"
+        assert resp.get("ok") is False
+        assert "error" in resp
+    finally:
+        _stop(p)
+        _real_settings_restore(backup)
+
+
+def test_llm_test_rejects_unknown_provider():
+    backup = _real_settings_backup()
+    Path("data/settings.json").unlink(missing_ok=True)
+    p, port = _spawn_serve(Path("data/settings.json"))
+    try:
+        time.sleep(0.5)
+        body = {"provider": "bogus", "bogus": {}}
+        status, resp = _post_json(f"http://127.0.0.1:{port}/api/llm/test", body)
         assert status == 400
     finally:
         _stop(p)
