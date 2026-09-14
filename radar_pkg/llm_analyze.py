@@ -271,7 +271,7 @@ def _call_openai(prompt: str, *, max_tokens: int = 800) -> str:
         "response_format": {"type": "json_object"},
     }
     resp = _post_json(
-        f"{base}/v1/chat/completions",
+        f"{base}/chat/completions",
         payload,
         {"Authorization": f"Bearer {api_key}"},
     )
