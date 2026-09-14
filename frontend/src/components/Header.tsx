@@ -1,4 +1,4 @@
-import { Github, RefreshCw, Loader2 } from 'lucide-react'
+import { Github, RefreshCw, Loader2, Settings } from 'lucide-react'
 import { RadarFilled } from '@appica/icons-react'
 import { Button } from '@appica/ui-react'
 
@@ -17,6 +17,8 @@ export interface HeaderProps {
   fetchedAt: string | null
   refreshing: boolean
   onRefresh: () => void
+  onSettings: () => void
+  settingsStatus: 'none' | 'untested' | 'configured'
   totalRepos: number
   totalCategories: number
   sourceSummary?: string
@@ -26,6 +28,8 @@ export function Header({
   fetchedAt,
   refreshing,
   onRefresh,
+  onSettings,
+  settingsStatus,
   totalRepos,
   totalCategories,
   sourceSummary,
@@ -66,6 +70,20 @@ export function Header({
             </>
           )}
         </div>
+
+        <button
+          onClick={onSettings}
+          aria-label="LLM 设置"
+          className="relative rounded p-2 text-foreground-subtle hover:bg-background-muted hover:text-foreground"
+        >
+          <Settings size={16} />
+          {settingsStatus === 'configured' && (
+            <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-emerald-500" />
+          )}
+          {settingsStatus === 'untested' && (
+            <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-amber-500" />
+          )}
+        </button>
 
         <Button
           size="sm"
