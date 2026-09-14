@@ -5,6 +5,8 @@ import type {
   GainPage,
   Snapshot,
   Stats,
+  Settings,
+  TestLlmResult,
 } from './types'
 
 const BASE = ''  // same-origin via Vite proxy
@@ -98,5 +100,23 @@ export const api = {
       }
     }
     return jsonOrThrow(r)
+  },
+
+  async getSettings(): Promise<Settings | null> {
+    const r = await fetch(`${BASE}/api/settings`)
+    if (!r.ok) throw new Error(`getSettings ${r.status}`)
+    const body = await r.json()
+    return body.settings ?? null
+  },
+
+  async saveSettings(s: Settings): Promise<{ ok: boolean; error?: string }> {
+    return post('/api/settings', s)
+  },
+
+  async testLlm(
+    provider: Settings['provider'],
+    fields: Record<string, unknown>,
+  ): Promise<TestLlmResult> {
+    return post('/api/llm/test', { provider, [provider]: fields })
   },
 }

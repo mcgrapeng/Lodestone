@@ -88,3 +88,30 @@ export interface ReadmeZh {
   fallback?: string
   error?: string
 }
+
+export interface ProviderAnthropic {
+  api_key: string
+  model: string
+}
+export interface ProviderOpenAI {
+  base_url: string
+  api_key: string
+  model: string
+}
+export interface ProviderOllama {
+  host: string
+  model: string
+}
+export interface Settings {
+  provider: 'anthropic' | 'openai' | 'ollama'
+  anthropic: ProviderAnthropic
+  openai: ProviderOpenAI
+  ollama: ProviderOllama
+  min_stars: number
+  updated_at?: string
+}
+export interface TestLlmResult {
+  ok: boolean
+  model?: string
+  error?: string
+}
