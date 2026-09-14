@@ -334,6 +334,15 @@ def serve(port=8765):
                     "uptime_seconds": round(time.time() - _SERVE_STARTED_AT, 1),
                 })
                 return
+            # ponytail: settings UI 持久化层。无文件返 null + updated_at。
+            if self.path == "/api/settings":
+                from radar_pkg import settings as _settings
+                loaded = _settings.load()
+                self._json({
+                    "settings": loaded,
+                    "updated_at": (loaded or {}).get("updated_at"),
+                })
+                return
             # ponytail: 2026-09 — /api/restart 给 /yz:ai skill 一键重启.
             # 杀掉当前端口的旧 serve 进程,启动新 detached serve,等就绪后返回.
             # 旧进程仍能继续响应本请求(200 返回后自杀).
@@ -1048,6 +1057,29 @@ def serve(port=8765):
         def do_POST(self):
             if self._origin_forbidden():
                 self._json({"ok": False, "error": "forbidden origin"}, status=403)
+                return
+            if self.path == "/api/settings":
+                # ponytail: 保存 LLM 设置。仅白名单字段落盘（防注入），
+                # provider 必须在 3 个允许值内。
+                try:
+                    body = self._read_body()
+                    from radar_pkg import settings as _settings
+                    provider = body.get("provider", "")
+                    if provider not in _settings._VALID_PROVIDERS:
+                        self._json({"ok": False, "error": f"provider must be one of {sorted(_settings._VALID_PROVIDERS)}"}, status=400)
+                        return
+                    # ponytail: deviation from brief — brief's implementation code only
+                    # validates provider and lets settings.save silently filter unknown
+                    # keys, but test_post_rejects_unknown_field expects 400 on unknown key.
+                    # Loud reject > silent filter: caller gets a clear error, no surprise.
+                    unknown = set(body.keys()) - _settings._KEYS
+                    if unknown:
+                        self._json({"ok": False, "error": f"unknown fields: {sorted(unknown)}"}, status=400)
+                        return
+                    _settings.save(body)
+                    self._json({"ok": True})
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=500)
                 return
             # ponytail: 2026-09 — /api/restart 给 /yz:ai skill 一键重启.
             # 设计: spawn 一个完全独立的 `radar.py restart <port>` 子进程(独立 CLI 命令,
