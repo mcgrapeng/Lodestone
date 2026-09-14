@@ -11,6 +11,13 @@ from env_loader import load_env  # noqa: E402
 load_env()
 
 import pg8000.dbapi as pg  # noqa: E402  (must run after env_loader)
+from pg8000.converters import JSONB as _JSONB_OID, PG_TYPES as _PG_TYPES, json_in as _json_in  # noqa: E402
+
+# ponytail: 2026-09 — 防御性 JSONB 类型适配器注册。pg8000 ≥1.30 默认 PG_TYPES[3802]=json_in
+# （loads 解析为 dict），但旧版本可能漏注册导致 JSONB 列读回 str — 5 桶渲染前端全空。
+# 这里 idempotent 注册一遍（已注册则覆盖回相同 callable，无副作用）。
+if _PG_TYPES.get(_JSONB_OID) is not _json_in:
+    _PG_TYPES[_JSONB_OID] = _json_in
 
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 

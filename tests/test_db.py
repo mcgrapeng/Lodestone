@@ -316,6 +316,82 @@ def test_query_categories_returns_trending_flag():
         conn.close()
 
 
+def test_query_hot_now_parses_jsonb_fields_as_dicts():
+    """2026-09 audit fix — DB columns are summary_sections_json / analysis_5d_json,
+    but the frontend TS Repo type expects summary_sections / analysis_5d as dicts.
+
+    Without the SQL alias + JSONB adapter, the row dict has:
+      - keys named `*_json` (not `Repo.summary_sections`)
+      - values as Python `str` (the raw JSONB bytes), so `r["summary_sections"]["intro"]` raises
+
+    This test pins both invariants so a future pg8000 downgrade or schema rename
+    fails loudly instead of silently breaking the 5-bucket drawer render."""
+    conn = _q()
+    try:
+        sections = {
+            "intro": "磁石 — AI 工程师的 GitHub 雷达",
+            "can_do": "聚合 GitHub + HF + MCP + arXiv",
+            "problem": "刷十几个 RSS 太累",
+            "competitive": "lodge, ai-trending, etc.",
+            "when_to_use": "每天 5 分钟扫一眼",
+        }
+        analysis = {
+            "what": "lodash for AI tools",
+            "can_do": "聚合多源",
+            "problem": "信号噪",
+            "alternatives": [
+                {"name": "ai-trending", "pros": "GitHub only", "cons": "缺 HF/MCP"},
+            ],
+            "when_to_use": "新工具入门",
+        }
+        db.upsert_repos(
+            conn,
+            [
+                {
+                    "name": "owner/jsonb-check",
+                    "full_name": "owner/jsonb-check",
+                    "url": "u",
+                    "description": "x",
+                    "desc_zh": "x",
+                    "stars": 500,
+                    "forks": 0,
+                    "lang": "Python",
+                    "topics": ["ai-agent"],
+                    "best_category": "agent",
+                    "pushed": "2026-09-14",
+                    "updated": "2026-09-14",
+                    "is_ai_relevant": True,
+                    "summary_sections": sections,
+                    "analysis_5d": analysis,
+                }
+            ],
+        )
+        conn.commit()
+        rows = db.query_hot_now(conn, limit=100)
+        r = next(x for x in rows if x["name"] == "owner/jsonb-check")
+        # ponytail: 字段名必须去掉 _json 后缀（前端 TS Repo 类型期望）
+        assert "summary_sections_json" not in r, (
+            f"column name leaked through; got keys: {sorted(r)}"
+        )
+        assert "analysis_5d_json" not in r, (
+            f"column name leaked through; got keys: {sorted(r)}"
+        )
+        assert "summary_sections" in r and "analysis_5d" in r
+        # ponytail: 值必须是 dict，不能是 str(否则前端 .intro 取值全部 undefined)
+        assert isinstance(r["summary_sections"], dict), (
+            f"summary_sections should be dict, got {type(r['summary_sections']).__name__}"
+        )
+        assert isinstance(r["analysis_5d"], dict), (
+            f"analysis_5d should be dict, got {type(r['analysis_5d']).__name__}"
+        )
+        # ponytail: 5 桶结构完整 — 这是 drawer render 的依赖
+        assert r["summary_sections"]["intro"] == sections["intro"]
+        assert r["analysis_5d"]["when_to_use"] == analysis["when_to_use"]
+        assert r["analysis_5d"]["alternatives"][0]["name"] == "ai-trending"
+    finally:
+        conn.close()
+
+
 def test_crawl_log_records_queries_failed():
     conn = _q()
     try:

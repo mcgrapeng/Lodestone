@@ -159,7 +159,9 @@ def query_top_5k(conn, page: int = 1, size: int = 12, sort: str = "stars"):
         f"""
         SELECT name, url, description, desc_zh, stars, forks, lang, topics,
                pushed_at, updated_at, trending, first_seen_at, stars_today,
-               is_skill, summary_sections_json, analysis_5d_json
+               is_skill,
+               summary_sections_json AS summary_sections,
+               analysis_5d_json AS analysis_5d
         FROM repos
         WHERE is_ai_relevant AND stars >= 1000
         ORDER BY {sort_sql}
@@ -185,7 +187,9 @@ def query_hot_now(conn, limit: int = 40):
         """
         SELECT name, url, description, desc_zh, stars, forks, lang, topics,
                pushed_at, updated_at, trending, first_seen_at, stars_today,
-               is_skill, summary_sections_json, analysis_5d_json
+               is_skill,
+               summary_sections_json AS summary_sections,
+               analysis_5d_json AS analysis_5d
         FROM repos WHERE is_ai_relevant
         ORDER BY stars DESC LIMIT %s
     """,
@@ -207,7 +211,9 @@ def query_categories(conn):
     cur.execute("""
         SELECT best_category, name, url, description, desc_zh, stars, forks,
                lang, topics, pushed_at, updated_at, trending, first_seen_at, stars_today,
-               is_skill, summary_sections_json, analysis_5d_json
+               is_skill,
+               summary_sections_json AS summary_sections,
+               analysis_5d_json AS analysis_5d
         FROM repos
         WHERE is_ai_relevant AND best_category IS NOT NULL
         ORDER BY best_category, stars DESC
@@ -291,7 +297,9 @@ def query_gain(
         ranked AS (
             SELECT c.name, r.url, r.description, r.desc_zh, r.stars, r.lang,
                    r.topics, r.pushed_at, c.delta_24h, c.cold_start,
-                   r.summary_zh, r.summary_sections_json, r.analysis_5d_json,
+                   r.summary_zh,
+                   r.summary_sections_json AS summary_sections,
+                   r.analysis_5d_json AS analysis_5d,
                    r.is_skill, r.stars_today
             FROM combined c
             JOIN repos r ON r.name = c.name
