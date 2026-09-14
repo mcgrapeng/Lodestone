@@ -56,20 +56,31 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from radar_pkg import core
+from radar_pkg import settings as _settings
 
 
 _ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
-_ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
 _ANTHROPIC_VERSION = "2023-06-01"
 
-_OPENAI_DEFAULT_BASE = "https://api.openai.com"
-_OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 
-_OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
-_OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1")
+def _config() -> tuple[str, dict]:
+    """Lazy lookup of active LLM config. Settings file wins; env is fallback."""
+    return _settings.active_config()
 
-# ponytail: 控制成本 — 不分析低星项目和已经分析过的。阈值可调。
-_MIN_STARS_FOR_ANALYSIS = int(os.environ.get("LLM_MIN_STARS", "50"))
+
+def _min_stars() -> int:
+    """Min stars threshold — settings.min_stars > env LLM_MIN_STARS > default 50."""
+    s = _settings.load() or {}
+    v = s.get("min_stars")
+    if v is not None:
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            pass
+    try:
+        return int(os.environ.get("LLM_MIN_STARS", "50"))
+    except ValueError:
+        return 50
 
 
 def _post_json(url: str, payload: dict, headers: dict, timeout: int = 60) -> dict:
@@ -90,13 +101,25 @@ def _post_json(url: str, payload: dict, headers: dict, timeout: int = 60) -> dic
 
 
 def detect_provider() -> str | None:
-    """根据 env + 本地服务探测，返回 'anthropic' / 'openai' / 'ollama' / None。"""
+    """Return active provider name ('anthropic' / 'openai' / 'ollama' / None).
+    Settings file is source of truth; env is fallback for users without the UI."""
+    s = _settings.load() or {}
+    chosen = s.get("provider")
+    if chosen in _settings._VALID_PROVIDERS:
+        # Settings has a valid provider selected — check it has minimum required fields
+        fields = s.get(chosen) or {}
+        if chosen == "anthropic" and fields.get("api_key"):
+            return "anthropic"
+        if chosen == "openai" and fields.get("api_key") and fields.get("base_url"):
+            return "openai"
+        if chosen == "ollama" and fields.get("host"):
+            return "ollama"
+        # Settings present but incomplete — fall through to env
     if os.environ.get("ANTHROPIC_API_KEY"):
         return "anthropic"
     if os.environ.get("OPENAI_API_KEY"):
         return "openai"
-    # Ollama: 检查 127.0.0.1:11434 是否在监听（轻探测，避免无谓 import）
-    host = _OLLAMA_HOST.rstrip("/")
+    host = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
     try:
         req = urllib.request.Request(f"{host}/api/tags", method="GET")
         with urllib.request.urlopen(req, timeout=2) as resp:
@@ -207,10 +230,14 @@ def _normalize(d: dict | None) -> dict:
 # 各 backend 实现
 # =========================================================================
 def _call_anthropic(prompt: str, *, max_tokens: int = 800) -> str:
-    """Claude Messages API → 提取文本。"""
-    api_key = os.environ["ANTHROPIC_API_KEY"]
+    """Claude Messages API. Reads api_key + model from settings."""
+    _, fields = _config()
+    api_key = fields.get("api_key", "")
+    if not api_key:
+        raise RuntimeError("anthropic api_key not configured")
+    model = fields.get("model", "claude-3-5-haiku-latest")
     payload = {
-        "model": _ANTHROPIC_MODEL,
+        "model": model,
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3,
@@ -223,18 +250,21 @@ def _call_anthropic(prompt: str, *, max_tokens: int = 800) -> str:
             "anthropic-version": _ANTHROPIC_VERSION,
         },
     )
-    # 响应: {content: [{type: "text", text: "..."}], ...}
     parts = resp.get("content") or []
     texts = [p.get("text", "") for p in parts if p.get("type") == "text"]
     return "\n".join(texts)
 
 
 def _call_openai(prompt: str, *, max_tokens: int = 800) -> str:
-    """OpenAI Chat Completions API（兼容 base_url，可指向 Together/Groq 等）。"""
-    api_key = os.environ["OPENAI_API_KEY"]
-    base = os.environ.get("OPENAI_BASE_URL", _OPENAI_DEFAULT_BASE).rstrip("/")
+    """OpenAI Chat Completions API (custom base_url). Reads from settings."""
+    _, fields = _config()
+    api_key = fields.get("api_key", "")
+    if not api_key:
+        raise RuntimeError("openai api_key not configured")
+    base = fields.get("base_url", "https://api.openai.com/v1").rstrip("/")
+    model = fields.get("model", "gpt-4o-mini")
     payload = {
-        "model": _OPENAI_MODEL,
+        "model": model,
         "max_tokens": max_tokens,
         "temperature": 0.3,
         "messages": [{"role": "user", "content": prompt}],
@@ -250,10 +280,12 @@ def _call_openai(prompt: str, *, max_tokens: int = 800) -> str:
 
 
 def _call_ollama(prompt: str, *, max_tokens: int = 800) -> str:
-    """Ollama /api/chat — 本地模型无 key 要求。"""
-    host = _OLLAMA_HOST.rstrip("/")
+    """Ollama /api/chat. Reads host + model from settings."""
+    _, fields = _config()
+    host = fields.get("host", "http://127.0.0.1:11434").rstrip("/")
+    model = fields.get("model", "llama3.1")
     payload = {
-        "model": _OLLAMA_MODEL,
+        "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "stream": False,
         "options": {"temperature": 0.3, "num_predict": max_tokens},
@@ -314,11 +346,11 @@ def analyze_one(
     force: bool = False,
 ) -> dict | None:
     """单 repo LLM 分析。cache=None 时用全局文件缓存。
-    跳过条件：stars < _MIN_STARS_FOR_ANALYSIS / 缓存命中 / 非 GitHub。
+    跳过条件：stars < _min_stars() / 缓存命中 / 非 GitHub。
     失败返 None（前端降级到 3 桶 README 摘要）。"""
     if not name or "/" not in name:
         return None
-    if stars < _MIN_STARS_FOR_ANALYSIS and not force:
+    if stars < _min_stars() and not force:
         return None
     cache = cache if cache is not None else _load_cache()
     key = name.lower()
@@ -344,18 +376,19 @@ def analyze_many(repos: list, max_workers: int = 4) -> int:
     print(f"  · llm analysis: provider={provider} model={_provider_model(provider)}")
     cache = _load_cache()
     todo = []
+    threshold = _min_stars()
     for r in repos:
         name = r.get("name") or ""
         if "/" not in name:
             continue
-        if (r.get("stars") or 0) < _MIN_STARS_FOR_ANALYSIS:
+        if (r.get("stars") or 0) < threshold:
             continue
         if not (r.get("readme") or ""):
             continue
         todo.append(r)
     if not todo:
         print(
-            f"  · llm analysis: no eligible repos (need stars≥{_MIN_STARS_FOR_ANALYSIS} + README)"
+            f"  · llm analysis: no eligible repos (need stars≥{threshold} + README)"
         )
         return 0
     print(
@@ -394,10 +427,11 @@ def analyze_many(repos: list, max_workers: int = 4) -> int:
 
 
 def _provider_model(provider: str) -> str:
+    _, fields = _config()
     return {
-        "anthropic": _ANTHROPIC_MODEL,
-        "openai": _OPENAI_MODEL,
-        "ollama": _OLLAMA_MODEL,
+        "anthropic": fields.get("model", "claude-3-5-haiku-latest"),
+        "openai": fields.get("model", "gpt-4o-mini"),
+        "ollama": fields.get("model", "llama3.1"),
     }.get(provider, "?")
 
 
