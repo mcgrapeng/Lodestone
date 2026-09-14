@@ -74,7 +74,6 @@ from radar_pkg.detect import (  # noqa: F401
     SKILL_PLATFORM_LABELS,
     SUPPORTED_CLIS,
     KNOWN_CLIS,
-    _DEFAULT_INSTALL_TARGETS,
     _skills_root_for,
     _LOCAL_SCAN_TTL,
     _local_scan_cache,
@@ -158,19 +157,6 @@ if __name__ == "__main__":
         crawl()
     elif cmd == "serve":
         serve(int(sys.argv[2]) if len(sys.argv) > 2 else 8765)
-    elif cmd == "restart":
-        # ponytail: 2026-09 — 独立 CLI 子命令,做 kill 旧 + spawn 新 + wait alive,
-        # 与 /yz:ai skill 配合(/api/restart 调用此命令).
-        # 独立进程避免 fork+inherit 父 serve 监听 socket 的复杂性.
-        from radar_pkg.serve import _restart_serve
-        port = int(sys.argv[2]) if len(sys.argv) > 2 else 8765
-        try:
-            result = _restart_serve(port)
-            print(f"[restart] OK: {result}", flush=True)
-            sys.exit(0)
-        except Exception as e:
-            print(f"[restart] FAILED: {e}", file=sys.stderr, flush=True)
-            sys.exit(1)
     elif cmd == "web":
         web(int(sys.argv[2]) if len(sys.argv) > 2 else 8765)
     elif cmd == "today":

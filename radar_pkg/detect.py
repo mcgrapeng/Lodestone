@@ -3,6 +3,7 @@
 import json
 import re
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -323,16 +324,28 @@ def detect_local_skills(force: bool = False):
     # ponytail: CLI integrations grouped by installer — drives the "本机 CLI" card.
     out["clis"] = {}
 
-    # brew binaries (symbolic links under /opt/homebrew/bin)
-    brew_bin = Path("/opt/homebrew/bin")
-    if brew_bin.exists():
-        out["clis"]["brew"] = sorted(
-            p.name
-            for p in brew_bin.iterdir()
-            if not p.name.startswith(".") and (p.is_file() or p.is_symlink())
-        )
+    # ponytail: 2026-09 — macOS-only paths. /opt/homebrew/bin 和 /Applications 是
+    # Apple Silicon 默认布局，Linux 上不会崩（Path.exists() 守卫），但用户看不到
+    # 「平台不支持 brew/cask」的明确信号——卡里只剩 uv/cargo。显式 sys.platform 守卫。
+    if sys.platform == "darwin":
+        # brew binaries (symbolic links under /opt/homebrew/bin)
+        brew_bin = Path("/opt/homebrew/bin")
+        if brew_bin.exists():
+            out["clis"]["brew"] = sorted(
+                p.name
+                for p in brew_bin.iterdir()
+                if not p.name.startswith(".") and (p.is_file() or p.is_symlink())
+            )
+
+        # Homebrew cask GUI apps in /Applications
+        apps_dir = Path("/Applications")
+        if apps_dir.exists():
+            out["clis"]["cask"] = sorted(
+                p.stem for p in apps_dir.iterdir() if p.suffix == ".app"
+            )
 
     # uv tools (parse `uv tool list` — first token per non-separator line)
+    # 跨平台可用,不需要守卫
     try:
         uv_out = subprocess.check_output(
             ["uv", "tool", "list"],
@@ -353,13 +366,6 @@ def detect_local_skills(force: bool = False):
     if cargo_bin.exists():
         out["clis"]["cargo"] = sorted(
             p.name for p in cargo_bin.iterdir() if p.name.startswith("cargo-")
-        )
-
-    # Homebrew cask GUI apps in /Applications
-    apps_dir = Path("/Applications")
-    if apps_dir.exists():
-        out["clis"]["cask"] = sorted(
-            p.stem for p in apps_dir.iterdir() if p.suffix == ".app"
         )
 
     with _local_scan_lock:

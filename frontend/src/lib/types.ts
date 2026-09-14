@@ -77,14 +77,6 @@ export interface GainPage {
   note?: string | null
 }
 
-export interface TopPage {
-  items: Repo[]
-  page: number
-  size: number
-  pages: number
-  total: number
-}
-
 export interface ReadmeZh {
   ok: boolean
   repo: string

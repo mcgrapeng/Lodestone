@@ -6,6 +6,7 @@ import json
 import re
 import subprocess
 import sys
+import threading
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -14,6 +15,11 @@ from radar_pkg import core
 import db  # ponytail: get_readme_zh uses db._DB_OK guard; imported lazily at runtime via try/except elsewhere
 from radar_pkg.core import _repo_slug_from_url
 from radar_pkg.gh import _gh_repo_meta
+
+# ponytail: 2026-09 — 序列化 JSON cache 写。enrich_summaries 4 worker + translate_batch 10 worker
+# 都对同一文件做 read-modify-write,无锁时后写覆盖前写 → 多 worker 翻译结果丢失。
+# 锁内必须重读 disk(只锁内存 dict 不够,会基于过期 snapshot 写回覆盖并发写入)。
+_TRANSLATE_LOCK = threading.Lock()
 
 """radar_pkg.translate — 由 radar.py 搬移(2026-09 架构拆分)。"""
 _LANG_NAV_WORDS = (
@@ -619,13 +625,23 @@ def enrich_summaries(repos: list, max_workers: int = 4) -> int:
     # 无需 LLM,纯本地匹配。competitive 是字符串而非 list(drawer 当文字段落渲染).
     n_comp = _attach_competitive(repos)
     print(f"[crawl] competitive: filled for {n_comp} repos")
-    try:
-        # ponytail: 原子写(tmp + rename)避免多 worker 并发时覆盖其他 worker 的更新
-        tmp = core.README_ZH_CACHE.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(cache, ensure_ascii=False, indent=1))
-        tmp.replace(core.README_ZH_CACHE)
-    except Exception as e:
-        print(f"  [warn] summary cache write failed: {e}", file=sys.stderr)
+    # ponytail: 2026-09 — 锁内重读 disk 合并写回。/api/save_summary_batch 也写同一文件,
+    # 不重读 disk 直接写 cache 会把并发的新桶数据覆盖丢。
+    with _TRANSLATE_LOCK:
+        try:
+            on_disk = (
+                json.loads(core.README_ZH_CACHE.read_text())
+                if core.README_ZH_CACHE.exists()
+                else {}
+            )
+            # 内存 cache(worker 刚 mutate 完)对 on_disk 是 superset,用内存覆盖
+            for k, v in cache.items():
+                on_disk[k] = v
+            tmp = core.README_ZH_CACHE.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(on_disk, ensure_ascii=False, indent=1))
+            tmp.replace(core.README_ZH_CACHE)
+        except Exception as e:
+            print(f"  [warn] summary cache write failed: {e}", file=sys.stderr)
     return sum(1 for r in repos if r.get("summary_zh"))
 
 
@@ -696,15 +712,29 @@ def translate_batch(pairs):
             out[k] = cache[k]
         else:
             todo[k] = v
-    if todo:
-        print(f"  · translating {len(todo)} descriptions…", file=sys.stderr)
-        with ThreadPoolExecutor(max_workers=10) as ex:
-            futs = {ex.submit(translate_text, v): k for k, v in todo.items()}
-            for fut in as_completed(futs):
-                out[futs[fut]] = fut.result() or ""
+    if not todo:
+        return out
+    print(f"  · translating {len(todo)} descriptions…", file=sys.stderr)
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        futs = {ex.submit(translate_text, v): k for k, v in todo.items()}
+        for fut in as_completed(futs):
+            out[futs[fut]] = fut.result() or ""
+    # ponytail: 2026-09 — 锁内重读 disk 合并写回。避免两个并发 translate_batch
+    # 各自基于过期 snapshot 写回造成 lost update。
+    with _TRANSLATE_LOCK:
+        on_disk = (
+            json.loads(core.TRANSLATE_CACHE.read_text())
+            if core.TRANSLATE_CACHE.exists()
+            else {}
+        )
         # ponytail: don't cache empty results — a failed translation shouldn't be permanent
-        cache.update({k: out[k] for k in todo if out[k]})
-        core.TRANSLATE_CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2))
+        for k in todo:
+            v = out.get(k)
+            if v:
+                on_disk[k] = v
+        tmp = core.TRANSLATE_CACHE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(on_disk, ensure_ascii=False, indent=2))
+        tmp.replace(core.TRANSLATE_CACHE)
     return out
 
 

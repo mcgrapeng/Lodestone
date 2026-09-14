@@ -199,7 +199,7 @@ def query_categories(conn):
     cur = conn.cursor()
     cat_meta = {}
     try:
-        from radar import CATEGORIES  # late import to avoid circular
+        from radar_pkg.core import CATEGORIES  # canonical source (was: late import from radar)
 
         cat_meta = {c["id"]: (c["name"], c["desc"]) for c in CATEGORIES}
     except Exception:

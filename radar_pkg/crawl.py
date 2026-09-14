@@ -86,6 +86,9 @@ def _crawl_inner():
     """Fetch all categories, dedupe, save."""
     today = datetime.date.today().isoformat()
     core.GH_SEARCH_STATS["failed"] = 0
+    # ponytail: 2026-09 — 重置自适应限速 sleep。REST 限流恢复把 sleep 永久 bump 到 6.0
+    # (gh.py:53),不重置会让后续 crawl 在同进程内一直慢到下次重启。
+    core._SEARCH_PACE["sleep"] = 2.0
     print(f"[crawl] {today} — {len(CATEGORIES)} categories")
     try:
         from scrapers import status as scraper_status
@@ -459,23 +462,22 @@ def _crawl_inner():
         if llm_inputs:
             n = analyze_many(llm_inputs, max_workers=4)
             print(f"  ✓ llm analysis: {n} repos got 5d analysis")
+            # ponytail: 2026-09 — llm cache 一次性 load（旧代码每 repo 重读磁盘，1000 行→1000 次读）
+            try:
+                from radar_pkg.llm_analyze import _load_cache as _load_llm_cache
+
+                llm_cache = _load_llm_cache()
+            except Exception:
+                llm_cache = {}
             # ponytail: 把分析结果回写到 readme_zh_cache（共享缓存文件，避免再开一个）
             for inp in llm_inputs:
                 key = inp["name"].lower()
-                if key in readme_cache:
-                    # 重新加载刚写入的 llm cache，取最新
-                    try:
-                        from radar_pkg.llm_analyze import _load_cache as _load_llm_cache
-
-                        llm_cache = _load_llm_cache()
-                        if key in llm_cache:
-                            readme_cache[key]["analysis_5d"] = llm_cache[key]
-                            for r in deduped:
-                                if (r.get("name") or "").lower() == key:
-                                    r["analysis_5d"] = llm_cache[key]
-                                    break
-                    except Exception:
-                        pass
+                if key in llm_cache:
+                    readme_cache.setdefault(key, {})["analysis_5d"] = llm_cache[key]
+                    for r in deduped:
+                        if (r.get("name") or "").lower() == key:
+                            r["analysis_5d"] = llm_cache[key]
+                            break
             # 把 analysis_5d 落回 readme_zh_cache.json
             try:
                 core.README_ZH_CACHE.write_text(

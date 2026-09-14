@@ -2,15 +2,8 @@
 """radar_pkg.core — 常量/分类表/过滤/归一化(无兄弟模块依赖)。
 2026-09 架构拆分自 radar.py;共享可变常量(SKILLS_CACHE 等)定义于此,
 使用方一律 `from radar_pkg import core` + 属性访问(patch 穿透规约)。"""
-import datetime
-import json
 import os
 import re
-import shutil
-import subprocess
-import sys
-import time
-import urllib.request
 from pathlib import Path
 
 # ponytail: 本文件在 radar_pkg/ 下,仓库根是上一级

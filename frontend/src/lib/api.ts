@@ -5,7 +5,6 @@ import type {
   GainPage,
   Snapshot,
   Stats,
-  TopPage,
 } from './types'
 
 const BASE = ''  // same-origin via Vite proxy
@@ -54,12 +53,6 @@ export const api = {
 
   async getStats(): Promise<Stats> {
     return jsonOrThrow(await fetch(`${BASE}/api/stats`))
-  },
-
-  async getTop(page = 1, size = 12, sort: 'stars' | 'forks' = 'stars'): Promise<TopPage> {
-    return jsonOrThrow(
-      await fetch(`${BASE}/api/top?page=${page}&size=${size}&sort=${sort}`),
-    )
   },
 
   async getGain(minDelta = 50, page = 1, size = 24): Promise<GainPage> {
