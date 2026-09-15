@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 200" width="600" height="200">
+  <defs>
+    <linearGradient id="lodestone-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="50%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#ec4899"/>
+    </linearGradient>
+    <linearGradient id="stone-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Stylized magnetic stone (lodestone) with sparkle rays pointing outward -->
+  <!-- Main stone: hexagonal-ish rock with gradient -->
+  <g transform="translate(80,100)">
+    <!-- Outer rays/sparkle -->
+    <g stroke="url(#lodestone-grad)" stroke-width="4" stroke-linecap="round" opacity="0.85">
+      <line x1="0" y1="-70" x2="0" y2="-58"/>
+      <line x1="0" y1="58" x2="0" y2="70"/>
+      <line x1="-70" y1="0" x2="-58" y2="0"/>
+      <line x1="58" y1="0" x2="70" y2="0"/>
+      <line x1="-50" y1="-50" x2="-42" y2="-42"/>
+      <line x1="42" y1="-42" x2="50" y2="-50"/>
+      <line x1="-50" y1="50" x2="-42" y2="42"/>
+      <line x1="42" y1="42" x2="50" y2="50"/>
+    </g>
+    <!-- Rock body -->
+    <path d="M -45,-20 L -25,-50 L 25,-50 L 45,-20 L 40,30 L 0,55 L -40,30 Z"
+          fill="url(#stone-grad)" stroke="#1e1b4b" stroke-width="2"/>
+    <!-- Highlight -->
+    <path d="M -30,-35 L -10,-45 L 10,-42 L -5,-25 L -25,-20 Z"
+          fill="#c4b5fd" opacity="0.55"/>
+    <!-- North arrow on the stone (magnet pointing direction) -->
+    <path d="M 0,-30 L 6,-5 L 0,-12 L -6,-5 Z"
+          fill="#fbbf24" stroke="#92400e" stroke-width="1"/>
+  </g>
+
+  <!-- Wordmark: "Lodestone" + tagline -->
+  <g transform="translate(180, 100)" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif">
+    <text x="0" y="-8" font-size="56" font-weight="700" fill="url(#lodestone-grad)" letter-spacing="-1">
+      Lodestone
+    </text>
+    <text x="2" y="32" font-size="16" font-weight="500" fill="#6b7280" letter-spacing="0.5">
+      磁石 · 你的 AI 工程师罗盘
+    </text>
+  </g>
+</svg>

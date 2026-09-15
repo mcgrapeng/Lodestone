@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lodestone · 文档预览</title>
+<style>
+:root {
+  --bg: #0b0d12;
+  --bg-2: #131722;
+  --panel: #1a1f2e;
+  --panel-2: #232a3d;
+  --border: #2d3548;
+  --text: #e6e9ef;
+  --text-dim: #9ba4b5;
+  --accent: #8b5cf6;
+  --accent-2: #ec4899;
+  --accent-3: #6366f1;
+  --good: #10b981;
+  --warn: #f59e0b;
+  --bad: #ef4444;
+  --code-bg: #0a0c12;
+  --link: #a78bfa;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  font-size: 16px;
+}
+.container { max-width: 920px; margin: 0 auto; padding: 32px 24px 80px; }
+header.site-header {
+  text-align: center;
+  padding: 48px 0 32px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 32px;
+}
+header.site-header img { max-width: 540px; height: auto; }
+header.site-header h1 {
+  font-size: 36px;
+  background: linear-gradient(135deg, var(--accent-3), var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 24px 0 8px;
+}
+header.site-header p {
+  color: var(--text-dim);
+  font-size: 17px;
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+nav.site-nav {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  position: sticky;
+  top: 0;
+  background: rgba(11, 13, 18, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 100;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 48px;
+}
+nav.site-nav a {
+  color: var(--text-dim);
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+nav.site-nav a:hover {
+  background: var(--panel);
+  color: var(--text);
+}
+nav.site-nav a.nav-external {
+  background: linear-gradient(135deg, var(--accent-3), var(--accent));
+  color: white;
+}
+nav.site-nav a.nav-external:hover { opacity: 0.9; }
+section.doc {
+  padding-top: 48px;
+  margin-top: 48px;
+  border-top: 1px solid var(--border);
+}
+section.doc:first-of-type {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text);
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 1.8em 0 0.6em;
+  scroll-margin-top: 80px;
+}
+h1 { font-size: 36px; margin-top: 0; }
+h2 {
+  font-size: 26px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+h3 { font-size: 20px; color: var(--accent); }
+h4 { font-size: 17px; }
+p { margin: 0.8em 0; color: var(--text); }
+ul, ol { margin: 0.6em 0 0.6em 1.5em; }
+li { margin: 0.3em 0; }
+li > p { margin: 0.4em 0; }
+strong { color: var(--accent); font-weight: 600; }
+em { color: var(--text); font-style: italic; }
+code {
+  font-family: "SF Mono", "Monaco", "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: 0.9em;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #fbbf24;
+}
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 1em 0;
+  overflow-x: auto;
+}
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+blockquote {
+  border-left: 3px solid var(--accent);
+  background: var(--panel);
+  margin: 1em 0;
+  padding: 12px 16px;
+  border-radius: 0 8px 8px 0;
+  color: var(--text-dim);
+  font-style: italic;
+}
+blockquote p { margin: 0; }
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+  font-size: 14px;
+}
+th, td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+th {
+  background: var(--panel);
+  font-weight: 600;
+  color: var(--accent);
+}
+tbody tr:hover { background: var(--panel); }
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 1em 0;
+  border: 1px solid var(--border);
+}
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2em 0;
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+footer.site-footer {
+  margin-top: 80px;
+  padding: 24px 0;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+code.language-bash { color: #a5d6a7; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<header class="site-header">
+  <img src="../logo.svg" alt="Lodestone · 磁石 · 你的 AI 工程师罗盘">
+  <h1>Lodestone · 文档预览</h1>
+  <p>完整文档嵌入到 GitHub 仓库根（README.md / 安装说明.md / 使用手册.md）。本预览页用 mistune 渲染，挂本地 server 即可访问。</p>
+</header>
+
+
+<nav class="site-nav">
+  <a href="#readme-top" class="nav-item">📖 README</a>
+  <a href="#install-top" class="nav-item">📦 安装说明</a>
+  <a href="#manual-top" class="nav-item">🛠 使用手册</a>
+  <a href="https://github.com/lodestone/lodestone" class="nav-item nav-external" target="_blank" rel="noopener">⭐ GitHub →</a>
+</nav>
+
+
+<section class="doc">
+<p>&lt;img src=&quot;logo.svg&quot; alt=&quot;Lodestone · 磁石 · 你的 AI 工程师罗盘&quot; width=&quot;540&quot;&gt;</p>
+<h1 id="readme-top">⚡ Lodestone</h1>
+<p><strong>每天 5 分钟，给 AI 工程师一份&quot;现在值得关注&quot;清单。</strong></p>
+<p>Lodestone（磁石）= 古代航海家用天然磁铁矿导航。我们把 GitHub、HuggingFace、MCP Registry、arXiv 四个数据洋流汇成一张中文友好的仪表盘——按 20 个用途分类，不刷十几个 RSS。</p>
+<hr />
+<h2 id="一图流-数据怎么流">🧭 一图流：数据怎么流</h2>
+<pre><code>            4 数据洋流                        4 级爬虫兜底
+                                                  ┌─ httpx ─── 多数直接命中
+  GitHub   ──┐                                  ├─ cloudscraper ── 破 Cloudflare
+  HuggingFace ─┼─→ 抓 · 去重 · AI 过滤 ──→ 仪表盘 ──┤
+  MCP Reg    ─┤                                  ├─ playwright_stealth ── 真浏览器
+  arXiv      ─┘                                  └─ jina ── 本地 IP 被封换出口
+                  ↓
+              Postgres（推荐）/ JSON 回退
+                  ↓
+              ┌─ 卡片墙：hot_now / trending / 分类 / 24h 星增
+              ├─ 5 桶详情：是什么 / 能干什么 / 解决什么问题 / 同类 / 何时选它
+              └─ 一键装为 skill（仓库根有 SKILL.md 时）
+</code></pre>
+<p>GitHub 抗爬时其他 3 个源照常工作——你不会&quot;今天啥都看不到&quot;。</p>
+<hr />
+<h2 id="30-秒上手">🚀 30 秒上手</h2>
+<pre><code class="language-bash">git clone &lt;仓库&gt; ~/lodestone &amp;&amp; cd ~/lodestone
+./radar.py crawl                  # ~5 分钟：抓 + 翻译 + 入库
+./radar.py web                    # 后台起 serve + 自动开浏览器 → http://127.0.0.1:8765
+</code></pre>
+<p>要不要装成 Claude Code 的 <code>/yz:ai</code> 命令？一行：</p>
+<pre><code class="language-bash">./install.sh install              # 软链接到 ~/.claude/skills/yz-ai
+</code></pre>
+<p>完全退出 Claude Code 再重开。说&quot;刷一下 AI 雷达&quot;就能用。</p>
+<blockquote>
+<p>📸 <strong>Dashboard 主视图</strong>（DB 加载好后是这个样子）：
+<img src="../../screenshots/dashboard.png" alt="Dashboard" /></p>
+</blockquote>
+<hr />
+<h2 id="写给谁-解决什么">🎯 写给谁 / 解决什么</h2>
+<p><strong>主要用户</strong>：AI 应用工程师，每天 5 分钟扫&quot;现在出了什么值得关注的新东西&quot;。</p>
+<p><strong>解决的问题</strong>（这些是真实痛点）：</p>
+<table>
+<thead>
+<tr>
+  <th>痛点</th>
+  <th>为什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>GitHub Trending 一天 25 条，只有 ~5 条跟 AI 有关</td>
+  <td>Trending 不分主题，要人工过滤</td>
+</tr>
+<tr>
+  <td>HuggingFace 首页不主动推新模型</td>
+  <td>要主动浏览 + 看 trending</td>
+</tr>
+<tr>
+  <td>MCP 协议刚起步，没有&quot;热门 MCP server&quot;榜</td>
+  <td>官方 registry 是 raw JSON，自己读累</td>
+</tr>
+<tr>
+  <td>arXiv 一天 100+ AI 论文</td>
+  <td>没人有空逐条翻</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-个数据源覆盖什么">🌊 5 个数据源覆盖什么</h2>
+<table>
+<thead>
+<tr>
+  <th>源</th>
+  <th>抓什么</th>
+  <th>为什么不能少</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>GitHub</strong></td>
+  <td>主流开源 AI 项目</td>
+  <td>90% 的 AI 工具在这</td>
+</tr>
+<tr>
+  <td><strong>HuggingFace Spaces</strong></td>
+  <td>社区精选 AI demo</td>
+  <td>跑得起来的比 README 更有用</td>
+</tr>
+<tr>
+  <td><strong>HuggingFace Models</strong></td>
+  <td>模型权重排行</td>
+  <td>知道流行什么（Qwen / Llama / DeepSeek）</td>
+</tr>
+<tr>
+  <td><strong>MCP Registry</strong></td>
+  <td>官方 MCP server</td>
+  <td>MCP 协议生态入口</td>
+</tr>
+<tr>
+  <td><strong>arXiv</strong></td>
+  <td>最新 AI 论文</td>
+  <td>模型还没出，论文先发</td>
+</tr>
+</tbody>
+</table>
+<p>GitHub 抗爬 → 其他 4 个源照常。<strong>一个倒、其他不倒</strong>。</p>
+<hr />
+<h2 id="关键技术能力">⚙️ 关键技术能力</h2>
+<table>
+<thead>
+<tr>
+  <th>能力</th>
+  <th>怎么实现</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>4 级爬虫 fallback</strong></td>
+  <td>httpx → cloudscraper → playwright_stealth → jina。日常只 httpx 在跑</td>
+</tr>
+<tr>
+  <td><strong>中文友好</strong></td>
+  <td>desc + README 自动翻译 + 结构化摘要</td>
+</tr>
+<tr>
+  <td><strong>Postgres + JSON 双模</strong></td>
+  <td>PG 优先（24h 星增、历史快照），PG 不可达回退 JSON</td>
+</tr>
+<tr>
+  <td><strong>决策支持</strong></td>
+  <td>LLM 5 桶分析（是什么 / 痛点 / 同类 / 优缺 / 何时选），可选 Claude/GPT/Ollama</td>
+</tr>
+<tr>
+  <td><strong>Skill 一键安装</strong></td>
+  <td>探测 SKILL.md → 标记 is_skill → 卡片显示&quot;装&quot;按钮</td>
+</tr>
+<tr>
+  <td><strong>20 个分类</strong></td>
+  <td>Agent · RAG · LLM · IDE · MCP · Voice · 安全 · 机器人 · 论文 …</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="文档导航">📚 文档导航</h2>
+<table>
+<thead>
+<tr>
+  <th>你想看什么</th>
+  <th>跳到</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>🚀 装好跑起来</td>
+  <td><a href="%E5%AE%89%E8%A3%85%E8%AF%B4%E6%98%8E.md">安装说明</a></td>
+</tr>
+<tr>
+  <td>📖 命令清单 + 故障排查 + 加新数据源</td>
+  <td><a href="%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C.md">使用手册</a></td>
+</tr>
+<tr>
+  <td>🤖 Claude Code 触发入口（<code>/yz:ai</code>）</td>
+  <td><a href="../SKILL.md">SKILL.md</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="技术栈">📦 技术栈</h2>
+<ul>
+<li><strong>后端</strong>：Python 3.10+（stdlib + 可选 <code>pg8000</code>）</li>
+<li><strong>数据库</strong>：PostgreSQL（JSON 回退）</li>
+<li><strong>爬虫</strong>：4 引擎分级 fallback，stdlib + 可选依赖</li>
+<li><strong>数据源</strong>：5 个互补源（GitHub + HF × 2 + MCP + arXiv）</li>
+<li><strong>前端</strong>：React 19 + Vite 6 + Appica UI + Tailwind v4</li>
+<li><strong>依赖</strong>：<code>gh</code> CLI 已认证；翻译走 Google Translate；可选 LLM 走 Claude / OpenAI / Ollama</li>
+</ul>
+<hr />
+<h2 id="部署">🚀 部署</h2>
+<p>本地默认 <code>127.0.0.1:8765</code>（安全：API 能 <code>git clone</code> 你的 skill 目录，不暴露到内网）。</p>
+<p>服务器部署需 3 个改动（详见 <a href="%E5%AE%89%E8%A3%85%E8%AF%B4%E6%98%8E.md#%E9%83%A8%E7%BD%B2%E5%88%B0%E6%9C%8D%E5%8A%A1%E5%99%A8">安装说明 § 部署</a>）：</p>
+<pre><code class="language-bash"># .env
+RADAR_HOST=0.0.0.0          # serve 监听外部接口（前面挂 nginx 做 TLS）
+LODESTONE_HOME=/var/lib/lodestone  # 数据缓存目录（多用户服务器场景）
+PGHOST=10.0.0.5             # PG 不在 localhost 时
+</code></pre>
+<hr />
+<h2 id="license">📄 License</h2>
+<p>Apache-2.0 — see <a href="../LICENSE">LICENSE</a>.</p>
+<h2 id="authors">✍️ Authors</h2>
+<p>Commit metadata 全部走 <code>Lodestone &lt;noreply@lodestone.dev&gt;</code>（开源 release 时 history rewrite 过）。</p>
+<p>新贡献者建议这样配 git 身份保持一致：</p>
+<pre><code class="language-bash">git config user.name &quot;Your Name&quot;
+git config user.email &quot;you@example.com&quot;
+</code></pre>
+<p>(不强制特定邮箱——你用什么邮箱都行。)</p>
+<hr />
+<h2 id="相关项目">🔗 相关项目</h2>
+<ul>
+<li><a href="https://github.com/sst/opencode"><code>opencode</code></a> — terminal-based AI coding harness (这个 skill 跑在它里面)</li>
+<li><a href="https://github.com/oraios/serena"><code>serena</code></a> — IDE-like semantic code retrieval (开发时用)</li>
+<li><a href="https://claude.com/claude-code">Claude Code</a>, <a href="https://github.com/openai/codex">Codex CLI</a>, <a href="https://easycode.ai">EasyCode</a> — 其他支持的 runtime</li>
+</ul>
+
+</section>
+
+<section class="doc">
+<p>&lt;img src=&quot;logo.svg&quot; alt=&quot;Lodestone · 磁石 · 你的 AI 工程师罗盘&quot; width=&quot;540&quot;&gt;</p>
+<h1 id="install-top">🧭 安装说明</h1>
+<p>把 Lodestone 装起来、跑起来，让它每天给你送 5 分钟的&quot;值得看&quot;清单。</p>
+<blockquote>
+<p>📖 这是什么 / 为什么 → <a href="README.md">README</a>
+🛠️ 命令清单 / 故障排查 → <a href="%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C.md">使用手册</a></p>
+</blockquote>
+<hr />
+<h2 id="你需要什么">📦 你需要什么</h2>
+<table>
+<thead>
+<tr>
+  <th>工具</th>
+  <th>版本</th>
+  <th>没装怎么办</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>Python</strong></td>
+  <td>3.10+</td>
+  <td>macOS: <code>brew install python3</code> · Linux: <code>apt install python3.10</code></td>
+</tr>
+<tr>
+  <td><strong>Node.js</strong></td>
+  <td>18+</td>
+  <td><a href="https://nodejs.org">nodejs.org</a></td>
+</tr>
+<tr>
+  <td><strong>Git</strong></td>
+  <td>任意</td>
+  <td>系统自带，或 <code>brew install git</code></td>
+</tr>
+<tr>
+  <td><strong><code>gh</code> CLI</strong></td>
+  <td>2.0+</td>
+  <td><a href="https://cli.github.com">cli.github.com</a> → <code>gh auth login</code></td>
+</tr>
+</tbody>
+</table>
+<p>网络能访问 <code>github.com</code> + <code>translate.googleapis.com</code> + <code>registry.modelcontextprotocol.io</code> 就行。</p>
+<p>想用 Claude Code 的 <code>/yz:ai</code> 入口？再装个 <a href="https://claude.com/download">Claude Code</a>。<strong>可以后装</strong>——先把后端跑起来。</p>
+<blockquote>
+<p>📸 <strong>dashboard 跑起来后是这个样子：</strong>
+<img src="../../screenshots/dashboard.png" alt="Dashboard main view" /></p>
+</blockquote>
+<hr />
+<h2 id="三步装好">⚡ 三步装好</h2>
+<pre><code class="language-bash"># 1. 拉代码
+git clone &lt;仓库地址&gt; ~/lodestone
+cd ~/lodestone
+
+# 2. 装 Python 依赖（接 Postgres 时才需要 pg8000）
+.venv/bin/pip install pg8000    # 或 pip install -r requirements.txt
+
+# 3. 前端依赖
+(cd frontend &amp;&amp; npm install --no-audit --no-fund)
+
+# 4. 跑起来
+./radar.py crawl                # ~3-5 分钟：抓 + 翻译 + 入库
+./radar.py today                # 终端看 Top 15，能打印就说明 OK
+./radar.py web                  # 后台起 serve + 自动开浏览器
+</code></pre>
+<p>想要 <code>/yz:ai</code> skill 命令？装它：</p>
+<pre><code class="language-bash">./install.sh install            # 软链接到 ~/.claude/skills/yz-ai 等
+./install.sh status             # 验证装好
+</code></pre>
+<blockquote>
+<p>📸 <strong>Settings UI（右上角齿轮打开）：</strong>
+<img src="../../screenshots/settings-drawer.png" alt="Settings drawer" /></p>
+</blockquote>
+<p><strong>完全退出 Claude Code 再重开</strong>（Cmd+Q / Alt+F4），让 SKILL.md 重新加载。</p>
+<hr />
+<h2 id="部署到服务器">🚀 部署到服务器</h2>
+<blockquote>
+<p>本地能跑 ≠ 服务器能跑。下面 3 件事必须改，否则会在 Linux 服务器上炸。</p>
+</blockquote>
+<h3 id="1-env-配-postgres-推荐">1. <code>.env</code> 配 Postgres（推荐）</h3>
+<pre><code class="language-bash">cp .env.example .env
+# 编辑 .env，把 PGHOST/PGUSER/PGPASSWORD/PGDATABASE 改成服务器实际值
+</code></pre>
+<p><code>.env</code> 里的所有变量在每个 <code>radar.py</code> 命令开头自动加载。Shell 环境变量优先级更高。</p>
+<h3 id="2-让-serve-监听外部接口">2. 让 serve 监听外部接口</h3>
+<p>默认 <code>serve</code> 只绑 <code>127.0.0.1</code>（安全：API 能 <code>git clone</code> 到你机器的 skill 目录，不暴露到内网）。</p>
+<p>服务器需要别人访问时：</p>
+<pre><code class="language-bash"># .env 里加
+RADAR_HOST=0.0.0.0
+
+# 同时强烈建议前面挂 nginx / caddy 做 TLS + 鉴权
+</code></pre>
+<h3 id="3-skill-缓存重定向到项目目录">3. Skill 缓存重定向到项目目录</h3>
+<p>默认 skill 缓存写 <code>$HOME/.cache/lodestone/</code>，多用户服务器需要重定向：</p>
+<pre><code class="language-bash"># .env 里加
+LODESTONE_HOME=/var/lib/lodestone
+mkdir -p /var/lib/lodestone
+</code></pre>
+<p>数据库 schema（<code>repos</code> / <code>repo_categories</code> / <code>repo_stars_history</code> / <code>crawl_log</code>）由 <code>db.ensure_schema()</code> 在第一次 crawl 时自动建。装好 <code>.env</code> + PG 可达，直接 <code>./radar.py crawl</code> 就行。</p>
+<hr />
+<h2 id="验证安装-4-个检查全过-装好了">✅ 验证安装（4 个检查全过 = 装好了）</h2>
+<pre><code class="language-bash">./install.sh status                # 看到 &quot;yz-ai ✅&quot; = skill 装好了
+ls ~/.claude/skills/yz-ai/SKILL.md   # SKILL.md 存在
+./radar.py today                   # 终端有 Top 15 输出 = 后端通了
+./radar.py serve 8765 &amp;            # 或 ./radar.py web（自动开浏览器）
+curl --noproxy '*' http://127.0.0.1:8765/api/data | head -c 200
+# API 返回 JSON = 数据层通了
+</code></pre>
+<hr />
+<h2 id="更新">🔄 更新</h2>
+<pre><code class="language-bash">cd ~/lodestone
+git pull
+# skill 是符号链接 → 自动同步新代码
+# 重启 Claude Code（让 SKILL.md 重新加载）
+</code></pre>
+<p>数据快照独立于代码：<code>./radar.py crawl</code> 重新生成即可，旧 <code>data/latest.json</code> 不会被破坏。</p>
+<hr />
+<h2 id="卸载">🗑 卸载</h2>
+<pre><code class="language-bash">./uninstall.sh               # 删 skill 软链接（含旧 zp / lodestone 兼容）
+rm -rf ~/lodestone           # 删源码（可选）
+rm -rf ~/lodestone/data/*    # 清数据快照（可选）
+</code></pre>
+<hr />
+<h2 id="故障排查">🛟 故障排查</h2>
+<table>
+<thead>
+<tr>
+  <th>报错</th>
+  <th>原因</th>
+  <th>解决</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>python3: command not found</code></td>
+  <td>Python 没装或不在 PATH</td>
+  <td>装 Python 3.10+</td>
+</tr>
+<tr>
+  <td><code>gh: command not found</code> / <code>gh auth status</code> 失败</td>
+  <td><code>gh</code> CLI 未装 / 未登录</td>
+  <td>装 <code>gh</code> → <code>gh auth login</code></td>
+</tr>
+<tr>
+  <td><code>node: command not found</code></td>
+  <td>Node 没装</td>
+  <td>装 Node 18+</td>
+</tr>
+<tr>
+  <td><code>install.sh</code> 报 &quot;缺少 SKILL.md&quot;</td>
+  <td>当前不在仓库根</td>
+  <td><code>cd ~/lodestone</code> 重试</td>
+</tr>
+<tr>
+  <td>Claude Code 不识别 <code>/yz:ai</code></td>
+  <td>SKILL.md 没加载</td>
+  <td>完全退出 Claude Code（Cmd+Q）再重开；不行就 <code>uninstall.sh &amp;&amp; install.sh</code></td>
+</tr>
+<tr>
+  <td><code>crawl</code> 报 <code>SSL: CERTIFICATE_VERIFY_FAILED</code></td>
+  <td>macOS Python 缺证书链</td>
+  <td><code>/Applications/Python\ 3.13/Install\ Certificates.command</code>；或装 <code>certifi</code></td>
+</tr>
+<tr>
+  <td><code>crawl</code> 一直卡在 <code>rate-limit hit</code></td>
+  <td>GitHub Search API 30 req/min 限流</td>
+  <td>等 60s 自动恢复，crawl 内置退避</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="下一步">🚀 下一步</h2>
+<ul>
+<li>🛠️ 怎么用 → <a href="%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C.md">使用手册</a></li>
+<li>📖 这是什么 → <a href="README.md">README</a></li>
+<li>🤖 <code>/yz:ai</code> skill 触发入口 → <a href="../SKILL.md">SKILL.md</a></li>
+</ul>
+
+</section>
+
+<section class="doc">
+<p>&lt;img src=&quot;logo.svg&quot; alt=&quot;Lodestone · 磁石 · 你的 AI 工程师罗盘&quot; width=&quot;540&quot;&gt;</p>
+<h1 id="manual-top">📖 使用手册</h1>
+<blockquote>
+<p><strong>Lodestone 怎么用、命令清单、爬虫引擎怎么选、出错了怎么办 —— 全在这里。</strong></p>
+<p>📦 安装看 <a href="%E5%AE%89%E8%A3%85%E8%AF%B4%E6%98%8E.md">安装说明</a> · 📖 项目总览看 <a href="README.md">README</a> · 🤖 <code>/yz:ai</code> 入口看 <a href="../SKILL.md">SKILL.md</a></p>
+</blockquote>
+<hr />
+<h2 id="这是什么">🎯 这是什么</h2>
+<p>Lodestone 每天从 GitHub、HuggingFace、MCP Registry、arXiv 抓主流 AI 工具，按 <strong>20 个用途</strong> 分类整理成中文友好仪表盘。</p>
+<h3 id="4-个数据源-互补独立-缺一个不影响其他">🌊 4 个数据源（互补独立，缺一个不影响其他）</h3>
+<blockquote>
+<p>📸 <strong>Stats 标签页显示数据分布：</strong>
+<img src="../../screenshots/stats-tab.png" alt="Stats tab" /></p>
+</blockquote>
+<table>
+<thead>
+<tr>
+  <th>源</th>
+  <th>抓什么</th>
+  <th>API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>GitHub</strong></td>
+  <td>主流开源 AI 项目（分类 + 5k 池 + 趋势 + 手工种子）</td>
+  <td><code>gh api</code> + <code>github.com/trending</code> HTML</td>
+</tr>
+<tr>
+  <td><strong>HuggingFace Spaces</strong></td>
+  <td>社区精选 AI 应用 demo</td>
+  <td><code>api/spaces?sort=likes7d</code></td>
+</tr>
+<tr>
+  <td><strong>HuggingFace Models</strong></td>
+  <td>模型权重排行</td>
+  <td><code>api/models?sort=likes7d</code></td>
+</tr>
+<tr>
+  <td><strong>MCP Registry</strong></td>
+  <td>官方 MCP server 注册表</td>
+  <td><code>registry.modelcontextprotocol.io/v0/servers</code></td>
+</tr>
+<tr>
+  <td><strong>arXiv</strong></td>
+  <td>最新 AI 论文（cs.AI / cs.CL / cs.LG）</td>
+  <td><code>export.arxiv.org/api/query</code></td>
+</tr>
+</tbody>
+</table>
+<p>GitHub 抗爬时 MCP / HF / arXiv 仍能完整工作——你不会&quot;今天啥都看不到&quot;。</p>
+<p><strong>20 个分类</strong>：AI Agent &amp; Skills · RAG / Memory · LLM Interface · Code Generation · Workflow · Multimodal · Fine-tuning · Eval · AI IDE · LLM Gateway · Observability · Awesome Lists · MCP Servers · Voice · Browser Use · HuggingFace Spaces · HuggingFace Models · AI 安全 · 机器人 / Embodied AI · arXiv 论文</p>
+<hr />
+<h2 id="三步上手">🚀 三步上手</h2>
+<pre><code class="language-bash">cd ~/lodestone
+
+# 1. 抓数据（约 3-5 分钟；首次跑会拉 + 翻译 1k+ repo）
+./radar.py crawl
+
+# 2. 起后端 + 前端，一条命令搞定
+./radar.py web                # 后台拉 serve + 自动开浏览器 → http://127.0.0.1:8765
+
+# 3. 触发 /yz:ai（首次配置模型地址后富化 5 桶；后续手动重富化）
+</code></pre>
+<p>没装 Claude Code？直接终端看：</p>
+<pre><code class="language-bash">./radar.py today              # Top 15 + 20 个分类概览
+</code></pre>
+<hr />
+<h2 id="命令速查">⚡ 命令速查</h2>
+<table>
+<thead>
+<tr>
+  <th>命令</th>
+  <th>干什么</th>
+  <th>何时用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>./radar.py web [port]</code></td>
+  <td>一键：起 serve + 自动开浏览器</td>
+  <td>日常看仪表盘（推荐）</td>
+</tr>
+<tr>
+  <td><code>./radar.py crawl</code></td>
+  <td>抓所有数据源 + 翻译 + 入库</td>
+  <td>每天 / 新数据时</td>
+</tr>
+<tr>
+  <td><code>./radar.py today</code></td>
+  <td>终端打印 Top 15 + 分类</td>
+  <td>快速看一眼</td>
+</tr>
+<tr>
+  <td><code>./radar.py serve [port]</code></td>
+  <td>只起 JSON API + 托管前端（默认 8765）</td>
+  <td>API-only / 调试</td>
+</tr>
+<tr>
+  <td><code>./radar.py audit</code></td>
+  <td>数据质量审计（去重 / 金融过滤 / 来源分布）</td>
+  <td>月度自查</td>
+</tr>
+<tr>
+  <td><code>python3 refresh_snapshot.py</code></td>
+  <td>只刷 MCP / HF / 翻译（不动 GitHub）</td>
+  <td>GitHub 限流时</td>
+</tr>
+<tr>
+  <td><code>cd frontend &amp;&amp; npm run dev</code></td>
+  <td>起 Vite + Python（dev 热更新）</td>
+  <td>改前端代码</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="api-端点-serve-在跑时">🔌 API 端点（serve 在跑时）</h2>
+<table>
+<thead>
+<tr>
+  <th>方法</th>
+  <th>路径</th>
+  <th>返回</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>GET</td>
+  <td><code>/api/data</code></td>
+  <td><code>{hot_now, categories, fetched_at}</code> 主视图</td>
+</tr>
+<tr>
+  <td>GET</td>
+  <td><code>/api/local</code></td>
+  <td>本机已装的 skills / commands / agents / plugins</td>
+</tr>
+<tr>
+  <td>GET</td>
+  <td><code>/api/top?page=&amp;size=&amp;sort=</code></td>
+  <td>1k+ AI 主流项目池（按 stars/recent/name 排序）</td>
+</tr>
+<tr>
+  <td>GET</td>
+  <td><code>/api/gain?size=&amp;min_delta=</code></td>
+  <td>24h 星增榜</td>
+</tr>
+<tr>
+  <td>GET</td>
+  <td><code>/api/stats</code></td>
+  <td>语言 × 主题分布</td>
+</tr>
+<tr>
+  <td>GET</td>
+  <td><code>/api/scrapers/status</code></td>
+  <td>当前可用爬虫引擎</td>
+</tr>
+<tr>
+  <td>POST</td>
+  <td><code>/api/crawl</code></td>
+  <td>后台触发 crawl（忙时返 409）</td>
+</tr>
+<tr>
+  <td>POST</td>
+  <td><code>/api/install</code></td>
+  <td>克隆 GitHub repo 装为 skill</td>
+</tr>
+<tr>
+  <td>POST</td>
+  <td><code>/api/install-cli</code></td>
+  <td>把任意 CLI 包成 slash command</td>
+</tr>
+</tbody>
+</table>
+<p>所有 API 只绑 <code>127.0.0.1</code> —— 因为能 <code>git clone</code> 到你机器的 skill 目录，暴露到内网等于送权限。需要 LAN 访问：<code>RADAR_HOST=0.0.0.0</code> 加进 <code>.env</code>，外面套 nginx。</p>
+<hr />
+<h2 id="数据怎么走-爬取流程">🕷 数据怎么走（爬取流程）</h2>
+<pre><code>./radar.py crawl
+   │
+   ├─[1] 文件锁（data/crawl.lock）—— 防并发
+   │
+   ├─[2] GitHub GraphQL 批量搜索（204 个 query × N aliases/请求）
+   │      失败 → REST gh_search → HTML 阶梯兜底
+   │
+   ├─[3] 4 个非 GitHub 数据源并行抓：
+   │      HF Spaces · HF Models · MCP Registry · arXiv
+   │
+   ├─[4] AI 过滤（topic + 描述关键词 + 金融屏蔽）
+   │
+   ├─[5] 去重（按规范化 git URL）
+   │
+   ├─[6] SKILL.md 探测 —— 标记哪些 repo 能装为 skill
+   │
+   ├─[7] 翻译（Google Translate 免费端点，per-repo 持久缓存）
+   │
+   ├─[8] 结构化摘要（README → 介绍 / 能干什么 / 优势 三段）
+   │
+   ├─[9] LLM 5 维度决策分析（可选，需配 ANTHROPIC_API_KEY 等）
+   │      是什么 · 解决什么问题 · 同类项目 · 优缺点 · 何时选它
+   │
+   └─[10] 入库 —— Postgres 优先；失败/不可达时回退 data/latest.json
+</code></pre>
+<p>整个流程 ~3-5 分钟。文件锁保证两个 crawl 不会撞车。</p>
+<hr />
+<h2 id="卡片显示什么">🧾 卡片显示什么</h2>
+<p>每张卡片字段：</p>
+<table>
+<thead>
+<tr>
+  <th>字段</th>
+  <th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>name</code> / <code>url</code></td>
+  <td>仓库 owner/repo + GitHub 链接</td>
+</tr>
+<tr>
+  <td><code>summary_zh</code></td>
+  <td>中文一句话介绍</td>
+</tr>
+<tr>
+  <td><code>summary_sections</code></td>
+  <td>详细介绍（介绍 / 能干什么 / 优势，README 拆分）</td>
+</tr>
+<tr>
+  <td><code>analysis_5d</code></td>
+  <td>LLM 5 维度决策（需要配 LLM API key）</td>
+</tr>
+<tr>
+  <td><code>stars</code> / <code>forks</code> / <code>lang</code> / <code>topics</code></td>
+  <td>GitHub 元数据</td>
+</tr>
+<tr>
+  <td><code>trending</code></td>
+  <td>是否今日 trending</td>
+</tr>
+<tr>
+  <td><code>local_installed</code></td>
+  <td>你机器上是否已装</td>
+</tr>
+<tr>
+  <td><code>is_skill</code></td>
+  <td>是否能装为 skill（前端据此显示&quot;安装&quot;按钮）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>⚠️ <strong>不是所有 GitHub 仓库都能装为 skill</strong> —— 只有仓库根或 <code>/skills/</code> 目录下有 <code>SKILL.md</code> / <code>skill.md</code> / <code>SKILL.yaml</code> 的才算。LLM 框架、IDE 插件、模型权重等都不是可装载的 skill 格式，<strong>装按钮会隐藏</strong>，并在卡片里说明原因。</p>
+</blockquote>
+<hr />
+<h2 id="爬虫引擎-4-级-fallback">🕸 爬虫引擎（4 级 fallback）</h2>
+<blockquote>
+<p>为什么是这 4 个？引擎不在多，在精、互补。<strong>日常爬取只有 httpx 在跑，不启动浏览器</strong>。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+  <th>层级</th>
+  <th>引擎</th>
+  <th>解决什么</th>
+  <th>装依赖</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>1</td>
+  <td><strong>httpx</strong></td>
+  <td>最快路径：trending 是 SSR，多数直接命中</td>
+  <td><code>pip install httpx</code></td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><strong>cloudscraper</strong></td>
+  <td>Cloudflare challenge 中间页</td>
+  <td><code>pip install cloudscraper</code></td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><strong>playwright_stealth</strong></td>
+  <td>JS 渲染 / 严格指纹检测</td>
+  <td><code>pip install playwright playwright-stealth &amp;&amp; playwright install chromium</code></td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><strong>jina</strong></td>
+  <td>本地 IP 被封时换出口（公开免费）</td>
+  <td>无（firecrawl CLI 自带）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>质量门</strong>：每级结果过三层判据才算数（长度 ≥ 500 字符 / 不含 bot-check 特征 / trending 页 ≥5 个 <code>&lt;article class=&quot;Box-row&quot;&gt;</code>），不过门自动升级下一级。</p>
+<p>引擎白名单在 <code>config.toml [orchestrator].priority</code> —— 不在列表里的引擎永不运行（即使装了也禁用）。想用付费的 firecrawl 替代 jina？加进 priority 数组即可。</p>
+<p>更多 10 个停用适配器（firecrawl / crawl4ai / playwright / nodriver / crawlee / scrapy / agent_reach / trafilatura / beautifulsoup / drissionpage）能力与上述 4 级重叠，代码保留着不再调度。</p>
+<hr />
+<h2 id="加新数据源">➕ 加新数据源</h2>
+<p>加一个 fetcher = 三个改动，~50 行：</p>
+<ol>
+<li><p><strong>写 fetcher</strong> <code>sources/&lt;name&gt;.py</code>：</p>
+<pre><code class="language-python">def fetch_&lt;name&gt;(max_items: int = 30) -&gt; list:
+    return [{
+        &quot;name&quot;: &quot;owner/repo&quot;, &quot;url&quot;: &quot;...&quot;, &quot;desc&quot;: &quot;...&quot;,
+        &quot;stars&quot;: 100, &quot;lang&quot;: &quot;Python&quot;, &quot;topics&quot;: [&quot;ai&quot;],
+        &quot;source&quot;: &quot;&lt;name&gt;&quot;,
+    }, ...]
+</code></pre>
+</li>
+<li><p><strong>注册到 <code>radar_pkg/core.py</code> 的 <code>CATEGORIES</code></strong>：</p>
+<pre><code class="language-python">{&quot;id&quot;: &quot;&lt;name&gt;&quot;, &quot;name&quot;: &quot;...&quot;, &quot;desc&quot;: &quot;...&quot;, &quot;queries&quot;: [], &quot;source&quot;: &quot;&lt;name&gt;&quot;}
+</code></pre>
+</li>
+<li><p><strong>挂到 <code>radar_pkg/crawl.py:_crawl_inner</code> 的 dispatch</strong>：</p>
+<pre><code class="language-python">elif src == &quot;&lt;name&gt;&quot;:
+    repos = fetch_&lt;name&gt;(max_items=30)
+</code></pre>
+</li>
+</ol>
+<p>后续的翻译、upsert、hot_now 自动复用。改主题分类关键词看 <code>core.py:CATEGORY_TOPIC_HINTS</code>。</p>
+<hr />
+<h2 id="故障排查">🛟 故障排查</h2>
+<h3 id="api-data-返-502"><code>/api/data</code> 返 502</h3>
+<p><strong>原因</strong>：终端/浏览器走了 HTTP 代理，代理拦截 localhost。</p>
+<p><strong>解决</strong>：</p>
+<pre><code class="language-bash"># 终端测试绕过代理
+curl --noproxy '*' http://127.0.0.1:8765/api/data
+# 浏览器：用 http://127.0.0.1:8765（不走代理）而不是 localhost
+</code></pre>
+<h3 id="vite-报-address-already-in-use">Vite 报 <code>Address already in use</code></h3>
+<pre><code class="language-bash">lsof -ti :8765 | xargs kill -9
+lsof -ti :5174 | xargs kill -9   # 5174 是 lodestone vite 端口
+cd frontend &amp;&amp; npm run vite-only
+</code></pre>
+<h3 id="crawl-一直卡在-rate-limit-hit"><code>crawl</code> 一直卡在 <code>rate-limit hit</code></h3>
+<p><strong>原因</strong>：GitHub Search API 30 req/min 限流。</p>
+<p><strong>解决</strong>：等 60s 自动恢复。<code>./radar.py crawl</code> 内置退避。日志在 <code>data/crawl.log</code>。</p>
+<h3 id="gh-api-rate-limit-exceeded-for-lt-ip-gt"><code>gh: API rate limit exceeded for &lt;IP&gt;</code></h3>
+<p><strong>原因</strong>：<code>gh</code> 的登录 token 过期了；未认证按 IP 限流（10 次/分钟）。</p>
+<p><strong>解决</strong>（选一）：</p>
+<pre><code class="language-bash"># 方式 1：交互式重新登录
+gh auth login -h github.com
+
+# 方式 2：写到 .env（gh CLI 原生读取 GH_TOKEN）
+echo 'GH_TOKEN=ghp_xxxx' &gt;&gt; .env
+</code></pre>
+<p>token 有效时搜索走 GraphQL 批量（204 个 query 约 3 分钟）；失效时降级 REST → HTML 阶梯兜底，更慢（10 分钟+）但功能不丢。</p>
+<h3 id="description-字段是英文"><code>description</code> 字段是英文</h3>
+<p>HF API 对 Spaces/Models 不返回 desc。<code>refresh_snapshot.py</code> 用 repo name 合成 placeholder（&quot;Owner/RepoName — AI / ML project&quot;），自动翻译。</p>
+<h3 id="mcp-server-标记而不是具体语言"><code>MCP Server</code> 标记而不是具体语言</h3>
+<p>MCP Registry 服务不是 GitHub repo，没 language 字段。<code>/api/stats</code> 自动过滤它，<code>/api/data</code> 卡片仍显示 &quot;MCP Server&quot;。</p>
+<h3 id="macos-python-报-ssl-certificate-verify-failed"><code>macOS</code> Python 报 <code>SSL: CERTIFICATE_VERIFY_FAILED</code></h3>
+<pre><code class="language-bash"># 方案 1：装证书
+/Applications/Python\ 3.13/Install\ Certificates.command
+
+# 方案 2：装 certifi（更省事）
+pip install --upgrade certifi
+</code></pre>
+<p>所有 scraper 已默认 <code>urllib → curl</code> 回退，应该自动绕过。</p>
+<h3 id="卡片没显示-安装-按钮">卡片没显示「安装」按钮</h3>
+<p>检查 <code>repo.is_skill</code>：</p>
+<pre><code class="language-bash">curl --noproxy '*' -s http://127.0.0.1:8765/api/data | python3 -c &quot;
+import json, sys
+d = json.load(sys.stdin)
+for r in d['hot_now'][:5]:
+    print(f\&quot;{r['name']:&lt;35} is_skill={r.get('is_skill')}\&quot;)
+&quot;
+</code></pre>
+<p><code>is_skill=False</code> 表示仓库根没有 <code>SKILL.md</code>，按设计不显示装按钮 —— 这是正确的（不是所有 GitHub 项目都能装为 skill）。</p>
+<h3 id="想启用已停用的爬虫引擎">想启用已停用的爬虫引擎</h3>
+<pre><code class="language-bash"># 编辑 config.toml，把引擎名加回 [orchestrator].priority
+# 例：想用 firecrawl 替代 jina 做云端层
+priority = [&quot;httpx&quot;, &quot;cloudscraper&quot;, &quot;playwright_stealth&quot;, &quot;firecrawl&quot;]
+</code></pre>
+<p><code>scrapers/</code> 里 firecrawl / crawl4ai / playwright / nodriver / crawlee 等 10 个适配器代码已就位，装上对应 Python 包就能用。</p>
+<hr />
+<h2 id="部署到服务器">🚀 部署到服务器</h2>
+<blockquote>
+<p>安装/迁移到 Linux 服务器 / Docker / systemd unit？完整步骤看 <a href="%E5%AE%89%E8%A3%85%E8%AF%B4%E6%98%8E.md#%E9%83%A8%E7%BD%B2%E5%88%B0%E6%9C%8D%E5%8A%A1%E5%99%A8">安装说明 § 部署到服务器</a>。</p>
+</blockquote>
+<p>简要：</p>
+<ol>
+<li><code>.env</code> 配 PG（如果用）</li>
+<li><code>RADAR_HOST=0.0.0.0</code> 让 serve 监听外部接口（前面挂 nginx 做 TLS）</li>
+<li><code>LODESTONE_HOME=/var/lib/lodestone</code> 让 skill 缓存落到项目目录（多用户场景）</li>
+<li><code>pg8000</code> + 可达 PG → <code>./radar.py crawl</code> 自动建表入库</li>
+<li>systemd unit 守护 <code>./radar.py serve 8765</code></li>
+</ol>
+<hr />
+<h2 id="文件位置">📁 文件位置</h2>
+<table>
+<thead>
+<tr>
+  <th>你想看什么</th>
+  <th>路径</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>数据快照</td>
+  <td><code>data/latest.json</code></td>
+</tr>
+<tr>
+  <td>翻译缓存</td>
+  <td><code>data/zh_cache.json</code></td>
+</tr>
+<tr>
+  <td>README 中文摘要缓存</td>
+  <td><code>data/readme_zh_cache.json</code></td>
+</tr>
+<tr>
+  <td>SKILL.md 探测缓存</td>
+  <td><code>data/skill_probe_cache.json</code></td>
+</tr>
+<tr>
+  <td>LLM 5 维度分析缓存</td>
+  <td><code>data/llm_analysis_cache.json</code></td>
+</tr>
+<tr>
+  <td>爬取日志</td>
+  <td><code>data/crawl.log</code></td>
+</tr>
+<tr>
+  <td>后端日志</td>
+  <td><code>data/serve.log</code></td>
+</tr>
+<tr>
+  <td>爬虫引擎</td>
+  <td><code>scrapers/&lt;name&gt;_scraper.py</code></td>
+</tr>
+<tr>
+  <td>数据源</td>
+  <td><code>sources/&lt;name&gt;.py</code></td>
+</tr>
+<tr>
+  <td>数据库层</td>
+  <td><code>db/repos.py</code></td>
+</tr>
+<tr>
+  <td>前端主组件</td>
+  <td><code>frontend/src/components/</code></td>
+</tr>
+</tbody>
+</table>
+
+</section>
+
+<footer class="site-footer">
+  <p>Lodestone · Apache-2.0 · 渲染时间 2026-09-15 16:55</p>
+  <p>Regenerate: <code>python3 scripts/render_preview.py</code> · Logo: <code>docs/logo.svg</code></p>
+</footer>
+
+</div>
+
+</body>
+</html>
