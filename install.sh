@@ -7,6 +7,8 @@
 #
 # OpenCode 还需要 command/<name>.md 包装文件才能注册 /lodestone 斜杠命令
 # (OpenCode 的 skills/ 与 commands/ 是两个目录，不像 Claude 那样合一).
+# ponytail: 2026-09 — 旧项目名 zp / yz-ai 的 legacy symlink 仍然建，用于老用户
+# 升级时无缝衔接。新用户 clone 后这两个目录不存在,自动跳过,无副作用。
 
 set -e
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

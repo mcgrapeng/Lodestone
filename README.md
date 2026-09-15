@@ -105,3 +105,19 @@ PGHOST=10.0.0.5             # PG 不在 localhost 时
 ## License
 
 Apache-2.0 — see [LICENSE](LICENSE).
+
+## Authors
+
+Created and maintained by zhangpeng. Pre-release commits were authored
+with the personal email `lodestonezhang@gmail.com` — this is part of
+git history and cannot be retroactively changed without rewriting history.
+Going forward, new commits use a no-reply address via `.mailmap` (see
+repo root).
+
+Contributions welcome via Pull Request.
+
+## Related projects
+
+-- [`opencode`](https://github.com/sst/opencode) — terminal-based AI coding harness (this skill runs inside it)
+- [`serena`](https://github.com/oraios/serena) — IDE-like semantic code retrieval (used during dev)
+- [Claude Code](https://claude.com/claude-code), [Codex CLI](https://github.com/openai/codex), [EasyCode](https://easycode.ai) — other supported runtimes (skill works in all 4)
