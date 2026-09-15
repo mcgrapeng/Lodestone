@@ -1,5 +1,6 @@
 """Repo-level CRUD + queries. All callers pass a pg8000 connection."""
 
+import json
 from typing import Iterable
 
 # ponytail: int IDs serve double duty as default sort column for /api/top
@@ -61,6 +62,13 @@ def upsert_repos(conn, repos: Iterable[dict]):
             r.get("updated") or None,
             bool(r.get("is_ai_relevant")),
             r.get("stars_today"),  # may be None — only trending scrape fills this
+            bool(r.get("is_skill")),  # 2026-09 — SKILL.md probe
+            json.dumps(r.get("summary_sections") or {})  # {intro, can_do, benefit}
+            if r.get("summary_sections")
+            else None,
+            json.dumps(r.get("analysis_5d") or {})  # 2026-09 — LLM 5 维度决策分析
+            if r.get("analysis_5d")
+            else None,
         )
         for r in repos
     ]
@@ -68,20 +76,26 @@ def upsert_repos(conn, repos: Iterable[dict]):
         """
         INSERT INTO repos (name, full_name, url, description, desc_zh,
                            stars, forks, lang, topics, best_category,
-                           pushed_at, updated_at, is_ai_relevant, stars_today)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                           pushed_at, updated_at, is_ai_relevant, stars_today,
+                           is_skill, summary_sections_json, analysis_5d_json)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         ON CONFLICT (name) DO UPDATE SET
           stars         = EXCLUDED.stars,
           forks         = EXCLUDED.forks,
           lang          = EXCLUDED.lang,
           topics        = EXCLUDED.topics,
-          pushed_at     = EXCLUDED.pushed_at,
-          updated_at    = EXCLUDED.updated_at,
+          -- 2026-09 P3: COALESCE 防退化 — 多源(MCP/arXiv/GitHub)同名行互相覆盖时,
+          -- 空 pushed/updated 不再抹掉已有真值(此前 NULL 直接覆盖)。
+          pushed_at     = COALESCE(EXCLUDED.pushed_at, repos.pushed_at),
+          updated_at    = COALESCE(EXCLUDED.updated_at, repos.updated_at),
           description   = COALESCE(EXCLUDED.description, repos.description),
           desc_zh       = COALESCE(EXCLUDED.desc_zh, repos.desc_zh),
           is_ai_relevant = EXCLUDED.is_ai_relevant,
           best_category = EXCLUDED.best_category,
           stars_today   = COALESCE(EXCLUDED.stars_today, repos.stars_today),
+          is_skill      = EXCLUDED.is_skill,
+          summary_sections_json = COALESCE(EXCLUDED.summary_sections_json, repos.summary_sections_json),
+          analysis_5d_json      = COALESCE(EXCLUDED.analysis_5d_json, repos.analysis_5d_json),
           last_seen_at  = NOW()
     """,
         rows,
@@ -112,14 +126,16 @@ def replace_categories(conn, repo_cats: list[tuple[str, str]]):
 
 
 def snapshot_stars(conn, repo_names: list[str]):
-    """Append a (repo_name, stars, NOW()) row for every repo in repo_names."""
+    """Append a (repo_name, stars, today) row for every repo in repo_names.
+    2026-09 P3: snapshot_at 截断到当天 — (repo, snapshot_at) 主键 + ON CONFLICT
+    使同日多次 crawl 只记一行(旧行已由 schema.sql 迁移归一)。"""
     if not repo_names:
         return 0
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO repo_stars_history (repo_name, stars)
-        SELECT name, stars FROM repos WHERE name = ANY(%s)
+        INSERT INTO repo_stars_history (repo_name, snapshot_at, stars)
+        SELECT name, date_trunc('day', NOW()), stars FROM repos WHERE name = ANY(%s)
         ON CONFLICT DO NOTHING
     """,
         (repo_names,),
@@ -142,7 +158,10 @@ def query_top_5k(conn, page: int = 1, size: int = 12, sort: str = "stars"):
     cur.execute(
         f"""
         SELECT name, url, description, desc_zh, stars, forks, lang, topics,
-               pushed_at, updated_at, trending, first_seen_at, stars_today
+               pushed_at, updated_at, trending, first_seen_at, stars_today,
+               is_skill,
+               summary_sections_json AS summary_sections,
+               analysis_5d_json AS analysis_5d
         FROM repos
         WHERE is_ai_relevant AND stars >= 1000
         ORDER BY {sort_sql}
@@ -167,7 +186,10 @@ def query_hot_now(conn, limit: int = 40):
     cur.execute(
         """
         SELECT name, url, description, desc_zh, stars, forks, lang, topics,
-               pushed_at, updated_at, trending, first_seen_at, stars_today
+               pushed_at, updated_at, trending, first_seen_at, stars_today,
+               is_skill,
+               summary_sections_json AS summary_sections,
+               analysis_5d_json AS analysis_5d
         FROM repos WHERE is_ai_relevant
         ORDER BY stars DESC LIMIT %s
     """,
@@ -181,14 +203,17 @@ def query_categories(conn):
     cur = conn.cursor()
     cat_meta = {}
     try:
-        from radar import CATEGORIES  # late import to avoid circular
+        from radar_pkg.core import CATEGORIES  # canonical source (was: late import from radar)
 
         cat_meta = {c["id"]: (c["name"], c["desc"]) for c in CATEGORIES}
     except Exception:
         pass
     cur.execute("""
         SELECT best_category, name, url, description, desc_zh, stars, forks,
-               lang, topics, pushed_at, updated_at, trending, first_seen_at, stars_today
+               lang, topics, pushed_at, updated_at, trending, first_seen_at, stars_today,
+               is_skill,
+               summary_sections_json AS summary_sections,
+               analysis_5d_json AS analysis_5d
         FROM repos
         WHERE is_ai_relevant AND best_category IS NOT NULL
         ORDER BY best_category, stars DESC
@@ -271,7 +296,11 @@ def query_gain(
         ),
         ranked AS (
             SELECT c.name, r.url, r.description, r.desc_zh, r.stars, r.lang,
-                   r.topics, r.pushed_at, c.delta_24h, c.cold_start
+                   r.topics, r.pushed_at, c.delta_24h, c.cold_start,
+                   r.summary_zh,
+                   r.summary_sections_json AS summary_sections,
+                   r.analysis_5d_json AS analysis_5d,
+                   r.is_skill, r.stars_today
             FROM combined c
             JOIN repos r ON r.name = c.name
         )

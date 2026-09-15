@@ -36,6 +36,19 @@ ALTER TABLE repos ADD COLUMN IF NOT EXISTS readme_zh TEXT;
 ALTER TABLE repos ADD COLUMN IF NOT EXISTS readme_zh_source TEXT;
 ALTER TABLE repos ADD COLUMN IF NOT EXISTS readme_zh_at TIMESTAMPTZ;
 
+-- ponytail: 2026-09 — SKILL.md 探测 + 结构化中文摘要。
+-- is_skill = 仓库根或子目录含 SKILL.md / skill.md / SKILL.yaml（前端据此门控安装）。
+-- summary_sections_json = README 拆分的中文 5 桶（无 LLM 也可用）:
+--   {intro, can_do, problem, competitive, when_to_use}
+--   intro / can_do / problem 来自 README heading 关键词分类翻译.
+--   competitive = 同类竞品列表（来自快照同 topic 仓库匹配）.
+--   when_to_use = 决策建议.
+-- analysis_5d_json = LLM 生成的同 schema 5 桶（含 alternatives 带 pros/cons）.
+-- 前端 detail drawer 优先读 analysis_5d_json，回退 summary_sections_json.
+ALTER TABLE repos ADD COLUMN IF NOT EXISTS is_skill BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE repos ADD COLUMN IF NOT EXISTS summary_sections_json JSONB;
+ALTER TABLE repos ADD COLUMN IF NOT EXISTS analysis_5d_json JSONB;
+
 CREATE TABLE IF NOT EXISTS repo_categories (
   repo_name    TEXT NOT NULL REFERENCES repos(name) ON DELETE CASCADE,
   category_id  TEXT NOT NULL,
@@ -63,3 +76,27 @@ CREATE TABLE IF NOT EXISTS crawl_log (
 );
 
 ALTER TABLE crawl_log ADD COLUMN IF NOT EXISTS queries_failed INT DEFAULT 0;
+
+-- ─────────────────────────────────────────
+-- 2026-09 数据修复迁移(幂等;ensure_schema 每次 crawl 前重放,无重复时零效果)
+
+-- P2:合并大小写变体行 — GitHub 仓库改名/大小写归一后,同一仓库会出现
+-- owner/Repo 与 owner/repo 两行(应用层合并键已统一小写,此处清历史存量)。
+-- 每组保留 stars 最大(平星标比 last_seen_at,再比 name 保证确定性);
+-- 子表行随 ON DELETE CASCADE 级联删除,分类关联下次 crawl 重建。
+DELETE FROM repos a
+USING repos b
+WHERE a.name <> b.name
+  AND lower(a.name) = lower(b.name)
+  AND (a.stars, a.last_seen_at, a.name) < (b.stars, b.last_seen_at, b.name);
+
+-- P3:stars 快照按天去重 — (repo, snapshot_at) 秒级主键使同日多次 crawl 产生
+-- 多行;先保每天最新一行,再把 snapshot_at 归一到当天零点(query_gain 语义不变)。
+DELETE FROM repo_stars_history a
+USING repo_stars_history b
+WHERE a.repo_name = b.repo_name
+  AND date_trunc('day', a.snapshot_at) = date_trunc('day', b.snapshot_at)
+  AND a.snapshot_at < b.snapshot_at;
+UPDATE repo_stars_history
+SET snapshot_at = date_trunc('day', snapshot_at)
+WHERE snapshot_at <> date_trunc('day', snapshot_at);

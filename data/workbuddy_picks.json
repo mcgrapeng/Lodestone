@@ -1,0 +1,83 @@
+[
+  {
+    "name": "WorkBuddy 官方桌面端",
+    "tagline": "腾讯出品的 AI 桌面智能体，能直接读写文件、跑脚本、交付成果",
+    "why": "国内合规、不需翻墙；桌面级 agent 不只是聊天，能动手完成任务",
+    "url": "https://codebuddy.cn/work",
+    "install": "官网下载安装包 (v5.2.5)，按指引登录腾讯账号即可",
+    "category": "agent-platform",
+    "tags": ["腾讯", "AI 桌面代理", "中文"]
+  },
+  {
+    "name": "Office 文档处理 Skill 包",
+    "tagline": "批量读 .docx/.xlsx/.pptx，提取结构化内容、生成摘要、改格式",
+    "why": "WorkBuddy 的内置技能包，对国内办公文档格式（特别是 WPS/Office 国产化版本）支持最好",
+    "url": "https://codebuddy.cn/work",
+    "install": "在 WorkBuddy 内搜索 'Office' 一键启用",
+    "category": "doc",
+    "tags": ["办公", "Office", "WPS"]
+  },
+  {
+    "name": "PPT 自动生成 Skill",
+    "tagline": "从需求文档一句话生成 PPT 大纲 + 配图 + 母版样式",
+    "why": "汇报场景刚需；替代手工找模板、对齐标题、加图",
+    "url": "https://codebuddy.cn/work",
+    "install": "内置技能，搜索 'PPT' 即开即用",
+    "category": "doc",
+    "tags": ["PPT", "汇报", "自动生成"]
+  },
+  {
+    "name": "QQ 邮件自动化 Skill",
+    "tagline": "QQ Mail SMTP 自动化，定时收信、分类、写回信草稿",
+    "why": "国内办公邮件主力；不用打开 Outlook 客户端",
+    "url": "https://blog.csdn.net/chilavert318/article/details/158959575",
+    "install": "配置 SMTP 授权码 → ~/.workbuddy/skills/qq-mail/",
+    "category": "automation",
+    "tags": ["邮件", "QQ", "定时任务"]
+  },
+  {
+    "name": "每日早报 Skill",
+    "tagline": "早 8 点汇总：GitHub trending、微博热搜、知乎热榜、邮件未读",
+    "why": "起床一杯咖啡的功夫扫完信息流；不用开 5 个 App",
+    "url": "https://blog.csdn.net/Derrick__1/article/details/159127291",
+    "install": "在 settings.json 配 cron '0 8 * * *' + skill 路径",
+    "category": "automation",
+    "tags": ["信息流", "定时", "早报"]
+  },
+  {
+    "name": "海报/海报图设计 Skill",
+    "tagline": "自然语言描述 → 海报图（公众号封面、活动海报、电商主图）",
+    "why": "国内运营/营销场景强需求；模板风格贴合中文审美",
+    "url": "https://codebuddy.cn/work",
+    "install": "内置技能，搜索 '海报' 启用",
+    "category": "design",
+    "tags": ["设计", "海报", "封面"]
+  },
+  {
+    "name": "文件批量整理 Skill",
+    "tagline": "按规则（日期/类型/关键词）批量移动/重命名/归档下载文件夹",
+    "why": "桌面/Downloads 长期救星；不需要写脚本",
+    "url": "https://codebuddy.cn/work",
+    "install": "内置技能，搜索 '文件整理' 启用",
+    "category": "automation",
+    "tags": ["文件管理", "自动化"]
+  },
+  {
+    "name": "数据分析与报表 Skill",
+    "tagline": "Excel/CSV 一键分析 + 生成可视化图表 + 写结论",
+    "why": "比 pandas 脚本快 10 倍；自然语言描述要算什么",
+    "url": "https://codebuddy.cn/work",
+    "install": "内置技能，搜索 '数据分析' 启用",
+    "category": "data",
+    "tags": ["Excel", "数据可视化", "报表"]
+  },
+  {
+    "name": "WorkBuddy 插件市场 (官方)",
+    "tagline": "官方 plugin marketplace；用户可一键安装第三方扩展",
+    "why": "扩展能力最快路径；类似 VS Code Marketplace",
+    "url": "https://codebuddy.cn/work",
+    "install": "在 WorkBuddy 内 → 插件市场 → 浏览/搜索 → 一键安装",
+    "category": "marketplace",
+    "tags": ["插件市场", "扩展"]
+  }
+]

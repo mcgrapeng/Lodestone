@@ -4,27 +4,20 @@ import os
 import re
 from pathlib import Path
 
+# ponytail: 2026-09 — 单一 .env 加载源（env_loader 是项目根下 30 行 stdlib 实现）。
+# radar.py main 也调一次 load_env()（幂等、setdefault 语义、shell 优先），删除旧的 _load_dotenv。
+# 这里必须先于 pg8000 import，否则 PGPASSWORD/PGDATABASE 还没填。
+from env_loader import load_env  # noqa: E402
+load_env()
 
-# ponytail: 5-line .env loader — keeps credentials out of git without adding a dependency.
-# Values already present in the environment win (os.environ.setdefault).
-def _load_dotenv() -> None:
-    env_file = Path(__file__).parent.parent / ".env"
-    if not env_file.exists():
-        return
-    try:
-        for line in env_file.read_text().splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            k, v = line.split("=", 1)
-            os.environ.setdefault(k.strip(), v.strip())
-    except OSError:
-        pass
+import pg8000.dbapi as pg  # noqa: E402  (must run after env_loader)
+from pg8000.converters import JSONB as _JSONB_OID, PG_TYPES as _PG_TYPES, json_in as _json_in  # noqa: E402
 
-
-_load_dotenv()
-
-import pg8000.dbapi as pg  # noqa: E402  (must run after dotenv load)
+# ponytail: 2026-09 — 防御性 JSONB 类型适配器注册。pg8000 ≥1.30 默认 PG_TYPES[3802]=json_in
+# （loads 解析为 dict），但旧版本可能漏注册导致 JSONB 列读回 str — 5 桶渲染前端全空。
+# 这里 idempotent 注册一遍（已注册则覆盖回相同 callable，无副作用）。
+if _PG_TYPES.get(_JSONB_OID) is not _json_in:
+    _PG_TYPES[_JSONB_OID] = _json_in
 
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 

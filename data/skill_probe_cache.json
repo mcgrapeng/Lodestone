@@ -1,0 +1,5912 @@
+{
+ "langchain-ai/langgraph": {
+  "is_skill": false,
+  "probed_at": "2026-09-08T17:35:43",
+  "branch": "main"
+ },
+ "affaan-m/ecc": {
+  "is_skill": false,
+  "probed_at": "2026-09-08T17:35:44",
+  "branch": "main"
+ },
+ "anomalyco/opencode": {
+  "is_skill": false,
+  "probed_at": "2026-09-08T17:35:47",
+  "branch": "dev"
+ },
+ "anthropics/skills": {
+  "is_skill": true,
+  "probed_at": "2026-09-08T17:35:48",
+  "branch": "main"
+ },
+ "openai/codex": {
+  "is_skill": false,
+  "probed_at": "2026-09-08T17:35:51",
+  "branch": "main"
+ },
+ "obra/superpowers": {
+  "is_skill": false,
+  "probed_at": "2026-09-08T17:36:40",
+  "branch": "main"
+ },
+ "shubhamsaboo/awesome-llm-apps": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T10:58:57",
+  "branch": "main"
+ },
+ "nousresearch/hermes-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T10:58:57",
+  "branch": "main"
+ },
+ "dietrichgebert/ponytail": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T10:59:01",
+  "branch": "main"
+ },
+ "graphify-labs/graphify": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T10:59:03",
+  "branch": "v8"
+ },
+ "msitarzewski/agency-agents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T10:59:03",
+  "branch": "main"
+ },
+ "nextlevelbuilder/ui-ux-pro-max-skill": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T10:59:03",
+  "branch": "main"
+ },
+ "langchain-ai/langchain": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T10:59:06",
+  "branch": "master"
+ },
+ "farion1231/cc-switch": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T10:59:09",
+  "branch": "main"
+ },
+ "nexu-io/open-design": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T10:59:09",
+  "branch": "main"
+ },
+ "google-gemini/gemini-cli": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T10:59:53",
+  "branch": "main"
+ },
+ "juliusbrussee/caveman": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T10:59:54",
+  "branch": "main"
+ },
+ "thedotmack/claude-mem": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T10:59:58",
+  "branch": "main"
+ },
+ "addyosmani/agent-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:00:04",
+  "branch": "main"
+ },
+ "rtk-ai/rtk": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:00:05",
+  "branch": "develop"
+ },
+ "earendil-works/pi": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:00:05",
+  "branch": "main"
+ },
+ "shareai-lab/learn-claude-code": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:00:12",
+  "branch": "main"
+ },
+ "egonex-ai/understand-anything": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:00:13",
+  "branch": "main"
+ },
+ "leonxlnx/taste-skill": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:00:14",
+  "branch": "main"
+ },
+ "ruvnet/ruflo": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:00:16",
+  "branch": "main"
+ },
+ "d4vinci/scrapling": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:00:41",
+  "branch": "main"
+ },
+ "panniantong/agent-reach": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:00:58",
+  "branch": "main"
+ },
+ "datawhalechina/hello-agents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:01:02",
+  "branch": "main"
+ },
+ "microsoft/ai-agents-for-beginners": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:01:02",
+  "branch": "main"
+ },
+ "composiohq/awesome-claude-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:01:07",
+  "branch": "master"
+ },
+ "thedaviddias/front-end-checklist": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:01:10",
+  "branch": "main"
+ },
+ "headroomlabs-ai/headroom": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:01:17",
+  "branch": "main"
+ },
+ "career-ops-hq/career-ops": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:01:20",
+  "branch": "main"
+ },
+ "open-webui/open-webui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:01:42",
+  "branch": "main"
+ },
+ "paddlepaddle/paddleocr": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:01:59",
+  "branch": "main"
+ },
+ "dair-ai/prompt-engineering-guide": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:02:02",
+  "branch": "main"
+ },
+ "infiniflow/ragflow": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:02:05",
+  "branch": "main"
+ },
+ "mintplex-labs/anything-llm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:02:05",
+  "branch": "master"
+ },
+ "mem0ai/mem0": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:02:10",
+  "branch": "main"
+ },
+ "pathwaycom/llm-app": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:02:14",
+  "branch": "main"
+ },
+ "flowiseai/flowise": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:02:16",
+  "branch": "main"
+ },
+ "hkuds/deeptutor": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:02:18",
+  "branch": "main"
+ },
+ "run-llama/llama_index": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:02:35",
+  "branch": "main"
+ },
+ "hkuds/nanobot": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:02:53",
+  "branch": "main"
+ },
+ "jeecgboot/jeecgboot": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:02:58",
+  "branch": "main"
+ },
+ "bojieli/ai-agent-book": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:03:03",
+  "branch": "main"
+ },
+ "hkuds/lightrag": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:03:03",
+  "branch": "main"
+ },
+ "milvus-io/milvus": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:03:03",
+  "branch": "master"
+ },
+ "the-vibe-company/quivr": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:03:16",
+  "branch": "main"
+ },
+ "chatchat-space/langchain-chatchat": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:03:19",
+  "branch": "master"
+ },
+ "patchy631/ai-engineering-hub": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:03:47",
+  "branch": "main"
+ },
+ "khoj-ai/khoj": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:03:54",
+  "branch": "master"
+ },
+ "significant-gravitas/autogpt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:04:06",
+  "branch": "master"
+ },
+ "volcengine/openviking": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:04:08",
+  "branch": "main"
+ },
+ "itzcrazykns/vane": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:04:09",
+  "branch": "master"
+ },
+ "microsoft/graphrag": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:04:19",
+  "branch": "main"
+ },
+ "ollama/ollama": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:04:19",
+  "branch": "main"
+ },
+ "firecrawl/firecrawl": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:04:27",
+  "branch": "main"
+ },
+ "f/prompts.chat": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:04:44",
+  "branch": "main"
+ },
+ "huggingface/transformers": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:04:59",
+  "branch": "main"
+ },
+ "microsoft/generative-ai-for-beginners": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:05:00",
+  "branch": "main"
+ },
+ "langgenius/dify": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:05:05",
+  "branch": "main"
+ },
+ "harry0703/moneyprinterturbo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:05:08",
+  "branch": "main"
+ },
+ "rasbt/llms-from-scratch": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:05:27",
+  "branch": "main"
+ },
+ "browser-use/browser-use": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:05:28",
+  "branch": "main"
+ },
+ "vllm-project/vllm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:05:33",
+  "branch": "main"
+ },
+ "chatgptnextweb/nextchat": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:05:45",
+  "branch": "main"
+ },
+ "openhands/openhands": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:05:54",
+  "branch": "main"
+ },
+ "mlabonne/llm-course": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:05:55",
+  "branch": "main"
+ },
+ "bytedance/deer-flow": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:06:03",
+  "branch": "main"
+ },
+ "unslothai/unsloth": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:06:08",
+  "branch": "main"
+ },
+ "hiyouga/llamafactory": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:06:18",
+  "branch": "main"
+ },
+ "foundationagents/metagpt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:06:21",
+  "branch": "main"
+ },
+ "x1xhlol/system-prompts-and-models-of-ai-tools": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:06:24",
+  "branch": "main"
+ },
+ "github/spec-kit": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:06:30",
+  "branch": "main"
+ },
+ "sickn33/agentic-awesome-skills": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:06:31",
+  "branch": "main"
+ },
+ "daytonaio/daytona": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:06:37",
+  "branch": "main"
+ },
+ "cline/cline": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:06:48",
+  "branch": "main"
+ },
+ "shanraisshan/claude-code-best-practice": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:06:49",
+  "branch": "main"
+ },
+ "diegosouzapw/omniroute": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:06:58",
+  "branch": "release/v3.8.51"
+ },
+ "chromedevtools/chrome-devtools-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:07:12",
+  "branch": "main"
+ },
+ "calesthio/openmontage": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:07:16",
+  "branch": "main"
+ },
+ "agno-agi/agno": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:07:18",
+  "branch": "main"
+ },
+ "chatboxai/chatbox": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:07:18",
+  "branch": "main"
+ },
+ "wshobson/agents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:07:26",
+  "branch": "main"
+ },
+ "yeachan-heo/oh-my-claudecode": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:07:37",
+  "branch": "main"
+ },
+ "copilotkit/copilotkit": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:07:47",
+  "branch": "main"
+ },
+ "herdrdev/herdr": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:07:53",
+  "branch": "master"
+ },
+ "medusajs/medusa": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:07:57",
+  "branch": "develop"
+ },
+ "continuedev/continue": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:08:02",
+  "branch": "main"
+ },
+ "jcodesmore/ai-website-cloner-template": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:08:04",
+  "branch": "master"
+ },
+ "esengine/deepseek-reasonix": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:08:18",
+  "branch": "main-v2"
+ },
+ "tabbyml/tabby": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:08:20",
+  "branch": "main"
+ },
+ "pythagora-io/gpt-pilot": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:08:32",
+  "branch": "main"
+ },
+ "tirth8205/code-review-graph": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:08:47",
+  "branch": "main"
+ },
+ "can1357/oh-my-pi": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:08:48",
+  "branch": "main"
+ },
+ "e2b-dev/awesome-ai-agents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:08:50",
+  "branch": "main"
+ },
+ "crewaiinc/crewai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:08:52",
+  "branch": "main"
+ },
+ "tinyhumansai/openhuman": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:09:01",
+  "branch": "main"
+ },
+ "langchain-ai/deepagents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:09:10",
+  "branch": "main"
+ },
+ "nirdiamant/genai_agents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:09:15",
+  "branch": "main"
+ },
+ "openai/swarm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:09:26",
+  "branch": "main"
+ },
+ "nirdiamant/agents-towards-production": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:09:45",
+  "branch": "main"
+ },
+ "mayooear/ai-pdf-chatbot-langchain": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:09:51",
+  "branch": "main"
+ },
+ "cft0808/edict": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:09:53",
+  "branch": "main"
+ },
+ "langchain-ai/langchainjs": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:10:06",
+  "branch": "main"
+ },
+ "getpaseo/paseo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:10:18",
+  "branch": "main"
+ },
+ "hkuds/deepcode": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:10:21",
+  "branch": "main"
+ },
+ "langchain-ai/openwiki": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:10:31",
+  "branch": "main"
+ },
+ "modsetter/surfsense": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:10:37",
+  "branch": "main"
+ },
+ "superset-sh/superset": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:10:53",
+  "branch": "main"
+ },
+ "microsoft/agent-framework": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:11:00",
+  "branch": "main"
+ },
+ "the-pocket/pocketflow": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:11:02",
+  "branch": "main"
+ },
+ "kyegomez/swarms": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:11:04",
+  "branch": "master"
+ },
+ "langchain4j/langchain4j": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:11:08",
+  "branch": "main"
+ },
+ "yzhao062/pyod": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:11:16",
+  "branch": "master"
+ },
+ "tmc/langchaingo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:11:20",
+  "branch": "main"
+ },
+ "kyrolabs/awesome-langchain": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:11:23",
+  "branch": "main"
+ },
+ "liaokongvfx/langchain-chinese-getting-started-guide": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:11:34",
+  "branch": "main"
+ },
+ "mattpocock/sandcastle": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:11:43",
+  "branch": "main"
+ },
+ "xerrors/yuxi": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:11:54",
+  "branch": "main"
+ },
+ "comfy-org/comfyui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:11:57",
+  "branch": "master"
+ },
+ "gkamradt/langchain-tutorials": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:12:03",
+  "branch": "main"
+ },
+ "lllyasviel/fooocus": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:12:06",
+  "branch": "main"
+ },
+ "fishaudio/fish-speech": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:12:09",
+  "branch": "main"
+ },
+ "bytedance/ui-tars-desktop": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:12:19",
+  "branch": "main"
+ },
+ "anil-matcha/open-generative-ai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:12:19",
+  "branch": "main"
+ },
+ "haotian-liu/llava": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:12:28",
+  "branch": "main"
+ },
+ "qwenaudio/cosyvoice": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:12:40",
+  "branch": "main"
+ },
+ "microsoft/unilm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:12:41",
+  "branch": "master"
+ },
+ "jina-ai/serve": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:12:49",
+  "branch": "master"
+ },
+ "screenpipe/screenpipe": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:12:52",
+  "branch": "main"
+ },
+ "livekit/livekit": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:12:58",
+  "branch": "master"
+ },
+ "modelscope/funasr": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:13:01",
+  "branch": "main"
+ },
+ "huanshere/videolingo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:13:04",
+  "branch": "main"
+ },
+ "deepseek-ai/janus": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:13:15",
+  "branch": "main"
+ },
+ "comfy-org/comfyui-manager": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:13:23",
+  "branch": "main"
+ },
+ "modelscope/ms-swift": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:13:36",
+  "branch": "main"
+ },
+ "hbai-ltd/toonflow-app": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:13:41",
+  "branch": "master"
+ },
+ "swivid/f5-tts": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:13:48",
+  "branch": "main"
+ },
+ "livekit/agents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:14:03",
+  "branch": "main"
+ },
+ "zai-org/cogvideo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:14:04",
+  "branch": "main"
+ },
+ "rerun-io/rerun": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:14:09",
+  "branch": "main"
+ },
+ "krillinai/opencreator": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:14:37",
+  "branch": "master"
+ },
+ "lightricks/ltx-video": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:14:49",
+  "branch": "main"
+ },
+ "datawhalechina/all-in-rag": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:14:51",
+  "branch": "main"
+ },
+ "runanywhereai/runanywhere-sdks": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:14:52",
+  "branch": "main"
+ },
+ "cvhub520/x-anylabeling": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:14:52",
+  "branch": "main"
+ },
+ "huggingface/peft": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:15:06",
+  "branch": "main"
+ },
+ "opengvlab/internvl": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:15:08",
+  "branch": "main"
+ },
+ "conardli/easy-dataset": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:15:14",
+  "branch": "main"
+ },
+ "microsoft/lora": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:15:37",
+  "branch": "main"
+ },
+ "bentoml/openllm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:15:47",
+  "branch": "main"
+ },
+ "ludwig-ai/ludwig": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:15:47",
+  "branch": "main"
+ },
+ "oumi-ai/oumi": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:15:53",
+  "branch": "main"
+ },
+ "axolotl-ai-cloud/axolotl": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:15:59",
+  "branch": "main"
+ },
+ "lightricks/ltx-2": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:16:03",
+  "branch": "main"
+ },
+ "internlm/lmdeploy": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:16:06",
+  "branch": "main"
+ },
+ "cloneofsimo/lora": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:16:18",
+  "branch": "master"
+ },
+ "flyteorg/flyte": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:16:28",
+  "branch": "main"
+ },
+ "yangjianxin1/firefly": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:16:42",
+  "branch": "master"
+ },
+ "akegarasu/lora-scripts": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:16:44",
+  "branch": "main"
+ },
+ "datajuicer/data-juicer": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:16:44",
+  "branch": "main"
+ },
+ "lightning-ai/lit-llama": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:16:59",
+  "branch": "main"
+ },
+ "makazhanalpamys/soup": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:17:00",
+  "branch": "main"
+ },
+ "h2oai/h2o-llmstudio": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:17:10",
+  "branch": "main"
+ },
+ "shibing624/medicalgpt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:17:12",
+  "branch": "main"
+ },
+ "kiln-ai/kiln": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:17:25",
+  "branch": "main"
+ },
+ "llmbook-zh/llmbook-zh.github.io": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:17:37",
+  "branch": "main"
+ },
+ "truefoundry/cognita": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:17:42",
+  "branch": "main"
+ },
+ "walkinglabs/hands-on-modern-rl": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:17:47",
+  "branch": "main"
+ },
+ "zyds/transformers-code": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:17:52",
+  "branch": "master"
+ },
+ "facico/chinese-vicuna": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:18:07",
+  "branch": "master"
+ },
+ "predibase/lorax": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:18:18",
+  "branch": "main"
+ },
+ "langfuse/langfuse": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:18:19",
+  "branch": "main"
+ },
+ "mlflow/mlflow": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:18:19",
+  "branch": "master"
+ },
+ "promptfoo/promptfoo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:18:38",
+  "branch": "main"
+ },
+ "openai/evals": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:18:41",
+  "branch": "main"
+ },
+ "comet-ml/opik": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:18:43",
+  "branch": "main"
+ },
+ "confident-ai/deepeval": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:18:53",
+  "branch": "main"
+ },
+ "ifixai-ai/ifixai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:19:02",
+  "branch": "main"
+ },
+ "arize-ai/phoenix": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:19:15",
+  "branch": "main"
+ },
+ "zalandoresearch/fashion-mnist": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:19:19",
+  "branch": "master"
+ },
+ "nvidia/garak": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:19:24",
+  "branch": "main"
+ },
+ "open-compass/opencompass": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:19:30",
+  "branch": "main"
+ },
+ "jeinlee1991/chinese-llm-benchmark": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:19:37",
+  "branch": "main"
+ },
+ "tencent/ai-infra-guard": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:19:39",
+  "branch": "main"
+ },
+ "helicone/helicone": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:19:47",
+  "branch": "main"
+ },
+ "giskard-ai/giskard-oss": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:20:07",
+  "branch": "main"
+ },
+ "q00/ouroboros": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:20:11",
+  "branch": "main"
+ },
+ "swe-bench/swe-bench": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:20:19",
+  "branch": "main"
+ },
+ "marker-inc-korea/autorag": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:20:30",
+  "branch": "main"
+ },
+ "packtpublishing/llm-engineers-handbook": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:20:33",
+  "branch": "main"
+ },
+ "kodezi/chronos": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:20:35",
+  "branch": "main"
+ },
+ "evolvinglmms-lab/lmms-eval": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:20:39",
+  "branch": "main"
+ },
+ "baichuan-inc/baichuan2": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:20:42",
+  "branch": "main"
+ },
+ "ruc-nlpir/flashrag": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:21:09",
+  "branch": "main"
+ },
+ "hemansnation/ai-engineer-headquarters": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:21:10",
+  "branch": "master"
+ },
+ "truera/trulens": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:21:18",
+  "branch": "main"
+ },
+ "genieincodebottle/generative-ai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:21:21",
+  "branch": "main"
+ },
+ "blader/humanizer": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:21:21",
+  "branch": "main"
+ },
+ "msoedov/agentic_security": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:21:28",
+  "branch": "main"
+ },
+ "lmnr-ai/lmnr": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:21:30",
+  "branch": "main"
+ },
+ "code-yeongyu/oh-my-openagent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:21:36",
+  "branch": "dev"
+ },
+ "future-agi/future-agi": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:21:37",
+  "branch": "main"
+ },
+ "aider-ai/aider": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:22:01",
+  "branch": "main"
+ },
+ "asgeirtj/system_prompts_leaks": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:22:07",
+  "branch": "main"
+ },
+ "patrickjs/awesome-cursorrules": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:22:19",
+  "branch": "main"
+ },
+ "voideditor/void": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:22:23",
+  "branch": "main"
+ },
+ "deusdata/codebase-memory-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:22:24",
+  "branch": "main"
+ },
+ "zhaoxuya520/reverse-skill": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:22:26",
+  "branch": "main"
+ },
+ "rohitg00/agentmemory": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:22:33",
+  "branch": "main"
+ },
+ "eyaltoledano/claude-task-master": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:22:34",
+  "branch": "main"
+ },
+ "othmanadi/planning-with-files": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:23:05",
+  "branch": "master"
+ },
+ "decolua/9router": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:23:16",
+  "branch": "master"
+ },
+ "onlook-dev/onlook": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:23:25",
+  "branch": "main"
+ },
+ "winfunc/opcode": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:23:27",
+  "branch": "main"
+ },
+ "jlcodes99/cockpit-tools": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:23:32",
+  "branch": "main"
+ },
+ "glips/figma-context-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:23:34",
+  "branch": "main"
+ },
+ "berriai/litellm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:23:38",
+  "branch": "litellm_internal_staging"
+ },
+ "liyupi/ai-guide": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:23:40",
+  "branch": "main"
+ },
+ "kong/kong": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:24:09",
+  "branch": "master"
+ },
+ "quantumnous/new-api": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:24:12",
+  "branch": "main"
+ },
+ "songquanpeng/one-api": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:24:19",
+  "branch": "main"
+ },
+ "asyncfuncai/deepwiki-open": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:24:25",
+  "branch": "main"
+ },
+ "lidge-jun/opencodex": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:24:29",
+  "branch": "main"
+ },
+ "coaidev/coai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:24:41",
+  "branch": "main"
+ },
+ "portkey-ai/gateway": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:24:44",
+  "branch": "main"
+ },
+ "tensorzero/tensorzero": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:24:45",
+  "branch": "main"
+ },
+ "opencoworkai/open-codesign": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:25:06",
+  "branch": "main"
+ },
+ "maximhq/bifrost": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:25:09",
+  "branch": "dev"
+ },
+ "mnfst/manifest": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:25:20",
+  "branch": "main"
+ },
+ "mnfst/awesome-free-llm-apis": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:25:26",
+  "branch": "main"
+ },
+ "rikkahub/rikkahub": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:25:31",
+  "branch": "master"
+ },
+ "katanemo/plano": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:25:38",
+  "branch": "main"
+ },
+ "olimorris/codecompanion.nvim": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:25:38",
+  "branch": "main"
+ },
+ "blockrunai/clawrouter": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:25:45",
+  "branch": "main"
+ },
+ "tbphp/gpt-load": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:25:56",
+  "branch": "main"
+ },
+ "looplj/axonhub": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:26:03",
+  "branch": "unstable"
+ },
+ "qixing-jk/all-api-hub": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:26:15",
+  "branch": "main"
+ },
+ "gptme/gptme": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:26:21",
+  "branch": "master"
+ },
+ "crmne/ruby_llm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:26:31",
+  "branch": "main"
+ },
+ "duolahypercho/codex-router": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:26:35",
+  "branch": "main"
+ },
+ "morphik-org/morphik-core": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:26:39",
+  "branch": "main"
+ },
+ "algorithmicsuperintelligence/optillm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:26:40",
+  "branch": "main"
+ },
+ "kaitranntt/ccs": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:26:48",
+  "branch": "main"
+ },
+ "composiohq/composio": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:26:54",
+  "branch": "next"
+ },
+ "liguodongiot/llm-action": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:27:07",
+  "branch": "main"
+ },
+ "openobserve/openobserve": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:27:16",
+  "branch": "main"
+ },
+ "transformeroptimus/superagi": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:27:23",
+  "branch": "main"
+ },
+ "raga-ai-hub/ragaai-catalyst": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:27:24",
+  "branch": "main"
+ },
+ "dataelement/bisheng": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:27:27",
+  "branch": "main"
+ },
+ "vibrantlabsai/ragas": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:27:31",
+  "branch": "main"
+ },
+ "voltagent/voltagent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:27:37",
+  "branch": "main"
+ },
+ "bentoml/bentoml": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:27:39",
+  "branch": "main"
+ },
+ "0xplaygrounds/rig": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:27:46",
+  "branch": "main"
+ },
+ "evidentlyai/evidently": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:27:51",
+  "branch": "main"
+ },
+ "traceloop/openllmetry": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:27:57",
+  "branch": "main"
+ },
+ "clearml/clearml": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:28:00",
+  "branch": "master"
+ },
+ "googlecloudplatform/agent-starter-pack": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:28:04",
+  "branch": "main"
+ },
+ "tensorchord/awesome-llmops": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:28:06",
+  "branch": "main"
+ },
+ "hesreallyhim/awesome-claude-code": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:28:13",
+  "branch": "main"
+ },
+ "rohitg00/ai-engineering-from-scratch": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:28:15",
+  "branch": "main"
+ },
+ "lordog/dive-into-llms": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:28:22",
+  "branch": "main"
+ },
+ "anthropics/claude-plugins-official": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:28:27",
+  "branch": "main"
+ },
+ "leey21/awesome-ai-research-writing": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:28:33",
+  "branch": "main"
+ },
+ "aishwaryanr/awesome-generative-ai-guide": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:28:41",
+  "branch": "main"
+ },
+ "jarrodwatts/claude-hud": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:28:42",
+  "branch": "main"
+ },
+ "hannibal046/awesome-llm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:28:44",
+  "branch": "main"
+ },
+ "alirezarezvani/claude-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:28:50",
+  "branch": "main"
+ },
+ "everyinc/compound-engineering-plugin": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:28:54",
+  "branch": "main"
+ },
+ "voltagent/awesome-claude-code-subagents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:28:57",
+  "branch": "main"
+ },
+ "anthropics/knowledge-work-plugins": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:29:02",
+  "branch": "main"
+ },
+ "aihubcn/awesome-chinese-llm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:29:08",
+  "branch": "main"
+ },
+ "travisvn/awesome-claude-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:29:15",
+  "branch": "main"
+ },
+ "agricidaniel/claude-obsidian": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:29:17",
+  "branch": "main"
+ },
+ "arindam200/awesome-ai-apps": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:29:17",
+  "branch": "main"
+ },
+ "steven2358/awesome-generative-ai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:29:23",
+  "branch": "main"
+ },
+ "hua1995116/awesome-ai-painting": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:29:27",
+  "branch": "master"
+ },
+ "behisecc/awesome-claude-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:29:31",
+  "branch": "main"
+ },
+ "ykdojo/claude-code-tips": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:29:36",
+  "branch": "main"
+ },
+ "alirezadir/aimlinterviews": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:29:40",
+  "branch": "main"
+ },
+ "anthropics/claude-for-legal": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:29:48",
+  "branch": "main"
+ },
+ "wangrongsheng/awesome-llm-resources": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:29:49",
+  "branch": "main"
+ },
+ "punkpeye/awesome-mcp-servers": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:29:50",
+  "branch": "main"
+ },
+ "sansan0/trendradar": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:29:56",
+  "branch": "master"
+ },
+ "upstash/context7": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:30:01",
+  "branch": "master"
+ },
+ "amruthpillai/reactive-resume": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:30:04",
+  "branch": "main"
+ },
+ "microsoft/playwright-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:30:10",
+  "branch": "main"
+ },
+ "github/github-mcp-server": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:30:15",
+  "branch": "main"
+ },
+ "oraios/serena": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:30:21",
+  "branch": "main"
+ },
+ "assafelovic/gpt-researcher": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:30:22",
+  "branch": "main"
+ },
+ "ahujasid/blender-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:30:23",
+  "branch": "main"
+ },
+ "prefecthq/fastmcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:30:31",
+  "branch": "main"
+ },
+ "modelcontextprotocol/python-sdk": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:30:38",
+  "branch": "main"
+ },
+ "czlonkowski/n8n-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:30:41",
+  "branch": "main"
+ },
+ "1panel-dev/maxkb": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:30:52",
+  "branch": "v2"
+ },
+ "mksglu/context-mode": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:30:53",
+  "branch": "main"
+ },
+ "triggerdotdev/trigger.dev": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:31:03",
+  "branch": "main"
+ },
+ "microsoft/mcp-for-beginners": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:31:04",
+  "branch": "main"
+ },
+ "googleapis/mcp-toolbox": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:31:06",
+  "branch": "main"
+ },
+ "wanshuiyin/auto-claude-code-research-in-sleep": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:31:11",
+  "branch": "main"
+ },
+ "xpzouying/xiaohongshu-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:31:17",
+  "branch": "main"
+ },
+ "open-metadata/openmetadata": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:31:22",
+  "branch": "main"
+ },
+ "yusufkaraaslan/skill_seekers": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:31:29",
+  "branch": "development"
+ },
+ "coplaydev/unity-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:31:30",
+  "branch": "beta"
+ },
+ "corentinj/real-time-voice-cloning": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:31:42",
+  "branch": "master"
+ },
+ "rvc-boss/gpt-sovits": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:31:42",
+  "branch": "main"
+ },
+ "microsoft/vibevoice": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:31:43",
+  "branch": "main"
+ },
+ "jamiepine/voicebox": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:31:46",
+  "branch": "main"
+ },
+ "mudler/localai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:31:51",
+  "branch": "master"
+ },
+ "coqui-ai/tts": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:31:57",
+  "branch": "dev"
+ },
+ "2noise/chattts": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:32:02",
+  "branch": "main"
+ },
+ "myshell-ai/openvoice": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:32:03",
+  "branch": "main"
+ },
+ "babysor/mockingbird": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:32:14",
+  "branch": "main"
+ },
+ "openbmb/voxcpm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:32:14",
+  "branch": "main"
+ },
+ "ath-maas/pixelle-video": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:32:15",
+  "branch": "main"
+ },
+ "mastra-ai/mastra": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:32:20",
+  "branch": "main"
+ },
+ "readest/readest": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:32:24",
+  "branch": "main"
+ },
+ "m-bain/whisperx": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:32:31",
+  "branch": "main"
+ },
+ "index-tts/index-tts": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:32:35",
+  "branch": "main"
+ },
+ "slopus/happy": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:32:36",
+  "branch": "main"
+ },
+ "debpalash/voicestudio": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:32:46",
+  "branch": "main"
+ },
+ "drewthomasson/ebook2audiobook": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:32:46",
+  "branch": "main"
+ },
+ "pydantic/pydantic-ai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:32:50",
+  "branch": "main"
+ },
+ "jianchang512/pyvideotrans": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:32:54",
+  "branch": "main"
+ },
+ "nvidia-nemo/speech": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:32:58",
+  "branch": "main"
+ },
+ "leon-ai/leon": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:33:04",
+  "branch": "develop"
+ },
+ "browser-use/video-use": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:33:06",
+  "branch": "main"
+ },
+ "pipecat-ai/pipecat": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:33:08",
+  "branch": "main"
+ },
+ "alphacep/vosk-api": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:33:09",
+  "branch": "master"
+ },
+ "feder-cr/aihawk": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:33:20",
+  "branch": "main"
+ },
+ "lightpanda-io/browser": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:33:21",
+  "branch": "main"
+ },
+ "browser-use/browser-harness": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:33:23",
+  "branch": "main"
+ },
+ "jackwener/opencli": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:33:23",
+  "branch": "main"
+ },
+ "alibaba/page-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:33:29",
+  "branch": "main"
+ },
+ "h4ckf0r0day/obscura": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:33:31",
+  "branch": "main"
+ },
+ "browserbase/stagehand": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:33:41",
+  "branch": "main"
+ },
+ "skyvern-ai/skyvern": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:33:41",
+  "branch": "main"
+ },
+ "trycua/cua": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:33:41",
+  "branch": "main"
+ },
+ "alibaba-nlp/deepresearch": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:33:53",
+  "branch": "main"
+ },
+ "getmaxun/maxun": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:33:55",
+  "branch": "develop"
+ },
+ "browser-use/web-ui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:33:56",
+  "branch": "main"
+ },
+ "citrolabs/ego-lite": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:33:59",
+  "branch": "main"
+ },
+ "web-infra-dev/midscene": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:34:04",
+  "branch": "main"
+ },
+ "nanmicoder/cc-haha": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:34:14",
+  "branch": "main"
+ },
+ "marcuswestin/store.js": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:34:14",
+  "branch": "master"
+ },
+ "lsdefine/genericagent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:34:14",
+  "branch": "main"
+ },
+ "nanobrowser/nanobrowser": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:34:27",
+  "branch": "master"
+ },
+ "hangwin/mcp-chrome": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:34:27",
+  "branch": "master"
+ },
+ "simular-ai/agent-s": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:34:28",
+  "branch": "main"
+ },
+ "bytebot-ai/bytebot": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:34:33",
+  "branch": "main"
+ },
+ "jo-inc/camofox-browser": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:34:37",
+  "branch": "master"
+ },
+ "microsoft/magentic-ui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:34:47",
+  "branch": "main"
+ },
+ "upsonic/upsonic": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:34:48",
+  "branch": "master"
+ },
+ "steel-dev/steel-browser": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:34:48",
+  "branch": "main"
+ },
+ "ray-project/ray": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:00",
+  "branch": "master"
+ },
+ "janhq/jan": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:01",
+  "branch": "main"
+ },
+ "alexsjones/llmfit": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:03",
+  "branch": "main"
+ },
+ "jundot/omlx": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:08",
+  "branch": "main"
+ },
+ "meta-llama/llama-cookbook": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:11",
+  "branch": "main"
+ },
+ "orchestra-research/ai-research-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:21",
+  "branch": "main"
+ },
+ "halfrost/halfrost-field": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:21",
+  "branch": "master"
+ },
+ "nvidia/tensorrt-llm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:22",
+  "branch": "main"
+ },
+ "getumbrel/llama-gpt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:33",
+  "branch": "master"
+ },
+ "lmcache/lmcache": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:34",
+  "branch": "dev"
+ },
+ "skypilot-org/skypilot": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:37",
+  "branch": "master"
+ },
+ "openrlhf/openrlhf": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:40",
+  "branch": "main"
+ },
+ "xorbitsai/inference": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:46",
+  "branch": "main"
+ },
+ "kvcache-ai/mooncake": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:57",
+  "branch": "main"
+ },
+ "ai-dynamo/dynamo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:57",
+  "branch": "main"
+ },
+ "kserve/kserve": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:35:59",
+  "branch": "master"
+ },
+ "michael-a-kuykendall/shimmy": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:36:09",
+  "branch": "main"
+ },
+ "openbmb/ultrarag": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:36:09",
+  "branch": "main"
+ },
+ "vllm-project/semantic-router": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:36:13",
+  "branch": "main"
+ },
+ "gpustack/gpustack": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:36:15",
+  "branch": "main"
+ },
+ "mostlygeek/llama-swap": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:36:20",
+  "branch": "main"
+ },
+ "xlite-dev/awesome-llm-inference": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:36:32",
+  "branch": "main"
+ },
+ "superduper-io/superduper": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:36:34",
+  "branch": "main"
+ },
+ "katanaml/sparrow": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:36:35",
+  "branch": "main"
+ },
+ "colbymchenry/codegraph": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:36:42",
+  "branch": "main"
+ },
+ "coderamp-labs/gitingest": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:36:43",
+  "branch": "main"
+ },
+ "codegraphcontext/codegraphcontext": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:36:47",
+  "branch": "main"
+ },
+ "aouicher/graphmind": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:36:49",
+  "branch": "main"
+ },
+ "jgravelle/jcodemunch-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:36:51",
+  "branch": "main"
+ },
+ "study8677/repobrain": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:36:54",
+  "branch": "main"
+ },
+ "proxysoul/empryo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:37:07",
+  "branch": "main"
+ },
+ "jakedismo/codegraph-rust": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:37:09",
+  "branch": "main"
+ },
+ "glincker/stacklit": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:37:11",
+  "branch": "master"
+ },
+ "bgauryy/octocode": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:37:11",
+  "branch": "main"
+ },
+ "manojmallick/sigmap": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:37:18",
+  "branch": "main"
+ },
+ "xnuinside/codegraph": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:37:19",
+  "branch": "main"
+ },
+ "tintinweb/pi-gitnexus": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:37:26",
+  "branch": "master"
+ },
+ "christopherkahler/base": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:37:28",
+  "branch": "main"
+ },
+ "simplyliz/ckb": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:37:30",
+  "branch": "main"
+ },
+ "unclecode/crawl4ai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:37:45",
+  "branch": "main"
+ },
+ "evalops/deep-code-reasoning-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:37:46",
+  "branch": "main"
+ },
+ "scrapegraphai/scrapegraph-ai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:37:48",
+  "branch": "main"
+ },
+ "miurla/morphic": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:37:52",
+  "branch": "main"
+ },
+ "learningcircuit/local-deep-research": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:37:54",
+  "branch": "main"
+ },
+ "firecrawl/firecrawl-mcp-server": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:38:01",
+  "branch": "main"
+ },
+ "mishushakov/llm-scraper": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:38:02",
+  "branch": "main"
+ },
+ "any4ai/anycrawl": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:38:05",
+  "branch": "main"
+ },
+ "0xmassi/webclaw": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:38:19",
+  "branch": "main"
+ },
+ "firecrawl/open-agent-builder": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:38:21",
+  "branch": "main"
+ },
+ "coleam00/mcp-crawl4ai-rag": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:38:23",
+  "branch": "main"
+ },
+ "firecrawl/fireplexity": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:38:27",
+  "branch": "main"
+ },
+ "steel-dev/awesome-web-agents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:38:28",
+  "branch": "main"
+ },
+ "firecrawl/open-scouts": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:38:35",
+  "branch": "main"
+ },
+ "firecrawl/fire-enrich": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:38:39",
+  "branch": "main"
+ },
+ "ihor-sokoliuk/mcp-searxng": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:38:40",
+  "branch": "main"
+ },
+ "yokingma/searchat": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:38:54",
+  "branch": "main"
+ },
+ "us/crw": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:38:55",
+  "branch": "main"
+ },
+ "firecrawl/firecrawl-app-examples": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:38:57",
+  "branch": "main"
+ },
+ "cxcscmu/craw4llm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:39:02",
+  "branch": "main"
+ },
+ "firecrawl/open-researcher": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:39:02",
+  "branch": "main"
+ },
+ "firecrawl/cli": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:39:09",
+  "branch": "main"
+ },
+ "felladrin/minisearch": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:39:12",
+  "branch": "main"
+ },
+ "danny-avila/librechat": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:39:15",
+  "branch": "main"
+ },
+ "onyx-dot-app/onyx": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:39:29",
+  "branch": "main"
+ },
+ "cinnamon/kotaemon": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:39:30",
+  "branch": "main"
+ },
+ "open-webui/mcpo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:39:35",
+  "branch": "main"
+ },
+ "open-webui/pipelines": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:39:37",
+  "branch": "main"
+ },
+ "open-webui/open-terminal": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:39:37",
+  "branch": "main"
+ },
+ "openagentplatform/dive": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:39:44",
+  "branch": "main"
+ },
+ "agenui/agenui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:39:48",
+  "branch": "main"
+ },
+ "datvodinh/rag-chatbot": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:39:51",
+  "branch": "main"
+ },
+ "dmitrizzle/chat-bubble": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:05",
+  "branch": "master"
+ },
+ "cocolalilal/lastchat": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:07",
+  "branch": "LastChat"
+ },
+ "mrdjohnson/llm-x": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:09",
+  "branch": "main"
+ },
+ "ai-joe-git/belullama": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:12",
+  "branch": "main"
+ },
+ "promptpasture/llama.ui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:13",
+  "branch": "main"
+ },
+ "yoziru/nextjs-vllm-ui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:17",
+  "branch": "main"
+ },
+ "codecentric/c4-genai-suite": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:22",
+  "branch": "main"
+ },
+ "1337hero/faster-chat": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:23",
+  "branch": "main"
+ },
+ "landing-ai/ade-cli": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:40:24",
+  "branch": "main"
+ },
+ "pdfmathtranslate/pdfmathtranslate": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:39",
+  "branch": "main"
+ },
+ "libretranslate/libretranslate": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:40",
+  "branch": "main"
+ },
+ "unstructured-io/unstructured": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:44",
+  "branch": "main"
+ },
+ "funstory-ai/babeldoc": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:45",
+  "branch": "main"
+ },
+ "oomol-lab/pdf-craft": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:47",
+  "branch": "main"
+ },
+ "axa-group/parsr": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:52",
+  "branch": "master"
+ },
+ "eikek/docspell": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:57",
+  "branch": "master"
+ },
+ "nanonets/docext": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:40:59",
+  "branch": "main"
+ },
+ "alibabaresearch/advancedliteratemachinery": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:41:13",
+  "branch": "main"
+ },
+ "enoch3712/extractthinker": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:41:15",
+  "branch": "main"
+ },
+ "nanonets/docstrange": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:41:19",
+  "branch": "main"
+ },
+ "superlinear-ai/raglite": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:41:21",
+  "branch": "main"
+ },
+ "aiptimizer/turboocr": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:41:22",
+  "branch": "main"
+ },
+ "ggozad/haiku.rag": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:41:26",
+  "branch": "main"
+ },
+ "run-llama/parsebench": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:41:31",
+  "branch": "main"
+ },
+ "libnyx/lt2md": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:41:32",
+  "branch": "master"
+ },
+ "ledat98/nexusrag": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:41:33",
+  "branch": "main"
+ },
+ "nebutra/mineru-skill": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:41:33",
+  "branch": "main"
+ },
+ "skygazer42/mimirq": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:41:56",
+  "branch": "main"
+ },
+ "harishdeivanayagam/rowfill": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:41:57",
+  "branch": "master"
+ },
+ "scub-france/docling-studio": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:42:04",
+  "branch": "main"
+ },
+ "jasoncheng7115/jt-doc-tools": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:42:05",
+  "branch": "main"
+ },
+ "fcakyon/craft-text-detector": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:42:05",
+  "branch": "master"
+ },
+ "jing-yilin/e2m": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:42:10",
+  "branch": "main"
+ },
+ "steven-tey/novel": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:42:18",
+  "branch": "main"
+ },
+ "hashangit/extract2md": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:42:18",
+  "branch": "main"
+ },
+ "assistant-ui/assistant-ui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:42:31",
+  "branch": "main"
+ },
+ "thinkinaixyz/deepchat": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:42:33",
+  "branch": "dev"
+ },
+ "tanstack/ai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:42:39",
+  "branch": "main"
+ },
+ "copilotkit/openbot": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:42:39",
+  "branch": "main"
+ },
+ "ovidijusparsiunas/deep-chat": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:42:39",
+  "branch": "main"
+ },
+ "microsoft/foundry-local": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:42:46",
+  "branch": "main"
+ },
+ "gcwing/openbitfun": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:42:52",
+  "branch": "main"
+ },
+ "yawiii/comfyui-prompt-assistant": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:42:53",
+  "branch": "main"
+ },
+ "midday-ai/ai-sdk-tools": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:43:05",
+  "branch": "main"
+ },
+ "agentset-ai/agentset": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:43:06",
+  "branch": "main"
+ },
+ "copilotkit/opengenerativeui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:43:12",
+  "branch": "main"
+ },
+ "openilink/openilink-hub": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:43:12",
+  "branch": "main"
+ },
+ "deuz-ai/deuz-sdk": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:43:17",
+  "branch": "main"
+ },
+ "steven-tey/chathn": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:43:23",
+  "branch": "main"
+ },
+ "blazity/shadcn-chatbot-kit": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:43:28",
+  "branch": "main"
+ },
+ "copilotkit/opentag": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:43:29",
+  "branch": "main"
+ },
+ "assistant-ui/tool-ui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:43:43",
+  "branch": "main"
+ },
+ "lumpinif/deepcrawl": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:43:44",
+  "branch": "main"
+ },
+ "crafter-station/elements": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:43:48",
+  "branch": "main"
+ },
+ "tetherto/qvac": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:43:49",
+  "branch": "main"
+ },
+ "vercel-labs/ai-sdk-preview-rag": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:43:50",
+  "branch": "main"
+ },
+ "nuxt-ui-templates/chat": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:43:58",
+  "branch": "main"
+ },
+ "ben-vargas/ai-sdk-provider-claude-code": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:44:02",
+  "branch": "main"
+ },
+ "varghq/sdk": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:44:05",
+  "branch": "main"
+ },
+ "pensarai/apex": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:44:19",
+  "branch": "canary"
+ },
+ "usestrix/strix": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:44:22",
+  "branch": "main"
+ },
+ "elder-plinius/cl4r1t4s": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:44:23",
+  "branch": "main"
+ },
+ "mukul975/anthropic-cybersecurity-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:44:24",
+  "branch": "main"
+ },
+ "emcie-co/parlant": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:44:26",
+  "branch": "develop"
+ },
+ "nvidia/skillspector": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:44:34",
+  "branch": "main"
+ },
+ "0xk1h0/chatgpt_dan": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:44:38",
+  "branch": "main"
+ },
+ "louisshark/chatgpt_system_prompt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:44:41",
+  "branch": "main"
+ },
+ "guardrails-ai/guardrails": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:44:53",
+  "branch": "main"
+ },
+ "nvidia-nemo/guardrails": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:44:56",
+  "branch": "develop"
+ },
+ "microsoft/agent-governance-toolkit": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:44:58",
+  "branch": "main"
+ },
+ "trusted-ai/adversarial-robustness-toolbox": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:45:01",
+  "branch": "main"
+ },
+ "superagent-ai/superagent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:45:01",
+  "branch": "main"
+ },
+ "ibm/mcp-context-forge": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:45:09",
+  "branch": "main"
+ },
+ "archestra-ai/archestra": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:45:11",
+  "branch": "main"
+ },
+ "elementalsouls/claude-bughunter": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:45:12",
+  "branch": "main"
+ },
+ "jphall663/awesome-machine-learning-interpretability": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:45:36",
+  "branch": "master"
+ },
+ "nolabs-ai/nono": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:45:39",
+  "branch": "main"
+ },
+ "verazuo/jailbreak_llms": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:45:46",
+  "branch": "main"
+ },
+ "protectai/llm-guard": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:45:47",
+  "branch": "main"
+ },
+ "goochbeater/spiritual-spell-red-teaming": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:45:48",
+  "branch": "main"
+ },
+ "wechaty/wechaty": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:45:55",
+  "branch": "main"
+ },
+ "earthtojake/text-to-cad": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:45:58",
+  "branch": "main"
+ },
+ "bulletphysics/bullet3": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:46:04",
+  "branch": "master"
+ },
+ "dlr-rm/stable-baselines3": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:46:13",
+  "branch": "master"
+ },
+ "kornia/kornia": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:46:21",
+  "branch": "main"
+ },
+ "minedojo/voyager": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:46:25",
+  "branch": "main"
+ },
+ "cactus-compute/needle": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:46:28",
+  "branch": "main"
+ },
+ "dusty-nv/jetson-inference": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:46:29",
+  "branch": "master"
+ },
+ "pliang279/awesome-multimodal-ml": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:46:37",
+  "branch": "master"
+ },
+ "jason718/awesome-self-supervised-learning": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:46:38",
+  "branch": "master"
+ },
+ "paperswithcode/ai-deadlines": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:46:48",
+  "branch": "gh-pages"
+ },
+ "adam-cad/cadam": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:46:53",
+  "branch": "master"
+ },
+ "rlinf/rlinf": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:47:06",
+  "branch": "main"
+ },
+ "haris-musa/excel-mcp-server": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:47:06",
+  "branch": "main"
+ },
+ "evolvinglmms-lab/otter": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:47:10",
+  "branch": "main"
+ },
+ "huangjunsen0406/py-xiaozhi": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:47:12",
+  "branch": "main"
+ },
+ "facebookresearch/habitat-lab": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:47:14",
+  "branch": "main"
+ },
+ "enactic/openarm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:47:18",
+  "branch": "main"
+ },
+ "hyp1231/awesome-llm-powered-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:47:24",
+  "branch": "main"
+ },
+ "unrealcv/unrealcv": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:47:44",
+  "branch": "5.2"
+ },
+ "hcplab-sysu/embodied_ai_paper_list": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:47:49",
+  "branch": "main"
+ },
+ "facebookresearch/theseus": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:47:54",
+  "branch": "main"
+ },
+ "roboterax/humanoid-gym": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:47:54",
+  "branch": "main"
+ },
+ "leofan90/awesome-world-models": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:47:56",
+  "branch": "main"
+ },
+ "nvlabs/alpamayo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:47:57",
+  "branch": "main"
+ },
+ "zchoi/awesome-embodied-robotics-and-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:48:04",
+  "branch": "main"
+ },
+ "showlab/showui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:48:19",
+  "branch": "main"
+ },
+ "stanfordvl/behavior-1k": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:48:31",
+  "branch": "main"
+ },
+ "kritiksoman/gimp-ml": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:48:39",
+  "branch": "dev"
+ },
+ "mattpocock/skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:48:41",
+  "branch": "main"
+ },
+ "snailclimb/javaguide": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:48:42",
+  "branch": "main"
+ },
+ "multica-ai/andrej-karpathy-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:48:43",
+  "branch": "main"
+ },
+ "deepseek-ai/deepseek-harness": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:48:49",
+  "branch": "master"
+ },
+ "langflow-ai/langflow": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:48:52",
+  "branch": "main"
+ },
+ "anthropics/claude-code": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:48:57",
+  "branch": "main"
+ },
+ "voltagent/awesome-design-md": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:49:24",
+  "branch": "main"
+ },
+ "supabase/supabase": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:49:27",
+  "branch": "master"
+ },
+ "karpathy/autoresearch": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:49:33",
+  "branch": "master"
+ },
+ "ruvnet/ruview": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:49:39",
+  "branch": "main"
+ },
+ "lobehub/lobehub": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:49:40",
+  "branch": "canary"
+ },
+ "openai/whisper": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:49:40",
+  "branch": "main"
+ },
+ "666ghj/mirofish": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:49:46",
+  "branch": "main"
+ },
+ "openai/openai-cookbook": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:49:55",
+  "branch": "main"
+ },
+ "openinterpreter/openinterpreter": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:50:22",
+  "branch": "main"
+ },
+ "gsd-build/get-shit-done": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:50:23",
+  "branch": "main"
+ },
+ "mvanhorn/last30days-skill": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:50:25",
+  "branch": "main"
+ },
+ "stablyai/orca": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:50:26",
+  "branch": "main"
+ },
+ "tw93/pake": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:50:29",
+  "branch": "main"
+ },
+ "pathwaycom/pathway": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:50:30",
+  "branch": "main"
+ },
+ "microsoft/autogen": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:50:40",
+  "branch": "main"
+ },
+ "mempalace/mempalace": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:50:46",
+  "branch": "develop"
+ },
+ "alishahryar1/free-claude-code": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:51:05",
+  "branch": "main"
+ },
+ "tt-a1i/archify": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:51:05",
+  "branch": "main"
+ },
+ "aaif-goose/goose": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:51:10",
+  "branch": "main"
+ },
+ "router-for-me/cliproxyapi": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:51:17",
+  "branch": "main"
+ },
+ "anthropics/claude-cookbooks": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:51:19",
+  "branch": "main"
+ },
+ "lencx/chatgpt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:51:22",
+  "branch": "v2-dev"
+ },
+ "multica-ai/multica": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:51:24",
+  "branch": "main"
+ },
+ "cherryhq/cherry-studio": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:51:24",
+  "branch": "main"
+ },
+ "k-dense-ai/scientific-agent-skills": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:51:30",
+  "branch": "main"
+ },
+ "kepano/obsidian-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:51:45",
+  "branch": "main"
+ },
+ "coreyhaines31/marketingskills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:51:49",
+  "branch": "main"
+ },
+ "heygen-com/hyperframes": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:51:51",
+  "branch": "main"
+ },
+ "imbad0202/academic-research-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:51:56",
+  "branch": "main"
+ },
+ "siyuan-note/siyuan": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:52:05",
+  "branch": "master"
+ },
+ "zhayujie/cowagent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:52:08",
+  "branch": "master"
+ },
+ "vercel-labs/agent-browser": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:52:21",
+  "branch": "main"
+ },
+ "chatanywhere/gpt_api_free": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:52:23",
+  "branch": "main"
+ },
+ "madslorentzen/ai-job-search": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:52:43",
+  "branch": "master"
+ },
+ "luongnv89/claude-howto": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:52:44",
+  "branch": "main"
+ },
+ "hmbown/codewhale": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:52:48",
+  "branch": "main"
+ },
+ "wei-shaw/sub2api": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:52:51",
+  "branch": "main"
+ },
+ "mindsdb/mindshub": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:52:56",
+  "branch": "main"
+ },
+ "astrbotdevs/astrbot": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:52:59",
+  "branch": "master"
+ },
+ "deepseek-ai/awesome-deepseek-integration": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:52:59",
+  "branch": "main"
+ },
+ "posthog/posthog": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:53:00",
+  "branch": "master"
+ },
+ "google/langextract": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:53:22",
+  "branch": "main"
+ },
+ "ashishpatel26/500-ai-agents-projects": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:53:30",
+  "branch": "main"
+ },
+ "github/awesome-copilot": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:53:31",
+  "branch": "main"
+ },
+ "anthropics/prompt-eng-interactive-tutorial": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:53:34",
+  "branch": "master"
+ },
+ "openai/gym": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:53:36",
+  "branch": "master"
+ },
+ "1panel-dev/1panel": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:53:39",
+  "branch": "dev-v2"
+ },
+ "huggingface/pytorch-image-models": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:53:40",
+  "branch": "main"
+ },
+ "musistudio/claude-code-router": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:53:42",
+  "branch": "main"
+ },
+ "vectifyai/pageindex": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:54:05",
+  "branch": "main"
+ },
+ "reworkd/agentgpt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:54:06",
+  "branch": "main"
+ },
+ "sgl-project/sglang": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:54:08",
+  "branch": "main"
+ },
+ "agentscope-ai/qwenpaw": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:54:13",
+  "branch": "main"
+ },
+ "anthropics/financial-services": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:54:13",
+  "branch": "main"
+ },
+ "cathrynlavery/diagram-design": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:54:14",
+  "branch": "main"
+ },
+ "huggingface/diffusers": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:54:14",
+  "branch": "main"
+ },
+ "qdrant/qdrant": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:54:22",
+  "branch": "master"
+ },
+ "openai/clip": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:54:39",
+  "branch": "main"
+ },
+ "linshenkx/prompt-optimizer": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:54:41",
+  "branch": "develop"
+ },
+ "voltagent/awesome-agent-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:54:45",
+  "branch": "main"
+ },
+ "sillytavern/sillytavern": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:54:47",
+  "branch": "release"
+ },
+ "lyogavin/airllm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:54:47",
+  "branch": "main"
+ },
+ "alibaba/nacos": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:54:48",
+  "branch": "develop"
+ },
+ "datawhalechina/happy-llm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:54:51",
+  "branch": "main"
+ },
+ "openai/codex-plugin-cc": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:03",
+  "branch": "main"
+ },
+ "zeroclaw-labs/zeroclaw": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:12",
+  "branch": "master"
+ },
+ "iofficeai/aionui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:15",
+  "branch": "main"
+ },
+ "datawhalechina/self-llm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:18",
+  "branch": "master"
+ },
+ "openai/openai-python": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:19",
+  "branch": "main"
+ },
+ "huggingface/agents-course": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:20",
+  "branch": "main"
+ },
+ "rustfs/rustfs": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:22",
+  "branch": "main"
+ },
+ "agentscope-ai/agentscope": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:23",
+  "branch": "main"
+ },
+ "p-e-w/heretic": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:38",
+  "branch": "master"
+ },
+ "ayghri/i-have-adhd": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:45",
+  "branch": "main"
+ },
+ "nanocoai/nanoclaw": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:48",
+  "branch": "main"
+ },
+ "getzep/graphiti": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:54",
+  "branch": "main"
+ },
+ "78/xiaozhi-esp32": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:54",
+  "branch": "main"
+ },
+ "davila7/claude-code-templates": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:56",
+  "branch": "main"
+ },
+ "zackriya-solutions/meetily": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:56",
+  "branch": "main"
+ },
+ "topoteretes/cognee": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:55:56",
+  "branch": "main"
+ },
+ "labring/fastgpt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:56:16",
+  "branch": "main"
+ },
+ "virgiliojr94/book-to-skill": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:56:21",
+  "branch": "master"
+ },
+ "jushbjj/mr.-ranedeer-ai-tutor": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:56:21",
+  "branch": "main"
+ },
+ "zarazhangrui/frontend-slides": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:56:22",
+  "branch": "main"
+ },
+ "simstudioai/sim": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:56:23",
+  "branch": "main"
+ },
+ "nirdiamant/rag_techniques": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:56:26",
+  "branch": "main"
+ },
+ "supermemoryai/supermemory": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:56:28",
+  "branch": "main"
+ },
+ "openai/openai-agents-python": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:56:29",
+  "branch": "main"
+ },
+ "huggingface/smolagents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:56:31",
+  "branch": "main"
+ },
+ "chroma-core/chroma": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:56:41",
+  "branch": "main"
+ },
+ "handsonllm/hands-on-large-language-models": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:56:50",
+  "branch": "main"
+ },
+ "yamadashy/repomix": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:56:57",
+  "branch": "main"
+ },
+ "ottermind/chat2db": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:56:58",
+  "branch": "main"
+ },
+ "microsoft/semantic-kernel": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:56:59",
+  "branch": "main"
+ },
+ "budibase/budibase": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:57:03",
+  "branch": "master"
+ },
+ "bloopai/vibe-kanban": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:57:05",
+  "branch": "main"
+ },
+ "google-labs-code/design.md": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:57:06",
+  "branch": "main"
+ },
+ "qwenlm/qwen-code": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:57:14",
+  "branch": "main"
+ },
+ "qwenlm/qwen3": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:57:26",
+  "branch": "main"
+ },
+ "huggingface/lerobot": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:57:31",
+  "branch": "main"
+ },
+ "kilo-org/kilocode": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:57:32",
+  "branch": "main"
+ },
+ "stability-ai/generative-models": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:57:32",
+  "branch": "main"
+ },
+ "fosowl/agenticseek": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:57:38",
+  "branch": "main"
+ },
+ "openai/symphony": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:57:42",
+  "branch": "main"
+ },
+ "gastownhall/beads": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:57:46",
+  "branch": "main"
+ },
+ "manaflow-ai/cmux": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:57:51",
+  "branch": "main"
+ },
+ "vercel/ai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:58:06",
+  "branch": "main"
+ },
+ "xai-org/grok-build": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:58:07",
+  "branch": "main"
+ },
+ "op7418/guizang-ppt-skill": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T11:58:08",
+  "branch": "main"
+ },
+ "openai/skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:58:08",
+  "branch": "main"
+ },
+ "huggingface/open-r1": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:58:12",
+  "branch": "main"
+ },
+ "deepset-ai/haystack": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:58:14",
+  "branch": "main"
+ },
+ "zai-org/open-autoglm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:58:19",
+  "branch": "main"
+ },
+ "tencentcloud/tencentdb-agent-memory": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:58:20",
+  "branch": "feat/server_team"
+ },
+ "phuryn/pm-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:58:24",
+  "branch": "main"
+ },
+ "mozilla-ai/llamafile": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:58:41",
+  "branch": "main"
+ },
+ "humanlayer/12-factor-agents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:58:44",
+  "branch": "main"
+ },
+ "jimliu/baoyu-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:58:46",
+  "branch": "main"
+ },
+ "a2aproject/a2a": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:58:46",
+  "branch": "main"
+ },
+ "agentskills/agentskills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:58:50",
+  "branch": "main"
+ },
+ "openai/gpt-2": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:58:55",
+  "branch": "master"
+ },
+ "letta-ai/letta": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:58:59",
+  "branch": "main"
+ },
+ "donchitos/claude-code-game-studios": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:59:03",
+  "branch": "main"
+ },
+ "roocodeinc/roo-code": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:59:17",
+  "branch": "main"
+ },
+ "agentsmd/agents.md": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:59:19",
+  "branch": "main"
+ },
+ "titanwings/distilly": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:59:20",
+  "branch": "distilly-plugin"
+ },
+ "accumulatemore/cv": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:59:26",
+  "branch": "main"
+ },
+ "vectorize-io/hindsight": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:59:41",
+  "branch": "main"
+ },
+ "hkuds/rag-anything": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:59:41",
+  "branch": "main"
+ },
+ "vanna-ai/vanna": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T11:59:42",
+  "branch": "main"
+ },
+ "micro/go-micro": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:00:06",
+  "branch": "master"
+ },
+ "anthropics/courses": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:00:09",
+  "branch": "master"
+ },
+ "pascalorg/editor": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:00:14",
+  "branch": "main"
+ },
+ "vxcontrol/pentagi": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:00:15",
+  "branch": "main"
+ },
+ "claude-code-best/claude-code": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:00:22",
+  "branch": "main"
+ },
+ "nvidia/nemoclaw": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:00:26",
+  "branch": "main"
+ },
+ "alibaba/open-code-review": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:00:34",
+  "branch": "main"
+ },
+ "huggingface/datasets": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:00:42",
+  "branch": "main"
+ },
+ "tencent/weknora": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:00:47",
+  "branch": "main"
+ },
+ "qwenlm/qwen": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:00:54",
+  "branch": "main"
+ },
+ "google/adk-python": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:01:01",
+  "branch": "main"
+ },
+ "coze-dev/coze-studio": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:01:02",
+  "branch": "main"
+ },
+ "guillaumemeyer/watermarks-remover": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:01:07",
+  "branch": "main"
+ },
+ "openai/chatgpt-retrieval-plugin": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:01:19",
+  "branch": "main"
+ },
+ "dyad-sh/dyad": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:01:19",
+  "branch": "main"
+ },
+ "steipete/codexbar": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:01:28",
+  "branch": "main"
+ },
+ "huggingface/candle": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:01:29",
+  "branch": "main"
+ },
+ "kkkkhazix/khazix-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:01:39",
+  "branch": "main"
+ },
+ "jnmetacode/agency-agents-zh": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:01:43",
+  "branch": "main"
+ },
+ "openai/gpt-oss": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:01:43",
+  "branch": "main"
+ },
+ "swe-agent/swe-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:01:52",
+  "branch": "main"
+ },
+ "teng-lin/notebooklm-py": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:01:54",
+  "branch": "main"
+ },
+ "qwenlm/qwen3-vl": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:02:01",
+  "branch": "main"
+ },
+ "camel-ai/owl": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:02:01",
+  "branch": "main"
+ },
+ "eosphoros-ai/db-gpt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:02:17",
+  "branch": "main"
+ },
+ "tanweai/pua": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:02:21",
+  "branch": "main"
+ },
+ "dzhng/deep-research": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:02:23",
+  "branch": "main"
+ },
+ "1jehuang/jcode": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:02:23",
+  "branch": "master"
+ },
+ "huggingface/trl": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:02:26",
+  "branch": "main"
+ },
+ "openai/tiktoken": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:02:38",
+  "branch": "main"
+ },
+ "huggingface/sentence-transformers": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:02:42",
+  "branch": "main"
+ },
+ "agent0ai/agent-zero": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:02:44",
+  "branch": "main"
+ },
+ "lss233/kirara-ai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:02:57",
+  "branch": "master"
+ },
+ "t8y2/dbx": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:03:03",
+  "branch": "main"
+ },
+ "arc53/docsgpt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:03:05",
+  "branch": "main"
+ },
+ "nesquena/hermes-webui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:03:06",
+  "branch": "master"
+ },
+ "labring/sealos": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:03:06",
+  "branch": "main"
+ },
+ "rightnow-ai/openfang": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:03:18",
+  "branch": "main"
+ },
+ "microsoft/agent-lightning": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:03:25",
+  "branch": "main"
+ },
+ "transitive-bullshit/agentic": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:03:26",
+  "branch": "main"
+ },
+ "every-app/open-seo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:03:37",
+  "branch": "main"
+ },
+ "nvidia/megatron-lm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:03:46",
+  "branch": "main"
+ },
+ "camel-ai/camel": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:03:48",
+  "branch": "master"
+ },
+ "googlecloudplatform/generative-ai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:03:49",
+  "branch": "main"
+ },
+ "langbot-app/langbot": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:03:51",
+  "branch": "master"
+ },
+ "anthropics/claude-quickstarts": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:03:59",
+  "branch": "main"
+ },
+ "canner/wrenai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:04:09",
+  "branch": "main"
+ },
+ "rowboatlabs/rowboat": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:04:10",
+  "branch": "main"
+ },
+ "evolinkai/awesome-gpt-image-2-api-and-prompts": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:04:15",
+  "branch": "main"
+ },
+ "qwenlm/qwen3-coder": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:04:23",
+  "branch": "main"
+ },
+ "openai/baselines": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:04:30",
+  "branch": "master"
+ },
+ "weaviate/weaviate": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:04:30",
+  "branch": "main"
+ },
+ "ryancodrai/turbovec": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:04:34",
+  "branch": "main"
+ },
+ "agricidaniel/claude-seo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:04:38",
+  "branch": "main"
+ },
+ "memvid/memvid": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:04:50",
+  "branch": "main"
+ },
+ "udecode/plate": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:04:51",
+  "branch": "main"
+ },
+ "memorilabs/memori": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:04:58",
+  "branch": "main"
+ },
+ "composio-community/awesome-codex-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:05:02",
+  "branch": "master"
+ },
+ "huggingface/transformers.js": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:05:17",
+  "branch": "main"
+ },
+ "alibaba/zvec": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:05:18",
+  "branch": "main"
+ },
+ "img2threejs/img2threejs": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:05:18",
+  "branch": "main"
+ },
+ "apache/doris": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:05:19",
+  "branch": "master"
+ },
+ "ag-ui-protocol/ag-ui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:05:28",
+  "branch": "main"
+ },
+ "openai/gpt-3": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:05:48",
+  "branch": "master"
+ },
+ "stability-ai/stablelm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:05:50",
+  "branch": "main"
+ },
+ "dottxt-ai/outlines": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:05:50",
+  "branch": "main"
+ },
+ "plandex-ai/plandex": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:05:56",
+  "branch": "main"
+ },
+ "yishentu/claudian": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:06:07",
+  "branch": "main"
+ },
+ "greydgl/pentestgpt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:06:08",
+  "branch": "main"
+ },
+ "gaizhenbiao/chuanhuchatgpt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:06:10",
+  "branch": "main"
+ },
+ "eigent-ai/eigent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:06:25",
+  "branch": "main"
+ },
+ "walkinglabs/learn-harness-engineering": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:06:34",
+  "branch": "main"
+ },
+ "opensandbox-group/opensandbox": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:06:34",
+  "branch": "main"
+ },
+ "botpress/botpress": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:06:41",
+  "branch": "master"
+ },
+ "kyegomez/openmythos": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:06:43",
+  "branch": "main"
+ },
+ "nevamind-ai/memu": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:06:46",
+  "branch": "main"
+ },
+ "nvidia/deeplearningexamples": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:06:54",
+  "branch": "master"
+ },
+ "llmware-ai/llmware": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:06:55",
+  "branch": "main"
+ },
+ "tencent-hunyuan/hunyuan3d-2": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:06:58",
+  "branch": "main"
+ },
+ "llamachinese/llama-chinese": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:07:08",
+  "branch": "main"
+ },
+ "microsoft/rd-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:07:21",
+  "branch": "main"
+ },
+ "mindfold-ai/trellis": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:07:24",
+  "branch": "main"
+ },
+ "palmier-io/palmier-pro": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:07:28",
+  "branch": "main"
+ },
+ "datawhalechina/llm-universe": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:07:29",
+  "branch": "main"
+ },
+ "opencode-ai/opencode": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:07:40",
+  "branch": "main"
+ },
+ "e2b-dev/e2b": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:07:44",
+  "branch": "main"
+ },
+ "open-llm-vtuber/open-llm-vtuber": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:07:44",
+  "branch": "main"
+ },
+ "siteboon/claudecodeui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:07:46",
+  "branch": "main"
+ },
+ "browseros-ai/browseros": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:08:03",
+  "branch": "main"
+ },
+ "modelcontextprotocol/typescript-sdk": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:08:14",
+  "branch": "main"
+ },
+ "youmind-openlab/awesome-nano-banana-pro-prompts": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:08:18",
+  "branch": "main"
+ },
+ "nvidia/tensorrt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:08:18",
+  "branch": "main"
+ },
+ "cloudwego/eino": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:08:36",
+  "branch": "main"
+ },
+ "huggingface/speech-to-speech": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:08:39",
+  "branch": "main"
+ },
+ "zoicware/removewindowsai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:08:40",
+  "branch": "main"
+ },
+ "neuml/txtai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:08:50",
+  "branch": "master"
+ },
+ "startrail-org/leann": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:08:57",
+  "branch": "main"
+ },
+ "insforge/insforge": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:09:07",
+  "branch": "main"
+ },
+ "nidhinjs/prompt-master": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:09:08",
+  "branch": "main"
+ },
+ "sirmalloc/ccstatusline": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:09:09",
+  "branch": "main"
+ },
+ "the-pr-agent/pr-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:09:11",
+  "branch": "main"
+ },
+ "evermind-ai/everos": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:09:18",
+  "branch": "main"
+ },
+ "codexu/note-gen": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:09:25",
+  "branch": "dev"
+ },
+ "langchain-ai/open_deep_research": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:09:26",
+  "branch": "main"
+ },
+ "piebald-ai/claude-code-system-prompts": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:09:36",
+  "branch": "main"
+ },
+ "wei-shaw/claude-relay-service": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:09:44",
+  "branch": "main"
+ },
+ "langgptai/langgpt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:09:59",
+  "branch": "main"
+ },
+ "infracost/infracost": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:10:01",
+  "branch": "master"
+ },
+ "tencent-hunyuan/hunyuanvideo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:10:02",
+  "branch": "main"
+ },
+ "zilliztech/claude-context": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:10:09",
+  "branch": "master"
+ },
+ "semantica-agi/semantica": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:10:14",
+  "branch": "main"
+ },
+ "chainlit/chainlit": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:10:16",
+  "branch": "main"
+ },
+ "ther1d/shell_gpt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:10:40",
+  "branch": "main"
+ },
+ "conardli/garden-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:10:46",
+  "branch": "main"
+ },
+ "openai/shap-e": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:10:49",
+  "branch": "main"
+ },
+ "sanbuphy/learn-coding-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:10:51",
+  "branch": "main"
+ },
+ "embedding/chinese-word-vectors": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:10:52",
+  "branch": "master"
+ },
+ "flagopen/flagembedding": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:11:02",
+  "branch": "master"
+ },
+ "bytedance/trae-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:11:06",
+  "branch": "main"
+ },
+ "tadata-org/fastapi_mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:11:11",
+  "branch": "main"
+ },
+ "h2oai/h2ogpt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:11:19",
+  "branch": "main"
+ },
+ "tencentcloud/cubesandbox": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:11:34",
+  "branch": "master"
+ },
+ "mrexodia/ida-pro-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:11:36",
+  "branch": "main"
+ },
+ "openai/spinningup": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:11:38",
+  "branch": "master"
+ },
+ "codebuffai/freebuff": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:11:43",
+  "branch": "main"
+ },
+ "beehiveinnovations/pal-mcp-server": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:11:49",
+  "branch": "main"
+ },
+ "nvidia/cosmos": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:11:52",
+  "branch": "main"
+ },
+ "0x4m4/hexstrike-ai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:11:55",
+  "branch": "master"
+ },
+ "embraceagi/awesome-chatgpt-zh": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:12:06",
+  "branch": "main"
+ },
+ "yizhiyanhua-ai/fireworks-tech-graph": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:12:08",
+  "branch": "main"
+ },
+ "quickwit-oss/quickwit": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:12:16",
+  "branch": "main"
+ },
+ "humanlayer/humanlayer": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:12:18",
+  "branch": "main"
+ },
+ "cocoindex-io/cocoindex": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:12:23",
+  "branch": "main"
+ },
+ "0xjacky/nginx-ui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:12:23",
+  "branch": "dev"
+ },
+ "lancedb/lancedb": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:12:28",
+  "branch": "main"
+ },
+ "jeffallan/claude-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:12:34",
+  "branch": "main"
+ },
+ "altic-dev/fluidvoice": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:12:42",
+  "branch": "main"
+ },
+ "memtensor/memos": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:12:59",
+  "branch": "main"
+ },
+ "holaboss-ai/holaos": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:13:00",
+  "branch": "main"
+ },
+ "microsoft/promptflow": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:13:07",
+  "branch": "main"
+ },
+ "tambo-ai/tambo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:13:12",
+  "branch": "main"
+ },
+ "nvidia/fastphotostyle": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:13:19",
+  "branch": "master"
+ },
+ "openai/openai-node": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:13:22",
+  "branch": "main"
+ },
+ "github/copilot-cli": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:13:25",
+  "branch": "main"
+ },
+ "cobusgreyling/loop-engineering": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:13:30",
+  "branch": "main"
+ },
+ "ten-framework/ten-framework": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:13:49",
+  "branch": "main"
+ },
+ "untrivial-ai/agent-orchestrator": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:13:53",
+  "branch": "main"
+ },
+ "moonshotai/kimi-k2": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:14:00",
+  "branch": "main"
+ },
+ "huggingface/skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:14:03",
+  "branch": "main"
+ },
+ "huggingface/tokenizers": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:14:10",
+  "branch": "main"
+ },
+ "aden-hive/hive": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:14:10",
+  "branch": "main"
+ },
+ "noefabris/opencode-antigravity-auth": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:14:12",
+  "branch": "main"
+ },
+ "kedro-org/kedro": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:14:27",
+  "branch": "main"
+ },
+ "huggingface/chat-ui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:14:42",
+  "branch": "main"
+ },
+ "getagentseal/codeburn": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:14:48",
+  "branch": "main"
+ },
+ "huggingface/text-generation-inference": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:14:50",
+  "branch": "main"
+ },
+ "modelcontextprotocol/inspector": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:14:55",
+  "branch": "main"
+ },
+ "alibaba/spring-ai-alibaba": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:15:02",
+  "branch": "main"
+ },
+ "openai/dall-e": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:15:06",
+  "branch": "master"
+ },
+ "mcp-use/mcp-use": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:15:07",
+  "branch": "main"
+ },
+ "mistralai/mistral-inference": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:15:09",
+  "branch": "main"
+ },
+ "huggingface/ml-intern": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:15:17",
+  "branch": "main"
+ },
+ "numman-ali/openskills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:15:28",
+  "branch": "main"
+ },
+ "langchain-ai/open-swe": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:15:29",
+  "branch": "main"
+ },
+ "openpipe/art": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:15:33",
+  "branch": "main"
+ },
+ "openai/codex-security": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:15:42",
+  "branch": "main"
+ },
+ "xinnan-tech/xiaozhi-esp32-server": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:15:44",
+  "branch": "main"
+ },
+ "ollama/ollama-python": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:15:50",
+  "branch": "main"
+ },
+ "sigoden/aichat": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:15:51",
+  "branch": "main"
+ },
+ "imbad0202/academic-research-skills-codex": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:15:57",
+  "branch": "main"
+ },
+ "zerolu/awesome-nanobanana-pro": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:16:06",
+  "branch": "main"
+ },
+ "kuberwastaken/claurst": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:16:08",
+  "branch": "main"
+ },
+ "oceanbase/oceanbase": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:16:14",
+  "branch": "master"
+ },
+ "deepseek-ai/3fs": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:16:20",
+  "branch": "main"
+ },
+ "diet103/claude-code-infrastructure-showcase": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:16:23",
+  "branch": "main"
+ },
+ "kangarooking/cangjie-skill": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:16:25",
+  "branch": "main"
+ },
+ "startrail-org/pixelrag": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:16:30",
+  "branch": "main"
+ },
+ "google-deepmind/sonnet": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:16:32",
+  "branch": "v2"
+ },
+ "huggingface/accelerate": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:16:38",
+  "branch": "main"
+ },
+ "youmind-openlab/awesome-gpt-image-2": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:16:46",
+  "branch": "main"
+ },
+ "omnigent-ai/omnigent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:16:49",
+  "branch": "main"
+ },
+ "hkuds/autoagent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:17:02",
+  "branch": "main"
+ },
+ "friuns2/blackfriday-gpts-prompts": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:17:06",
+  "branch": "main"
+ },
+ "openchamber/openchamber": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:17:09",
+  "branch": "main"
+ },
+ "awslabs/mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:17:15",
+  "branch": "main"
+ },
+ "microsoft/ufo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:17:23",
+  "branch": "main"
+ },
+ "chinasiro/claude-code-sourcemap": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:17:26",
+  "branch": "main"
+ },
+ "ntegrals/openbrowser": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:17:35",
+  "branch": "master"
+ },
+ "frankbria/ralph-claude-code": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:17:38",
+  "branch": "main"
+ },
+ "databendlabs/databend": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:17:49",
+  "branch": "main"
+ },
+ "adongwanai/agentguide": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:18:05",
+  "branch": "main"
+ },
+ "langchain-ai/local-deep-researcher": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:18:08",
+  "branch": "main"
+ },
+ "xberg-io/xberg": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:18:09",
+  "branch": "main"
+ },
+ "langchain-ai/rag-from-scratch": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:18:14",
+  "branch": "main"
+ },
+ "evomap/evolver": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:18:17",
+  "branch": "main"
+ },
+ "qwenaudio/sensevoice": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:18:19",
+  "branch": "main"
+ },
+ "activeloopai/deeplake": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:18:27",
+  "branch": "main"
+ },
+ "x-plug/mobileagent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:18:34",
+  "branch": "main"
+ },
+ "future-house/paper-qa": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:18:48",
+  "branch": "main"
+ },
+ "agents365-ai/drawio-skill": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:18:48",
+  "branch": "main"
+ },
+ "agricidaniel/claude-ads": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:18:59",
+  "branch": "main"
+ },
+ "lencx/noi": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:19:03",
+  "branch": "main"
+ },
+ "openspg/kag": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:19:09",
+  "branch": "master"
+ },
+ "stability-ai/stablestudio": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:19:09",
+  "branch": "main"
+ },
+ "mervinpraison/praisonai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:19:22",
+  "branch": "main"
+ },
+ "iflytek/astron-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:19:27",
+  "branch": "main"
+ },
+ "ai-boost/awesome-prompts": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:19:54",
+  "branch": "main"
+ },
+ "dice2o/binggpt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:19:54",
+  "branch": "main"
+ },
+ "anthropics/claude-code-action": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:20:03",
+  "branch": "main"
+ },
+ "justlovemaki/aiclient2api": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:20:11",
+  "branch": "main"
+ },
+ "rockbenben/chatgpt-shortcut": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:20:12",
+  "branch": "main"
+ },
+ "google/adk-go": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:20:15",
+  "branch": "main"
+ },
+ "nexu-io/html-anything": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:20:16",
+  "branch": "main"
+ },
+ "maciek-roboblog/claude-code-usage-monitor": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:20:23",
+  "branch": "main"
+ },
+ "thesysdev/openui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:20:42",
+  "branch": "main"
+ },
+ "reorproject/reor": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:20:47",
+  "branch": "main"
+ },
+ "backnotprop/plannotator": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:20:58",
+  "branch": "main"
+ },
+ "nvidia/openshell": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:21:05",
+  "branch": "main"
+ },
+ "lastmile-ai/mcp-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:21:09",
+  "branch": "main"
+ },
+ "openbmb/xagent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:21:09",
+  "branch": "main"
+ },
+ "teamwiseflow/xiaobei": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:21:11",
+  "branch": "master"
+ },
+ "smtg-ai/claude-squad": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:21:16",
+  "branch": "main"
+ },
+ "thudm/slime": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:21:26",
+  "branch": "main"
+ },
+ "idosal/git-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:21:31",
+  "branch": "main"
+ },
+ "automazeio/ccpm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:21:47",
+  "branch": "main"
+ },
+ "zilliztech/deep-searcher": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:21:53",
+  "branch": "master"
+ },
+ "google-labs-code/stitch-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:21:54",
+  "branch": "main"
+ },
+ "intitni/copilotforxcode": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:21:54",
+  "branch": "main"
+ },
+ "n4ze3m/page-assist": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:22:00",
+  "branch": "main"
+ },
+ "mariadb/server": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:22:03",
+  "branch": "main"
+ },
+ "jnmetacode/superpowers-zh": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:22:08",
+  "branch": "main"
+ },
+ "vercel-labs/deepsec": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:22:11",
+  "branch": "main"
+ },
+ "zilliztech/gptcache": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:22:13",
+  "branch": "main"
+ },
+ "jamez-bondos/awesome-gpt4o-images": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:22:23",
+  "branch": "main"
+ },
+ "vincentwei1021/video-shotcraft": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:22:25",
+  "branch": "main"
+ },
+ "anthropics/claude-agent-sdk-python": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:22:37",
+  "branch": "main"
+ },
+ "deepseek-ai/open-infra-index": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:22:39",
+  "branch": "main"
+ },
+ "microsoft/mastering-github-copilot-for-paired-programming": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:22:40",
+  "branch": "main"
+ },
+ "openai/jukebox": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:22:56",
+  "branch": "master"
+ },
+ "sciphi-ai/r2r": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:23:03",
+  "branch": "main"
+ },
+ "yaoapp/yao": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:23:03",
+  "branch": "main"
+ },
+ "ringhyacinth/star-office-ui": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:23:05",
+  "branch": "master"
+ },
+ "nirdiamant/prompt_engineering": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:23:11",
+  "branch": "main"
+ },
+ "osaurus-ai/osaurus": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:23:12",
+  "branch": "main"
+ },
+ "logancyang/obsidian-copilot": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:23:26",
+  "branch": "master"
+ },
+ "mufeedvh/code2prompt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:23:31",
+  "branch": "main"
+ },
+ "yzfly/awesome-mcp-zh": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:23:36",
+  "branch": "main"
+ },
+ "refly-ai/refly": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:23:53",
+  "branch": "main"
+ },
+ "openai/universe": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:23:54",
+  "branch": "master"
+ },
+ "anthropics/defending-code-reference-harness": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:24:00",
+  "branch": "main"
+ },
+ "xirong/my-git": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:24:02",
+  "branch": "master"
+ },
+ "openai/guided-diffusion": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:24:05",
+  "branch": "main"
+ },
+ "google-deepmind/lab": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:24:16",
+  "branch": "master"
+ },
+ "agentdeskai/browser-tools-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:24:18",
+  "branch": "main"
+ },
+ "luhengshiwo/llmforeverybody": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:24:23",
+  "branch": "main"
+ },
+ "zipstack/unstract": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:24:36",
+  "branch": "main"
+ },
+ "modelcontextprotocol/registry": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:24:38",
+  "branch": "main"
+ },
+ "interviewstreet/hiring-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:24:46",
+  "branch": "main"
+ },
+ "nvidia/warp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:24:47",
+  "branch": "main"
+ },
+ "jerryzliu/dayflow": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:24:54",
+  "branch": "main"
+ },
+ "plastic-labs/honcho": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:25:00",
+  "branch": "main"
+ },
+ "vespa-engine/vespa": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:25:00",
+  "branch": "master"
+ },
+ "op7418/guizang-social-card-skill": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:25:02",
+  "branch": "main"
+ },
+ "browsermcp/mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:25:04",
+  "branch": "main"
+ },
+ "grab/cursor-talk-to-figma-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:25:18",
+  "branch": "main"
+ },
+ "lance-format/lance": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:25:20",
+  "branch": "main"
+ },
+ "serpentai/serpentai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:25:23",
+  "branch": "dev"
+ },
+ "openai/openai-realtime-agents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:25:28",
+  "branch": "main"
+ },
+ "cursortouch/windows-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:25:38",
+  "branch": "main"
+ },
+ "nvidia/pix2pixhd": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:25:43",
+  "branch": "master"
+ },
+ "internlm/mindsearch": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:25:47",
+  "branch": "main"
+ },
+ "hijkzzz/awesome-llm-strawberry": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:25:52",
+  "branch": "main"
+ },
+ "openai/point-e": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:26:06",
+  "branch": "main"
+ },
+ "open-multi-agent/open-multi-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:26:07",
+  "branch": "main"
+ },
+ "max-sixty/worktrunk": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:26:09",
+  "branch": "main"
+ },
+ "deanpeters/product-manager-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:26:14",
+  "branch": "main"
+ },
+ "tencentqqgylab/appagent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:26:19",
+  "branch": "main"
+ },
+ "parthjadhav/app-store-screenshots": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:26:25",
+  "branch": "main"
+ },
+ "postgresml/postgresml": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:26:26",
+  "branch": "master"
+ },
+ "htdt/godogen": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:26:42",
+  "branch": "master"
+ },
+ "adbar/trafilatura": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:26:52",
+  "branch": "master"
+ },
+ "dataease/sqlbot": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:27:01",
+  "branch": "main"
+ },
+ "huggingface/smol-course": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:27:03",
+  "branch": "main"
+ },
+ "qwenlm/qwen-vl": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:27:07",
+  "branch": "master"
+ },
+ "langchain-ai/opengpts": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:27:14",
+  "branch": "main"
+ },
+ "wenyuchiou/awesome-agentic-ai-zh": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:27:21",
+  "branch": "main"
+ },
+ "vllm-project/vllm-omni": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:27:25",
+  "branch": "main"
+ },
+ "openai/tart": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:27:40",
+  "branch": "main"
+ },
+ "zenstory-ai/oh-story-claudecode": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:27:52",
+  "branch": "main"
+ },
+ "chaitanyagiri/munder-difflin": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:27:56",
+  "branch": "main"
+ },
+ "vas3k/taxhacker": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:27:58",
+  "branch": "main"
+ },
+ "nasiko-labs/nasiko": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:28:02",
+  "branch": "main"
+ },
+ "fr0gger/awesome-gpt-agents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:28:07",
+  "branch": "main"
+ },
+ "openai/openai-cs-agents-demo": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:28:16",
+  "branch": "main"
+ },
+ "airweave-ai/airweave": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:28:22",
+  "branch": "main"
+ },
+ "run-llama/rags": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:28:33",
+  "branch": "main"
+ },
+ "lilimozi/openhanako": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:28:46",
+  "branch": "main"
+ },
+ "linyilyi/street-fighter-ai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:28:47",
+  "branch": "master"
+ },
+ "trailhq/graft": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:28:48",
+  "branch": "main"
+ },
+ "openai/consistency_models": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:28:52",
+  "branch": "main"
+ },
+ "anbeime/skill": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:28:54",
+  "branch": "main"
+ },
+ "gentleman-programming/gentle-ai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:29:05",
+  "branch": "main"
+ },
+ "langchain-ai/chat-langchain": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:29:14",
+  "branch": "master"
+ },
+ "nvidia/fastertransformer": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:29:18",
+  "branch": "main"
+ },
+ "gentleman-programming/engram": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:29:37",
+  "branch": "main"
+ },
+ "apify/apify-mcp-server": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:29:46",
+  "branch": "master"
+ },
+ "genkit-ai/genkit": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:29:50",
+  "branch": "main"
+ },
+ "neovertex1/superprompt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:29:53",
+  "branch": "main"
+ },
+ "lavague-ai/lavague": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:29:57",
+  "branch": "main"
+ },
+ "getsentry/xcodebuildmcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:30:16",
+  "branch": "main"
+ },
+ "agiresearch/aios": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:30:17",
+  "branch": "main"
+ },
+ "kevinmusgrave/pytorch-metric-learning": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:30:31",
+  "branch": "master"
+ },
+ "promptslab/awesome-prompt-engineering": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:30:46",
+  "branch": "main"
+ },
+ "kunagent/kun": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:30:55",
+  "branch": "master"
+ },
+ "builderz-labs/mission-control": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:31:00",
+  "branch": "main"
+ },
+ "osmantic/ods": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:31:03",
+  "branch": "main"
+ },
+ "swyxio/ai-notes": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:31:07",
+  "branch": "main"
+ },
+ "langgptai/wonderful-prompts": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:31:13",
+  "branch": "main"
+ },
+ "lharries/whatsapp-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:31:17",
+  "branch": "main"
+ },
+ "redisearch/redisearch": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:31:36",
+  "branch": "master"
+ },
+ "dontriskit/awesome-ai-system-prompts": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:31:42",
+  "branch": "main"
+ },
+ "eigenwise/atomic-agents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:31:44",
+  "branch": "main"
+ },
+ "ikaijua/awesome-aitools": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:32:06",
+  "branch": "main"
+ },
+ "rullerzhou-afk/clawd-on-desk": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:32:12",
+  "branch": "main"
+ },
+ "anthropics/claude-code-security-review": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:32:17",
+  "branch": "main"
+ },
+ "heilcheng/awesome-agent-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:32:18",
+  "branch": "main"
+ },
+ "microsoft/taskweaver": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:32:21",
+  "branch": "main"
+ },
+ "voltagent/awesome-codex-subagents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:32:32",
+  "branch": "main"
+ },
+ "agegr/pi-web": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:32:35",
+  "branch": "main"
+ },
+ "crewaiinc/crewai-examples": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:32:35",
+  "branch": "main"
+ },
+ "chriswiles/claude-code-showcase": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:32:59",
+  "branch": "main"
+ },
+ "minishlab/semble": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:33:02",
+  "branch": "main"
+ },
+ "elder-plinius/t3mp3st": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:33:12",
+  "branch": "main"
+ },
+ "pawanosman/opencursor": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:33:14",
+  "branch": "main"
+ },
+ "ashishps1/learn-ai-engineering": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:33:24",
+  "branch": "main"
+ },
+ "netease-youdao/lobsterai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:33:29",
+  "branch": "main"
+ },
+ "gluonfield/enchanted": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:33:31",
+  "branch": "main"
+ },
+ "cactus-compute/cactus": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:33:33",
+  "branch": "main"
+ },
+ "deeplethe/utopia": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:33:57",
+  "branch": "dev"
+ },
+ "falkordb/falkordb": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:34:08",
+  "branch": "main"
+ },
+ "clusterzx/paperless-ai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:34:13",
+  "branch": "main"
+ },
+ "florianbruniaux/claude-code-ultimate-guide": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:34:15",
+  "branch": "main"
+ },
+ "tw93/kaku": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:34:16",
+  "branch": "main"
+ },
+ "helixdb/helix-db": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:34:16",
+  "branch": "main"
+ },
+ "mengto/skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:34:25",
+  "branch": "main"
+ },
+ "zseven-w/openpencil": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:34:26",
+  "branch": "main"
+ },
+ "sooperset/mcp-atlassian": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:34:49",
+  "branch": "main"
+ },
+ "fengshao1227/ccg-workflow": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:34:52",
+  "branch": "main"
+ },
+ "madcowd/ell": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:34:58",
+  "branch": "main"
+ },
+ "antfu/skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:35:01",
+  "branch": "main"
+ },
+ "browser-act/skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:35:07",
+  "branch": "main"
+ },
+ "modelengine-group/nexent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:35:07",
+  "branch": "develop"
+ },
+ "openai/plugins": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:35:13",
+  "branch": "main"
+ },
+ "21st-dev/magic-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:35:25",
+  "branch": "main"
+ },
+ "openai-php/client": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:35:41",
+  "branch": "main"
+ },
+ "tvytlx/ai-agent-deep-dive": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:35:49",
+  "branch": "main"
+ },
+ "ghuntley/how-to-build-a-coding-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:35:53",
+  "branch": "trunk"
+ },
+ "rllm-org/rllm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:35:59",
+  "branch": "main"
+ },
+ "pyspur-dev/pyspur": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:36:00",
+  "branch": "main"
+ },
+ "agentops-ai/agentops": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:36:03",
+  "branch": "main"
+ },
+ "klavis-ai/klavis": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:36:03",
+  "branch": "main"
+ },
+ "gosom/google-maps-scraper": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:36:10",
+  "branch": "main"
+ },
+ "nvidia/dali": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:36:39",
+  "branch": "main"
+ },
+ "eventual-inc/daft": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:36:42",
+  "branch": "main"
+ },
+ "appcypher/awesome-mcp-servers": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:36:42",
+  "branch": "main"
+ },
+ "neka-nat/freecad-mcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:36:44",
+  "branch": "main"
+ },
+ "nowork-studio/notfair-plugin": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:36:49",
+  "branch": "main"
+ },
+ "miuuyy/codex-chatgpt-web": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:36:55",
+  "branch": "main"
+ },
+ "tencent/teamai-cli": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:37:04",
+  "branch": "main"
+ },
+ "aipoch/open-science": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:37:05",
+  "branch": "main"
+ },
+ "huggingface/funes": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:37:24",
+  "branch": "main"
+ },
+ "mixelpixx/konnect": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:37:27",
+  "branch": "main"
+ },
+ "nutlope/logocreator": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:37:29",
+  "branch": "main"
+ },
+ "advaitpaliwal/feynman": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:37:32",
+  "branch": "main"
+ },
+ "stacklok/toolhive": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:37:35",
+  "branch": "main"
+ },
+ "nanako0129/sepia": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:37:42",
+  "branch": "main"
+ },
+ "human-agent-society/reef": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:37:46",
+  "branch": "main"
+ },
+ "2akouwu/reverify": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:37:51",
+  "branch": "main"
+ },
+ "tigerless-labs/agent-memory": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:38:03",
+  "branch": "main"
+ },
+ "datawhalechina/zero-to-sglang": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:38:10",
+  "branch": "main"
+ },
+ "onlyterp/opengrok": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:38:14",
+  "branch": "main"
+ },
+ "vuk97/forward-implementation-first": {
+  "is_skill": true,
+  "probed_at": "2026-09-09T12:38:16",
+  "branch": "main"
+ },
+ "jordyzomer/lemmalog": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:38:18",
+  "branch": "main"
+ },
+ "carloslfu/slotstream": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:38:25",
+  "branch": "main"
+ },
+ "useagenthq/useagent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:38:27",
+  "branch": "main"
+ },
+ "kydlikebtc/awesome-grokbot": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:38:30",
+  "branch": "main"
+ },
+ "fitchmultz/pi-posthorse": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:38:40",
+  "branch": "main"
+ },
+ "agenta-ai/awesome-ai-agent-platforms": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:38:46",
+  "branch": "main"
+ },
+ "continuum-ai-corp/orcareplay": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:38:59",
+  "branch": "main"
+ },
+ "ashutoshsinghpr7/wikiskill": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:39:01",
+  "branch": "main"
+ },
+ "jzjzzzzzzz/agent-me": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:39:07",
+  "branch": "main"
+ },
+ "abuzar-ansarii/needle": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:39:16",
+  "branch": "main"
+ },
+ "albertchamberlain/awesome-okf": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:39:18",
+  "branch": "main"
+ },
+ "amap-ml/looparena": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:39:21",
+  "branch": "main"
+ },
+ "usedotai/dot-reflex": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:39:32",
+  "branch": "main"
+ },
+ "jiabaobei/memory-bridge": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:39:36",
+  "branch": "main"
+ },
+ "nehanth/swarmllm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:39:44",
+  "branch": "main"
+ },
+ "alesha-pro/atlas": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:39:48",
+  "branch": "main"
+ },
+ "zeroa234/ryza-ai-revive": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:39:50",
+  "branch": "master"
+ },
+ "vaelkeep/hermes-paper-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:39:59",
+  "branch": "main"
+ },
+ "stevibe/sparklingkit": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:40:05",
+  "branch": "main"
+ },
+ "1panel-dev/1panel-gateway": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:40:09",
+  "branch": "main"
+ },
+ "xiaojumaoaihuaban/grok-unleashed": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:40:17",
+  "branch": "main"
+ },
+ "op7418/guizang-yingzao-skill": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:40:25",
+  "branch": "main"
+ },
+ "boardui/boardui": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:40:28",
+  "branch": "main"
+ },
+ "alephaitech/doubaoworkguide": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:40:37",
+  "branch": "main"
+ },
+ "sunyuzheng/lizheng-open-context": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:40:46",
+  "branch": "main"
+ },
+ "lincb522/gitgatto": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:40:55",
+  "branch": "main"
+ },
+ "aaravshah1311/agent-2": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:40:56",
+  "branch": "main"
+ },
+ "paulinewang183/daytrace": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:41:01",
+  "branch": "main"
+ },
+ "heyman333/agent-notion-template-docs": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:41:02",
+  "branch": "main"
+ },
+ "gesta-run/subpool": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:41:19",
+  "branch": "main"
+ },
+ "yuxuan2003/awesome-gui-agent-security": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:41:23",
+  "branch": "main"
+ },
+ "tcotl/agentcapture": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:41:25",
+  "branch": "main"
+ },
+ "xcjy8bao/baoer_signal_grep": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:41:36",
+  "branch": "main"
+ },
+ "jangtrinh/design-os-3d-blender": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:41:44",
+  "branch": "main"
+ },
+ "ryze-ai-adgent/open-seo-mcp-skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:41:47",
+  "branch": "main"
+ },
+ "noskillish/bankmcp": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:41:51",
+  "branch": "main"
+ },
+ "okf-memory/okf-agent-memory": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:41:56",
+  "branch": "main"
+ },
+ "neuronto/agentic-resource-discovery": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:42:05",
+  "branch": "main"
+ },
+ "cbrock84/headcount": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:42:07",
+  "branch": "main"
+ },
+ "bsab/italia-mcp-servers": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:42:10",
+  "branch": "main"
+ },
+ "hkqr/my-free-code": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:42:18",
+  "branch": "main"
+ },
+ "kkkkhazix/sun-style-writing": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:42:27",
+  "branch": "main"
+ },
+ "vicoa-ai/vicoa": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:42:35",
+  "branch": "main"
+ },
+ "frontier-harness-eval/eval": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:42:36",
+  "branch": "main"
+ },
+ "arahim3/kaggle-tpu-lab": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:42:45",
+  "branch": "main"
+ },
+ "qunqin24/pulse": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:42:56",
+  "branch": "main"
+ },
+ "chigwell/penelopa.ai": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:42:58",
+  "branch": "main"
+ },
+ "sharith45/atlas-assistant": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:43:00",
+  "branch": "main"
+ },
+ "nickname21kmr/gameops-investigator": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:43:05",
+  "branch": "main"
+ },
+ "wsw669/cclens": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:43:25",
+  "branch": "main"
+ },
+ "semihtalii/brink": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:43:26",
+  "branch": "main"
+ },
+ "hsandhu/mobilecode": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:43:29",
+  "branch": "dev"
+ },
+ "ewsun22/codex-manager": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T12:43:34",
+  "branch": "main"
+ },
+ "microsoft/markitdown": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:55:22",
+  "branch": "main"
+ },
+ "the-swarm-corporation/autohedge": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:55:27",
+  "branch": "main"
+ },
+ "moontechlab/lunatv": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:55:27",
+  "branch": "main"
+ },
+ "mnfst/llm-gateway": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:55:29",
+  "branch": "main"
+ },
+ "fmtlib/fmt": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:55:30",
+  "branch": "main"
+ },
+ "liquidslr/system-design-notes": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:55:31",
+  "branch": "main"
+ },
+ "viarotel-org/escrcpy": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:55:31",
+  "branch": "main"
+ },
+ "llvm/llvm-project": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:55:33",
+  "branch": "main"
+ },
+ "nvm-sh/nvm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:56:15",
+  "branch": "master"
+ },
+ "bilawalsidhu/gods-eye-view": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:56:26",
+  "branch": "main"
+ },
+ "hpcaitech/open-sora": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:56:27",
+  "branch": "main"
+ },
+ "hkuds/vibe-trading": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:56:27",
+  "branch": "main"
+ },
+ "google-research/timesfm": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:56:28",
+  "branch": "master"
+ },
+ "facebook/zstd": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:56:33",
+  "branch": "dev"
+ },
+ "free-tv/iptv": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:56:37",
+  "branch": "master"
+ },
+ "tauricresearch/tradingagents": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:56:41",
+  "branch": "main"
+ },
+ "k2-fsa/omnivoice": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:57:25",
+  "branch": "master"
+ },
+ "experientiallabs/experiential": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:57:28",
+  "branch": "main"
+ },
+ "adventdevinc/kudu": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:57:32",
+  "branch": "main"
+ },
+ "zie619/n8n-workflows": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:57:34",
+  "branch": "main"
+ },
+ "braveopotato/fcksignups": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:57:35",
+  "branch": "main"
+ },
+ "maotoumao/musicfree": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:57:36",
+  "branch": "master"
+ },
+ "n8n-io/n8n": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:57:46",
+  "branch": "master"
+ },
+ "hakanseven12/opencadstudio": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:57:50",
+  "branch": "main"
+ },
+ "nautechsystems/nautilus_trader": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:58:22",
+  "branch": "develop"
+ },
+ "rust-lang/rustlings": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:58:31",
+  "branch": "main"
+ },
+ "vllm-project/agentic-api": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:58:31",
+  "branch": "main"
+ },
+ "lostb1t/remux": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:58:32",
+  "branch": "main"
+ },
+ "pumpkin-mc/pumpkin": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:58:38",
+  "branch": "master"
+ },
+ "ajeetdsouza/zoxide": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:58:42",
+  "branch": "main"
+ },
+ "gtsteffaniak/filebrowser": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:58:45",
+  "branch": "main"
+ },
+ "microsoft/mxc": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:58:46",
+  "branch": "main"
+ },
+ "prometheus/prometheus": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:59:28",
+  "branch": "main"
+ },
+ "dstotijn/hetty": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:59:29",
+  "branch": "main"
+ },
+ "superplanehq/superplane": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:59:33",
+  "branch": "main"
+ },
+ "ndolestudio/httpsms": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:59:37",
+  "branch": "main"
+ },
+ "moby/buildkit": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:59:41",
+  "branch": "master"
+ },
+ "argoproj/argo-cd": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:59:41",
+  "branch": "master"
+ },
+ "go-playground/validator": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:59:43",
+  "branch": "master"
+ },
+ "project-hami/hami": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T16:59:49",
+  "branch": "master"
+ },
+ "junhan2/oh-my-fable": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T17:00:22",
+  "branch": "main"
+ },
+ "tokenrhythm/neohorse": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T17:00:24",
+  "branch": "main"
+ },
+ "petergyang/no-ai-slop": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:48:36",
+  "branch": "main"
+ },
+ "google/magika": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:48:38",
+  "branch": "main"
+ },
+ "freestylefly/awesome-gpt-image-2": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:48:38",
+  "branch": "main"
+ },
+ "vastsa/pi-desktop": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:48:39",
+  "branch": "main"
+ },
+ "chenhg5/cc-connect": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:48:40",
+  "branch": "main"
+ },
+ "larksuite/cli": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:48:40",
+  "branch": "main"
+ },
+ "dmtrkovalenko/fff": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:48:43",
+  "branch": "main"
+ },
+ "openbmb/toolbench": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:48:44",
+  "branch": "master"
+ },
+ "public-apis/public-apis": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:49:21",
+  "branch": "master"
+ },
+ "thu-maic/openmaic": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:49:24",
+  "branch": "main"
+ },
+ "opendcai/gamefactory-3a": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:49:25",
+  "branch": "main"
+ },
+ "smicallef/spiderfoot": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:49:25",
+  "branch": "master"
+ },
+ "vercel-labs/skills": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:49:29",
+  "branch": "main"
+ },
+ "solidjs/solid": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:49:30",
+  "branch": "main"
+ },
+ "primeintellect-ai/prime-agent": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:49:32",
+  "branch": "main"
+ },
+ "sumanth077/hands-on-ai-engineering": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:49:36",
+  "branch": "main"
+ },
+ "apache/maka": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:50:11",
+  "branch": "main"
+ },
+ "getopenscreen/openscreen": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:50:12",
+  "branch": "main"
+ },
+ "leookun/cursor-byok": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:50:12",
+  "branch": "main"
+ },
+ "actions/checkout": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:50:12",
+  "branch": "main"
+ },
+ "waditu/czsc": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:50:13",
+  "branch": "master"
+ },
+ "automattic/harper": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:50:15",
+  "branch": "master"
+ },
+ "polarsquad/krops": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:50:18",
+  "branch": "main"
+ },
+ "visioncortex/vtracer": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:50:21",
+  "branch": "master"
+ },
+ "xtls/xray-core": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:50:52",
+  "branch": "main"
+ },
+ "authelia/authelia": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:50:54",
+  "branch": "master"
+ },
+ "go-resty/resty": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:50:59",
+  "branch": "v3"
+ },
+ "volcano-sh/volcano": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:50:59",
+  "branch": "master"
+ },
+ "chaitin/safeline": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:51:02",
+  "branch": "main"
+ },
+ "akitaonrails/ai-memory": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:51:03",
+  "branch": "main"
+ },
+ "openfga/openfga": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:51:07",
+  "branch": "main"
+ },
+ "syncthing/syncthing": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:51:17",
+  "branch": "main"
+ },
+ "meiotcom/codingplanquota": {
+  "is_skill": false,
+  "probed_at": "2026-09-09T19:51:39",
+  "branch": "main"
+ }
+}
