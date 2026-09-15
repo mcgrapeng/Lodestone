@@ -5,7 +5,7 @@
 # Strategy: symlink (not copy) — single source of truth, no duplication
 # of data/, node_modules/, etc. Skills point back to this project directory.
 #
-# OpenCode 还需要 command/<name>.md 包装文件才能注册 /yz:ai 斜杠命令
+# OpenCode 还需要 command/<name>.md 包装文件才能注册 /yz-ai 斜杠命令
 # (OpenCode 的 skills/ 与 commands/ 是两个目录，不像 Claude 那样合一).
 # ponytail: 2026-09 — 旧项目名 lodestone / zp 的 legacy symlink 仍然建，用于老用户
 # 升级时无缝衔接。新用户 clone 后这两个目录不存在,自动跳过,无副作用。
@@ -13,7 +13,7 @@
 set -e
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # ponytail: 2026-09 — 主命令名 yz-ai; lodestone / zp 变 legacy alias.
-# /yz:ai 是航海家用磁石导航 — 这个 skill 是 AI 工程师的"磁石":
+# /yz-ai 是航海家用磁石导航 — 这个 skill 是 AI 工程师的"磁石":
 # 穿过 4 个数据洋流 (GitHub/HF/MCP/arXiv),把你引到该用的人工工具上.
 # 旧的 ~/.claude/skills/lodestone / zp 仍可通过同名 symlink 保留.
 NAME="yz-ai"
@@ -29,7 +29,7 @@ warn() { printf "  \033[33m!\033[0m %s\n" "$*"; }
 fail() { printf "  \033[31m✗\033[0m %s\n" "$*"; exit 1; }
 
 echo ""
-echo "⚡ Lodestone · /yz:ai skill (Claude Code + Codex + OpenCode + EasyCode)"
+echo "⚡ Lodestone · /yz-ai skill (Claude Code + Codex + OpenCode + EasyCode)"
 echo "   源目录: $HERE"
 echo ""
 
@@ -107,10 +107,10 @@ echo ""
 echo "🎉 安装完成!"
 echo ""
 echo "触发方式:"
-echo "  Claude Code → /yz:ai   (旧名 /lodestone / /zp 仍可触发)"
+echo "  Claude Code → /yz-ai   (旧名 /lodestone / /zp 仍可触发)"
 echo "  Codex CLI   → \$yz:ai  (Codex 用 \$ 前缀,不是 /)"
-echo "  OpenCode    → /yz:ai   (旧名 /lodestone / /zp 仍可触发)"
-echo "  EasyCode    → /yz:ai"
+echo "  OpenCode    → /yz-ai   (旧名 /lodestone / /zp 仍可触发)"
+echo "  EasyCode    → /yz-ai"
 echo ""
 echo "自然语言触发(三家都支持,不用记命令):"
 echo "  「看看最新AI项目」/「AI radar」/「刷一下AI雷达」/「最近有什么火的AI项目」"
