@@ -108,13 +108,20 @@ Apache-2.0 — see [LICENSE](LICENSE).
 
 ## Authors
 
-Created and maintained by zhangpeng. Pre-release commits were authored
-with the personal email `lodestonezhang@gmail.com` — this is part of
-git history and cannot be retroactively changed without rewriting history.
-Going forward, new commits use a no-reply address via `.mailmap` (see
-repo root).
+All commits authored by **Lodestone** `<noreply@lodestone.dev>` (post
+open-source-release history rewrite). Future contributions welcome via
+Pull Request.
 
-Contributions welcome via Pull Request.
+If you commit to this repo, configure git to use the same no-reply
+identity so commit metadata stays consistent:
+
+```bash
+git config user.name "Your Name"
+git config user.email "you@example.com"
+```
+
+(The repo does NOT enforce a specific email — use whatever you prefer
+for your contributions.)
 
 ## Related projects
 
