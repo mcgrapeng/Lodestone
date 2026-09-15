@@ -1,7 +1,0 @@
-[db] pg8000 unavailable (No module named 'pg8000'); falling back to JSON-only mode
-[serve-port] 8765
-  [POST] /api/save_summary_batch
-  [GET] /api/health
-  [GET] /api/health
-  [GET] /api/data
-  [GET] /api/health
