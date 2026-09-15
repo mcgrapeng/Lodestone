@@ -1,0 +1,16 @@
+# Custom domain for GitHub Pages.
+# Replace this file with your actual domain. GitHub Pages will serve the
+# site at https://<your-domain> (instead of https://<user>.github.io/<repo>/).
+#
+# Setup steps:
+# 1. Put your domain here, e.g.  docs.lodestone.dev
+# 2. Commit + push to the branch GitHub Pages publishes from (master)
+# 3. In repo Settings → Pages → Custom domain → enter the same domain → Save
+# 4. At your DNS registrar, add a CNAME record:
+#      <your-subdomain>.CNAME <user>.github.io.
+#    (or apex domain: add A records 185.199.108.153 / .154 / .155 / .156)
+# 5. Wait ~1 min for DNS + GitHub Pages to issue a Let's Encrypt cert
+# 6. Settings → Pages → "Enforce HTTPS" → tick
+#
+# Without this file, GitHub Pages serves at https://<user>.github.io/<repo>/
+docs.lodestone.dev
