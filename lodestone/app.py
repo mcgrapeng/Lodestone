@@ -126,6 +126,90 @@ def create_app() -> FastAPI:
                             "config_schema": getattr(c, "config_schema", {})}
         raise HTTPException(404, f"plugin not found: {name}")
 
+    # ---- 7 write endpoints ----
+
+    from pydantic import BaseModel
+    from datetime import datetime
+
+    class _ConfigBody(BaseModel):
+        config: dict = {}
+
+    @app.post("/api/sources/{name}/config")
+    async def set_source_config(name: str, body: _ConfigBody):
+        if app.state.pool is None:
+            raise HTTPException(503, "db unavailable")
+        async with app.state.pool.acquire() as conn:
+            store = Store(conn)
+            for k, v in body.config.items():
+                await store.set_plugin_state(name, k, v)
+        return {"ok": True}
+
+    @app.post("/api/sources/{name}/test")
+    async def test_source(name: str):
+        plugin = registry.get(name)
+        if plugin is None:
+            raise HTTPException(404, f"plugin not found: {name}")
+        count = 0
+        try:
+            async for _ in plugin.crawl():
+                count += 1
+                if count >= 5:
+                    break
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+        return {"ok": True, "sampled": count}
+
+    @app.post("/api/crawl")
+    async def trigger_crawl(source: str | None = None):
+        if source:
+            try:
+                await scheduler.run_now(source)
+            except KeyError as e:
+                raise HTTPException(404, str(e))
+        else:
+            for name, _ in registry.list_by_kind("source"):
+                try:
+                    await scheduler.run_now(name)
+                except Exception as e:
+                    log.warning("crawl %s failed: %s", name, e)
+        return {"ok": True, "triggered": source or "all"}
+
+    @app.get("/api/notifications")
+    async def list_notifications(unread_only: bool = False, since: str | None = None):
+        if app.state.pool is None:
+            raise HTTPException(503, "db unavailable")
+        since_dt = datetime.fromisoformat(since) if since else None
+        async with app.state.pool.acquire() as conn:
+            return await Store(conn).list_notifications(unread_only=unread_only, since=since_dt)
+
+    @app.post("/api/notifications/{nid}/read")
+    async def mark_read(nid: int):
+        if app.state.pool is None:
+            raise HTTPException(503, "db unavailable")
+        async with app.state.pool.acquire() as conn:
+            await Store(conn).mark_notification_read(nid)
+        return {"ok": True}
+
+    @app.get("/api/settings")
+    async def get_llm_settings():
+        from pathlib import Path
+        import json
+        p = Path("data/settings.json")
+        if p.exists():
+            return json.loads(p.read_text())
+        return None
+
+    @app.post("/api/settings")
+    async def save_llm_settings(body: dict):
+        from pathlib import Path
+        import json
+        p = Path("data/settings.json")
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(body, ensure_ascii=False, indent=2))
+        tmp.replace(p)
+        return {"ok": True}
+
     return app
 
 
