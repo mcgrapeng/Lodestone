@@ -103,4 +103,4 @@ PGHOST=10.0.0.5            # PG 不在 localhost 时
 
 ## License
 
-MIT
+Apache-2.0 — see [LICENSE](LICENSE).
