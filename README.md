@@ -46,7 +46,7 @@ git clone <仓库> ~/lodestone && cd ~/lodestone
 完全退出 Claude Code 再重开。说"刷一下 AI 雷达"就能用。
 
 > 📸 **Dashboard 主视图**（DB 加载好后是这个样子）：
-> ![Dashboard](screenshots/dashboard.png)
+> ![Dashboard](docs/screenshots/dashboard.png)
 
 ---
 

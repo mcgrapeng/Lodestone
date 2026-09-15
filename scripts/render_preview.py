@@ -1,19 +1,32 @@
 #!/usr/bin/env python3
-"""Render 3 docs to a single HTML preview site (uses mistune for reliable markdown).
+"""Render 3 docs to HTML preview site (uses mistune for reliable markdown).
 
-Output: docs/preview/index.html
+Output:
+- docs/index.html         (GitHub Pages root; served at https://user.github.io/lodestone/)
+- docs/preview/index.html (local preview; same content, same path-rewriting)
+
+Path rewriting:
+- Image src="docs/..." → src="../..." (because preview HTML is at docs/preview/
+  and the assets are at docs/; for docs/index.html the src stays as docs/...
+  since assets and HTML are both under docs/)
+
+Usage:
+  python3 scripts/render_preview.py
 """
 from __future__ import annotations
+import datetime as _dt
 import re
 from pathlib import Path
 
 import mistune
 
-DOCS = Path(__file__).resolve().parent.parent  # /Users/.../lodestone
+DOCS = Path(__file__).resolve().parent.parent
 PREVIEW_DIR = DOCS / "docs" / "preview"
-PREVIEW_DIR.mkdir(exist_ok=True)
+GHPAGES_DIR = DOCS / "docs"   # GitHub Pages serves docs/ root
+PREVIEW_DIR.mkdir(exist_ok=True, parents=True)
 
-# Set up mistune with GitHub-flavored features
+
+# mistune with GitHub-flavored features
 md = mistune.create_markdown(
     renderer="html",
     plugins=["table", "url", "strikethrough"],
@@ -21,55 +34,91 @@ md = mistune.create_markdown(
 
 
 def fixup(md_html: str, doc_id: str) -> str:
-    """Tweak generated HTML — add anchors to headings, etc."""
-    # Add id to top heading
+    """Add anchors to headings + rewrite cross-doc local links."""
+    # Anchor the top H1
     md_html = re.sub(
         r"<h1>(.*?)</h1>",
         rf'<h1 id="{doc_id}">\1</h1>',
         md_html,
         count=1,
     )
-    # Add anchors to ALL headings (so nav links work)
+
+    # Anchor ALL headings
     def _anch(m):
         level, txt = m.group(1), m.group(2)
-        # make id from text
         anchor_txt = re.sub(r"<[^>]+>", "", txt).lower()
         anchor = re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "-", anchor_txt).strip("-")
-        return f"<h{level} id=\"{anchor}\">{txt}</h{level}>"
+        return f'<h{level} id="{anchor}">{txt}</h{level}>'
     md_html = re.sub(r"<h([1-6])>(.*?)</h\1>", _anch, md_html)
-    # Rewrite local file links to anchors within same doc
+
+    # Rewrite cross-doc .md links to anchors within the same preview
     md_html = re.sub(r'href="README\.md#', f'href="#readme/', md_html)
     md_html = re.sub(r'href="安装说明\.md#', f'href="#install/', md_html)
     md_html = re.sub(r'href="使用手册\.md#', f'href="#manual/', md_html)
     md_html = re.sub(r'href="SKILL\.md"', f'href="#skill"', md_html)
-    # Resolve relative image paths to docs/
-    md_html = re.sub(r'<img src="(?!http|/|docs/)([^"]+)"', r'<img src="../\1"', md_html)
     return md_html
 
 
-# Note: README.md references `logo.svg` and `screenshots/*.png` which need to resolve
-# relative to the repo root. Since the preview is at docs/preview/index.html,
-# we rewrite `src="logo.svg"` → `src="../logo.svg"`. Same for screenshots.
+def rewrite_for_preview(html: str) -> str:
+    """Image / link path rewrite for the docs/preview/index.html file.
 
-LOGO_REWRITER = re.compile(r'(<img[^>]+src=")(?!http|/|#|docs/)([^"]+)"')
+    preview is at docs/preview/, assets are at docs/ — so 'docs/...' paths
+    need to become '../...'. GitHub Pages (docs/index.html) does NOT
+    apply this rewrite because everything stays under docs/.
+    """
+    # images: src="docs/X" → src="../X"
+    html = re.sub(
+        r'(<img[^>]+src=")(docs/(?!preview/))([^"]+)"',
+        r'\g<1>../\g<2>\g<3>"',
+        html,
+    )
+    # src="docs/preview/X" → src="X" (preview is already inside docs/)
+    html = re.sub(
+        r'(<img[^>]+src="docs/preview/)([^"]+)"',
+        r'\g<1>\g<2>"',
+        html,
+    )
+    return html
 
 
-def rewrite_logo(html: str) -> str:
-    """Move image paths up one level (docs/preview → docs/)."""
-    return LOGO_REWRITER.sub(r'\1../\2"', html)
+LOGO_PATH = "../logo.svg"  # from docs/preview/ → docs/logo.svg
+# We embed the logo via raw <img> in each doc, so we don't need to rewrite.
 
 
 README_MD = (DOCS / "README.md").read_text()
 INSTALL_MD = (DOCS / "安装说明.md").read_text()
 MANUAL_MD = (DOCS / "使用手册.md").read_text()
 
-README_HTML = fixup(md(README_MD), "readme-top")
-INSTALL_HTML = fixup(md(INSTALL_MD), "install-top")
-MANUAL_HTML = fixup(md(MANUAL_MD), "manual-top")
+# Logo SVG for inline embedding
+LOGO_SVG = (DOCS / "docs" / "logo.svg").read_text()
+# data: URL so the logo inlines cleanly into the single-file HTML
+import base64
+LOGO_DATA_URI = (
+    "data:image/svg+xml;base64," + base64.b64encode(LOGO_SVG.encode("utf-8")).decode("ascii")
+)
+LOGO_IMG = f'<img src="{LOGO_DATA_URI}" alt="Lodestone · 磁石 · 你的 AI 工程师罗盘" width="540">'
 
-README_HTML = rewrite_logo(README_HTML)
-INSTALL_HTML = rewrite_logo(INSTALL_HTML)
-MANUAL_HTML = rewrite_logo(MANUAL_HTML)
+# Replace the leading <img src="docs/logo.svg" ...> in each doc with the
+# data-URI version (so each HTML page is self-contained, no external fetch).
+def inline_logo(html: str) -> str:
+    return re.sub(
+        r'<img src="docs/logo\.svg"[^>]*>',
+        LOGO_IMG,
+        html,
+        count=1,
+    )
+
+
+def render(name: str, md_text: str, doc_id: str) -> str:
+    h = md(md_text)
+    h = fixup(h, doc_id)
+    h = inline_logo(h)
+    return h
+
+
+README_HTML = render("README", README_MD, "readme-top")
+INSTALL_HTML = render("安装说明", INSTALL_MD, "install-top")
+MANUAL_HTML = render("使用手册", MANUAL_MD, "manual-top")
 
 
 NAV = """
@@ -275,7 +324,6 @@ code.language-bash { color: #a5d6a7; }
 
 
 def build_html() -> str:
-    import datetime as _dt
     return f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -289,7 +337,7 @@ def build_html() -> str:
 <div class="container">
 
 <header class="site-header">
-  <img src="../logo.svg" alt="Lodestone · 磁石 · 你的 AI 工程师罗盘">
+  {LOGO_IMG}
   <h1>Lodestone · 文档预览</h1>
   <p>完整文档嵌入到 GitHub 仓库根（README.md / 安装说明.md / 使用手册.md）。本预览页用 mistune 渲染，挂本地 server 即可访问。</p>
 </header>
@@ -305,7 +353,7 @@ def build_html() -> str:
 </section>
 
 <section class="doc">
-{MANUAL_HTML}
+{ MANUAL_HTML}
 </section>
 
 <footer class="site-footer">
@@ -321,9 +369,18 @@ def build_html() -> str:
 
 
 def main():
-    out = PREVIEW_DIR / "index.html"
-    out.write_text(build_html(), encoding="utf-8")
-    print(f"wrote {out}")
+    html_text = build_html()
+
+    # Output 1: docs/index.html (for GitHub Pages — everything stays under docs/)
+    ghpages_out = GHPAGES_DIR / "index.html"
+    ghpages_out.write_text(html_text, encoding="utf-8")
+    print(f"wrote {ghpages_out}")
+
+    # Output 2: docs/preview/index.html (for local preview server on docs/ root)
+    preview_out = PREVIEW_DIR / "index.html"
+    preview_text = rewrite_for_preview(html_text)
+    preview_out.write_text(preview_text, encoding="utf-8")
+    print(f"wrote {preview_out}")
 
 
 if __name__ == "__main__":
