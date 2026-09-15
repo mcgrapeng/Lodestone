@@ -10,6 +10,9 @@ data/
 # ponytail: 2026-09 — session 内部分析/planning artifact，公开 repo 的人不需要看
 docs/superpowers/
 
+# ponytail: 2026-09 — 2.0 迁移/插件指南：源码内部参考，公开 repo 不发
+docs/2.0/
+
 # ponytail: 2026-09 — pre-existing debt 集中清理：pycache / venv / node_modules / IDE 配置
 # 历史 git 跟踪了这些，但新 clone 不应该拉（clone 重新生成 / 由各人 IDE 配置）。
 __pycache__/
@@ -53,3 +56,4 @@ storage/
 .claude/settings.local.json
 frontend/.claude/
 .superpowers
+lodestone.egg-info
