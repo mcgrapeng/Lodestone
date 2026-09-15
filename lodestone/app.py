@@ -229,6 +229,31 @@ def create_app() -> FastAPI:
                 "fetched_at": datetime.now(timezone.utc).isoformat(),
             }
 
+    # ---- enrichment state (5-bucket host-LLM pass) ----
+    from lodestone import enrich
+
+    @app.get("/api/enrich/status")
+    async def enrich_status():
+        return {
+            "enriched": enrich.is_enriched(),
+            "at": enrich.enriched_at(),
+        }
+
+    @app.post("/api/enrich/reset")
+    async def enrich_reset():
+        enrich.clear()
+        return {"ok": True}
+
+    @app.post("/api/enrich/mark")
+    async def enrich_mark():
+        """Host LLM calls this after a successful 5-bucket enrichment pass.
+
+        Sets data/.enriched_at to the current UTC timestamp. Subsequent
+        /yz:ai calls will see enriched=true and skip auto-enrichment.
+        """
+        ts = enrich.mark_enriched()
+        return {"ok": True, "at": ts}
+
     return app
 
 
