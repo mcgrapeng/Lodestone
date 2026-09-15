@@ -32,6 +32,10 @@ data/crawl.lock.stale-*
 # ponytail: 2026-09 — pre-existing commit-time 残留（保留给 git rm --cached 用）
 graphify-out/
 
+# ponytail: 2026-09 — 个人 Claude Code slash-command (/lodestone /yz-ai /zp)，
+# 装在 ~/.claude/commands/ 即可，不该跟仓库走
+command/
+
 # ponytail: 2026-09 — Apify Crawlee 运行期 KV store / request queue state，
 # 本地 crawl 自动重建
 storage/
