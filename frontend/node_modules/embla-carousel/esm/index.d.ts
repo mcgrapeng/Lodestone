@@ -1,0 +1,12 @@
+export { EmblaOptionsType, OptionsType } from './components/Options.js';
+export { EmblaEventType, EmblaEventCallbackType, EmblaCreatedEventType, EmblaEventModelType, EmblaEventListType } from './components/EventHandler.js';
+export { EmblaSsrOptionsType, EmblaSsrType } from './components/SsrHandler.js';
+export { EmblaCarouselType } from './components/EmblaCarousel.js';
+export { EmblaPluginType } from './components/Plugins.js';
+export { default } from './components/EmblaCarousel.js';
+export { CreatePluginType, EmblaPluginsType } from './components/Plugins.js';
+export { CreateOptionsType } from './components/Options.js';
+export { OptionsHandlerType } from './components/OptionsHandler.js';
+export { EngineType } from './components/Engine.js';
+export { ScrollBodyType } from './components/ScrollBody.js';
+export { NodesType } from './components/NodeHandler.js';

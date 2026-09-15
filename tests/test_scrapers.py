@@ -21,9 +21,20 @@ from scrapers.url_dispatcher import quality_marker, select_engines
 
 
 ALL_ENGINES = (
-    "httpx", "cloudscraper", "playwright_stealth", "jina",          # 启用（priority 白名单）
-    "firecrawl", "crawl4ai", "playwright", "nodriver", "crawlee",   # 停用但适配器保留
-    "scrapy", "agent_reach", "trafilatura", "beautifulsoup", "drissionpage",
+    "httpx",
+    "cloudscraper",
+    "playwright_stealth",
+    "jina",  # 启用（priority 白名单）
+    "firecrawl",
+    "crawl4ai",
+    "playwright",
+    "nodriver",
+    "crawlee",  # 停用但适配器保留
+    "scrapy",
+    "agent_reach",
+    "trafilatura",
+    "beautifulsoup",
+    "drissionpage",
 )
 ACTIVE = {"httpx", "cloudscraper", "playwright_stealth", "jina"}
 
@@ -52,14 +63,20 @@ def _mock_engines(scrape_fns: dict, extra_available=()):
 
 def _fn(html="", raises=False, error=None):
     """Sync scrape fn returning a fixed result."""
+
     def fn(url, timeout=90):
         if raises:
             raise RuntimeError(f"{html or 'engine'} boom")
-        return {"success": bool(html), "html": html, "error": error or (None if html else "empty")}
+        return {
+            "success": bool(html),
+            "html": html,
+            "error": error or (None if html else "empty"),
+        }
+
     return fn
 
 
-CLEAN_HTML = "<html>" + "x" * 600 + "</html>"          # 过长度门、无 bot 特征
+CLEAN_HTML = "<html>" + "x" * 600 + "</html>"  # 过长度门、无 bot 特征
 BOT_HTML = "<html>Just a moment...</html>" + "y" * 600  # 够长但命中 Cloudflare 特征
 
 
@@ -73,24 +90,44 @@ def test_quality_gate_length():
 
 def test_quality_gate_bot_markers():
     for marker in ("Just a moment", "Checking your browser", "Attention required"):
-        assert scrapers.quality_ok(f"<html>{marker}</html>" + "z" * 600, "https://example.com") is False
+        assert (
+            scrapers.quality_ok(
+                f"<html>{marker}</html>" + "z" * 600, "https://example.com"
+            )
+            is False
+        )
 
 
 def test_quality_gate_trending_structural_marker():
     # trending 页必须含 ≥5 个 Box-row article（与 radar.py 解析正则耦合）
     two_rows = "<html>" + '<article class="Box-row">' * 2 + "a" * 600 + "</html>"
     six_rows = "<html>" + '<article class="Box-row">' * 6 + "a" * 600 + "</html>"
-    assert scrapers.quality_ok(two_rows, "https://github.com/trending?since=daily") is False
-    assert scrapers.quality_ok(six_rows, "https://github.com/trending?since=daily") is True
+    assert (
+        scrapers.quality_ok(two_rows, "https://github.com/trending?since=daily")
+        is False
+    )
+    assert (
+        scrapers.quality_ok(six_rows, "https://github.com/trending?since=daily") is True
+    )
     # 无结构标记的 URL 不做该判据
     assert scrapers.quality_ok(six_rows, "https://example.com") is True
 
 
 def test_quality_gate_search_structural_marker():
-    assert scrapers.quality_ok("<html>" + "data-view-component" * 2 + "a" * 600,
-                               "https://github.com/search?q=x") is False
-    assert scrapers.quality_ok("<html>" + "data-view-component" * 3 + "a" * 600,
-                               "https://github.com/search?q=x") is True
+    assert (
+        scrapers.quality_ok(
+            "<html>" + "data-view-component" * 2 + "a" * 600,
+            "https://github.com/search?q=x",
+        )
+        is False
+    )
+    assert (
+        scrapers.quality_ok(
+            "<html>" + "data-view-component" * 3 + "a" * 600,
+            "https://github.com/search?q=x",
+        )
+        is True
+    )
 
 
 # =========================================================================
@@ -99,16 +136,20 @@ def test_quality_gate_search_structural_marker():
 def test_tiered_first_quality_pass_wins():
     """httpx 拿到干净页面 → 直接返回，更重的引擎根本不动。"""
     calls = []
+
     def tracked(name, fn):
         def wrapped(url, timeout=90):
             calls.append(name)
             return fn(url, timeout)
+
         return wrapped
 
-    with _mock_engines({
-        "httpx": tracked("httpx", _fn(CLEAN_HTML)),
-        "cloudscraper": tracked("cloudscraper", _fn(CLEAN_HTML)),
-    }):
+    with _mock_engines(
+        {
+            "httpx": tracked("httpx", _fn(CLEAN_HTML)),
+            "cloudscraper": tracked("cloudscraper", _fn(CLEAN_HTML)),
+        }
+    ):
         html, engine = scrapers.fetch_html("https://example.com", strategy="tiered")
     assert engine == "httpx"
     assert html == CLEAN_HTML
@@ -118,16 +159,20 @@ def test_tiered_first_quality_pass_wins():
 def test_tiered_escalates_on_bot_check():
     """httpx 拿到 Cloudflare 中间页（够长但命中 bot 特征）→ 升级 cloudscraper。"""
     calls = []
+
     def tracked(name, fn):
         def wrapped(url, timeout=90):
             calls.append(name)
             return fn(url, timeout)
+
         return wrapped
 
-    with _mock_engines({
-        "httpx": tracked("httpx", _fn(BOT_HTML)),
-        "cloudscraper": tracked("cloudscraper", _fn(CLEAN_HTML)),
-    }):
+    with _mock_engines(
+        {
+            "httpx": tracked("httpx", _fn(BOT_HTML)),
+            "cloudscraper": tracked("cloudscraper", _fn(CLEAN_HTML)),
+        }
+    ):
         html, engine = scrapers.fetch_html("https://example.com", strategy="tiered")
     assert engine == "cloudscraper"
     assert calls == ["httpx", "cloudscraper"]
@@ -137,11 +182,13 @@ def test_tiered_escalates_on_missing_structural_marker():
     """trending 页 httpx 只拿到 2 个 Box-row（空壳页）→ 升级下一级拿到 6 个。"""
     shell = "<html>" + '<article class="Box-row">' * 2 + "a" * 600 + "</html>"
     full = "<html>" + '<article class="Box-row">' * 6 + "b" * 600 + "</html>"
-    with _mock_engines({
-        "httpx": _fn(shell),
-        "cloudscraper": _fn(BOT_HTML),   # 又一个 bot 页 → 继续
-        "playwright_stealth": _fn(full),
-    }):
+    with _mock_engines(
+        {
+            "httpx": _fn(shell),
+            "cloudscraper": _fn(BOT_HTML),  # 又一个 bot 页 → 继续
+            "playwright_stealth": _fn(full),
+        }
+    ):
         html, engine = scrapers.fetch_html(
             "https://github.com/trending?since=daily", strategy="tiered"
         )
@@ -151,25 +198,32 @@ def test_tiered_escalates_on_missing_structural_marker():
 
 def test_tiered_all_fail_returns_empty_none():
     """全部引擎失败/抛异常 → ("", "none")，无异常逃逸。"""
-    with _mock_engines({
-        "httpx": _fn(raises=True),
-        "cloudscraper": _fn(""),
-        "playwright_stealth": _fn(raises=True),
-        "jina": _fn(""),
-    }):
-        assert scrapers.fetch_html("https://example.com", strategy="tiered") == ("", "none")
+    with _mock_engines(
+        {
+            "httpx": _fn(raises=True),
+            "cloudscraper": _fn(""),
+            "playwright_stealth": _fn(raises=True),
+            "jina": _fn(""),
+        }
+    ):
+        assert scrapers.fetch_html("https://example.com", strategy="tiered") == (
+            "",
+            "none",
+        )
 
 
 def test_tiered_best_effort_when_all_rejected():
     """全部过不了质量门但都有内容 → 回退返回最长的一个（调用方解析器兜底）。"""
     short_bot = "<html>Just a moment" + "a" * 500 + "</html>"
     long_bot = "<html>Just a moment" + "b" * 900 + "</html>"
-    with _mock_engines({
-        "httpx": _fn(short_bot),
-        "cloudscraper": _fn(long_bot),
-        "playwright_stealth": _fn(""),
-        "jina": _fn(""),
-    }):
+    with _mock_engines(
+        {
+            "httpx": _fn(short_bot),
+            "cloudscraper": _fn(long_bot),
+            "playwright_stealth": _fn(""),
+            "jina": _fn(""),
+        }
+    ):
         html, engine = scrapers.fetch_html("https://example.com", strategy="tiered")
     assert engine == "cloudscraper"
     assert len(html) == len(long_bot)
@@ -177,10 +231,12 @@ def test_tiered_best_effort_when_all_rejected():
 
 def test_tiered_exception_isolated():
     """某引擎抛异常 → 记录并跳过，不影响下一级。"""
-    with _mock_engines({
-        "httpx": _fn(raises=True),
-        "cloudscraper": _fn(CLEAN_HTML),
-    }):
+    with _mock_engines(
+        {
+            "httpx": _fn(raises=True),
+            "cloudscraper": _fn(CLEAN_HTML),
+        }
+    ):
         html, engine = scrapers.fetch_html("https://example.com", strategy="tiered")
     assert (html, engine) == (CLEAN_HTML, "cloudscraper")
 
@@ -188,6 +244,7 @@ def test_tiered_exception_isolated():
 def test_tiered_allowlist_blocks_disabled_engines():
     """firecrawl 模拟为可用且能拿到干净页面，但不在 config priority 白名单 → 永不运行。"""
     calls = []
+
     def fc(url, timeout=90):
         calls.append("firecrawl")
         return {"success": True, "html": CLEAN_HTML, "error": None}
@@ -195,9 +252,14 @@ def test_tiered_allowlist_blocks_disabled_engines():
     with _mock_engines({"httpx": _fn(CLEAN_HTML)}, extra_available=("firecrawl",)):
         # firecrawl available via extra mock, its scrape fn would win if it ran —
         # patch it in explicitly so we can observe calls
-        with patch.dict("sys.modules", {
-            "scrapers.firecrawl_scraper": MagicMock(is_available=lambda: True, scrape=fc)
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "scrapers.firecrawl_scraper": MagicMock(
+                    is_available=lambda: True, scrape=fc
+                )
+            },
+        ):
             html, engine = scrapers.fetch_html("https://example.com", strategy="tiered")
     assert engine == "httpx"
     assert calls == [], "白名单外的引擎（不在 config priority）不得运行"
@@ -205,10 +267,12 @@ def test_tiered_allowlist_blocks_disabled_engines():
 
 def test_serial_alias_skips_quality_gate():
     """strategy="serial"（= "first"）不做质量检查：短页面也算赢。"""
-    with _mock_engines({
-        "httpx": _fn("<html>short</html>"),
-        "cloudscraper": _fn(CLEAN_HTML),
-    }):
+    with _mock_engines(
+        {
+            "httpx": _fn("<html>short</html>"),
+            "cloudscraper": _fn(CLEAN_HTML),
+        }
+    ):
         html, engine = scrapers.fetch_html("https://example.com", strategy="serial")
     assert (html, engine) == ("<html>short</html>", "httpx")
 
@@ -218,16 +282,25 @@ def test_serial_alias_skips_quality_gate():
 # =========================================================================
 def test_select_engines_ladder_order():
     assert select_engines("https://github.com/trending") == [
-        "httpx", "cloudscraper", "playwright_stealth", "jina"
+        "httpx",
+        "cloudscraper",
+        "playwright_stealth",
+        "jina",
     ]
     assert select_engines("https://huggingface.co/spaces/a/b") == ["httpx", "jina"]
     assert select_engines("https://example.com") == [
-        "httpx", "cloudscraper", "playwright_stealth", "jina"
+        "httpx",
+        "cloudscraper",
+        "playwright_stealth",
+        "jina",
     ]
 
 
 def test_quality_marker_lookup():
-    assert quality_marker("https://github.com/trending?since=daily") == ('<article class="Box-row"', 5)
+    assert quality_marker("https://github.com/trending?since=daily") == (
+        '<article class="Box-row"',
+        5,
+    )
     assert quality_marker("https://github.com/search?q=x") == ("data-view-component", 3)
     assert quality_marker("https://example.com") is None
 
@@ -286,7 +359,7 @@ def test_fetch_github_trending_parses_scraper_html():
     extracted; non-repo paths (sponsors/) dropped; source=github_trending."""
     with (
         patch("scrapers.fetch_html", return_value=(TRENDING_HTML, "fixture")),
-        patch("radar.gh_fetch_repo", side_effect=_fake_gh_repo),
+        patch("radar_pkg.gh.gh_fetch_repo", side_effect=_fake_gh_repo),
     ):
         repos = radar.fetch_github_trending(since="daily", max_repos=30)
     names = [r["name"] for r in repos]
@@ -301,11 +374,9 @@ def test_fetch_github_trending_parses_scraper_html():
 def test_fetch_github_trending_unparseable_falls_back():
     """Engine returns a bot-check page the regex can't parse → search-API proxy kicks in."""
     with (
+        patch("scrapers.fetch_html", return_value=("<html>sign in</html>", "httpx")),
         patch(
-            "scrapers.fetch_html", return_value=("<html>sign in</html>", "httpx")
-        ),
-        patch(
-            "radar.fetch_recent_active_repos",
+            "radar_pkg.gh.fetch_recent_active_repos",
             return_value=[{"name": "x/proxy", "stars": 1}],
         ) as fb,
     ):
@@ -385,8 +456,16 @@ def _parallel_fake(
         **{
             f"{name}_scraper": MagicMock(is_available=lambda: False)
             for name in (
-                "firecrawl", "crawl4ai", "playwright", "nodriver", "crawlee",
-                "scrapy", "agent_reach", "trafilatura", "beautifulsoup", "drissionpage",
+                "firecrawl",
+                "crawl4ai",
+                "playwright",
+                "nodriver",
+                "crawlee",
+                "scrapy",
+                "agent_reach",
+                "trafilatura",
+                "beautifulsoup",
+                "drissionpage",
             )
         },
     }

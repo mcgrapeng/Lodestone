@@ -21,40 +21,48 @@ from typing import Optional
 
 HF_MODELS_URL = "https://huggingface.co/api/models?sort={sort}&limit={limit}&full=false"
 
-# 2026-08 — valid HF model sort values: downloads, likes, trending, updated, created.
-# We accept a small allowlist; `trending` is the official 7-day trending sort that
-# returns `trendingScore` consistently.
-VALID_SORTS = ("trending", "likes7d", "downloads", "downloads7d", "updated")
+# 2026-09 实测(curl 直打 API):`trending` 返回 400 "Invalid sort parameter",
+# `likes7d` 才是有效的 7 日趋势排序且稳定返回 trendingScore(旧注释把两者说反了,
+# 曾导致默认值被误改为 trending 后整个 HF models 源静默空转)。
+VALID_SORTS = ("likes7d", "downloads", "downloads7d", "updated")
 
 
-def _http_get_json(url: str, timeout: int = 30) -> Optional[list]:
-    """Same urllib → curl fallback as radar.fetch_huggingface_trending."""
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "lodestone/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read())
-        return data if isinstance(data, list) else None
-    except Exception:
-        pass
-    try:
-        out = subprocess.run(
-            ["curl", "-q", "-sS", "--max-time", str(timeout), "-A", "lodestone/1.0", url],
-            capture_output=True,
-            text=True,
-            timeout=timeout + 5,
-        )
-        if out.returncode == 0 and out.stdout.strip():
-            data = json.loads(out.stdout)
+def _http_get_json(url: str, timeout: int = 30, retries: int = 2) -> Optional[list]:
+    """Same urllib → curl fallback as radar.fetch_huggingface_trending.
+    2026-09: HF API 间歇性连接失败(实测 3 连发 1 次 000/0B)— 每轮
+    urllib→curl 双路都空则退避 3s 再试,共 retries+1 轮。"""
+    import time as _time
+
+    for attempt in range(1 + max(0, retries)):
+        if attempt:
+            _time.sleep(3)
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "lodestone/1.0"})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read())
             return data if isinstance(data, list) else None
-    except Exception:
-        pass
+        except Exception:
+            pass
+        try:
+            out = subprocess.run(
+                ["curl", "-q", "-sS", "--max-time", str(timeout), "-A", "lodestone/1.0", url],
+                capture_output=True,
+                text=True,
+                timeout=timeout + 5,
+            )
+            if out.returncode == 0 and out.stdout.strip():
+                data = json.loads(out.stdout)
+                return data if isinstance(data, list) else None
+        except Exception:
+            pass
     return None
 
 
 def fetch_huggingface_models_trending(max_items: int = 30, sort: str = "likes7d") -> list:
-    """Fetch trending HF models. `sort=likes7d` returns a `trendingScore` field
-    for each model; we surface that as `stars` so the existing UI/badge logic
-    treats models uniformly alongside Spaces / GitHub repos.
+    """Fetch trending HF models. `sort=likes7d` is the working 7-day trending
+    sort (实测;`trending` 会 400) and returns a `trendingScore` field for each
+    model; we surface that as `stars` so the existing UI/badge logic treats
+    models uniformly alongside Spaces / GitHub repos.
 
     Filters out:
       - private models (`private=True`)

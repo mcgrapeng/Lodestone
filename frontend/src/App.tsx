@@ -9,12 +9,13 @@ import { CategoryBrowser } from './components/CategoryBrowser'
 import { SearchResults } from './components/SearchResults'
 import { StatsPanel } from './components/StatsPanel'
 import { RepoDrawer } from './components/RepoDrawer'
+import { SettingsDrawer } from './components/SettingsDrawer'
 import { Skeleton } from './components/Skeleton'
 import { TabNav, type TabId } from './components/TabNav'
 import { api } from './lib/api'
 import { matchRepo, sourceOf, type RepoFilters, type SortKey, type SourceKind } from './lib/filters'
 import { useUrlState } from './lib/useUrlState'
-import type { Repo, Snapshot, Stats } from './lib/types'
+import type { Repo, Snapshot, Stats, Settings } from './lib/types'
 
 // ponytail: Vite proxy forwards /api/* to radar.py serve on :8765, so same-origin fetch.
 const POLL_INTERVAL_MS = 30_000
@@ -26,6 +27,8 @@ export function App() {
   const [refreshing, setRefreshing] = useState(false)
   const [drawerRepo, setDrawerRepo] = useState<Repo | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [settings, setSettings] = useState<Settings | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [refreshToast, setRefreshToast] = useState<string | null>(null)
   const initialFetchedAtRef = useRef<string | null>(null)
 
@@ -76,7 +79,8 @@ export function App() {
       const snap = await api.getSnapshot()
       setSnapshot(snap)
       setError(null)
-      // first-load seed for stats (only fetched once per mount; poll skips it)
+      // ponytail: settings 加载与 snapshot 解耦 — 一次失败不影响另一次
+      api.getSettings().then(setSettings).catch(() => setSettings(null))
       if (!stats) {
         api.getStats().then(setStats).catch(() => undefined)
       }
@@ -228,6 +232,8 @@ export function App() {
         fetchedAt={snapshot?.fetched_at ?? null}
         refreshing={refreshing}
         onRefresh={handleRefresh}
+        onSettings={() => setSettingsOpen(true)}
+        settingsStatus={settings?.updated_at ? 'configured' : 'none'}
         totalRepos={totalRepos}
         totalCategories={snapshot?.categories.length ?? 0}
         sourceSummary={sourceSummary}
@@ -331,6 +337,17 @@ export function App() {
             }}
           />
         )}
+
+      <SettingsDrawer
+        open={settingsOpen}
+        initial={settings}
+        onClose={() => setSettingsOpen(false)}
+        onSaved={(s) => {
+          setSettings(s)
+          setRefreshToast('✓ 设置已保存。下次 crawl 自动用新 provider。')
+          setTimeout(() => setRefreshToast(null), 4000)
+        }}
+      />
 
       <footer className="mt-16 border-t border-border-muted py-6 text-center text-[11px] text-foreground-subtle">
         Lodestone · React 19 + Appica UI · 数据源自 GitHub / HuggingFace / MCP Registry ·

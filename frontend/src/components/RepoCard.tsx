@@ -9,9 +9,10 @@ export interface RepoCardProps {
 }
 
 export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
-  // ponytail: 详细中文描述优先（README 首段翻译，爬取期生成），
-  // 逐级回退：summary_zh → desc_zh → desc。
-  const displayName = repo.summary_zh || repo.desc_zh || repo.desc || '—'
+  // ponytail: 2026-09 — 三段摘要优先用 intro（最像「是什么」的段），回退 summary_zh。
+  // 逐级回退：summary_sections.intro → summary_zh → desc_zh → desc。
+  const intro = repo.summary_sections?.intro?.trim()
+  const displayName = intro || repo.summary_zh || repo.desc_zh || repo.desc || '—'
   const topics = (repo.topics ?? []).slice(0, 3)
 
   if (variant === 'row') {
@@ -23,7 +24,7 @@ export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate font-mono text-sm font-medium text-primary">
+            <span className="min-w-0 flex-1 truncate font-mono text-sm font-medium text-primary">
               {repoOwner(repo.name)}/<span className="text-white">{repoSlug(repo.name)}</span>
             </span>
             {repo.trending && (
@@ -76,25 +77,25 @@ export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
     >
       {/* 顶部 accent 线 — hover 时从左到右亮起 */}
       <span className="absolute inset-x-4 top-0 h-px origin-left scale-x-0 bg-gradient-to-r from-primary/60 via-secondary/40 to-transparent transition-transform duration-300 group-hover:scale-x-100" />
-      {/* 视觉审查修正：所有状态徽章统一放标题行右侧 — 「已装」不再独占一行
-          把描述基线顶歪；且升级为绿色强调（个性化状态应有正向信号强度） */}
-      <div className="absolute right-3 top-3 flex shrink-0 items-center gap-1">
-        {repo.local_installed && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success ring-1 ring-success/30">
-            <Download className="h-2.5 w-2.5" /> 已装
-          </span>
-        )}
-        {repo.trending && (
-          <span className="chip-accent text-[10px]">
-            <Flame className="h-2.5 w-2.5" /> Trending
-          </span>
-        )}
-      </div>
-      <div className="flex items-start">
-        <div className="min-w-0 pr-2">
+      {/* 视觉审查修正：状态徽章与标题同行、文档流内布局 — 标题 truncate 收缩、
+          徽章 shrink-0 固定右侧，任何长度都不会重叠（替代旧的 absolute 悬浮定位） */}
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
           <div className="truncate font-mono text-[13px] font-medium text-primary">
             {repoOwner(repo.name)}/<span className="text-white">{repoSlug(repo.name)}</span>
           </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {repo.local_installed && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success ring-1 ring-success/30">
+              <Download className="h-2.5 w-2.5" /> 已装
+            </span>
+          )}
+          {repo.trending && (
+            <span className="chip-accent text-[10px]">
+              <Flame className="h-2.5 w-2.5" /> Trending
+            </span>
+          )}
         </div>
       </div>
       <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-foreground-muted">{displayName}</p>

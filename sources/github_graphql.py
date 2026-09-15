@@ -62,13 +62,20 @@ def _escape(q: str) -> str:
     return q.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def _build_document(queries: list[str], per_page: int) -> str:
-    """Build one GraphQL document with N aliased search fields."""
+def _build_document(
+    queries: list[str], per_page: int, cursors: list[str | None] | None = None
+) -> str:
+    """Build one GraphQL document with N aliased search fields.
+    cursors[i] 非空时给 q{i} 加 after: 游标(翻第二页)。"""
+    curs: list[str | None] = list(cursors) if cursors is not None else [None] * len(queries)
     parts = []
     for i, q in enumerate(queries):
+        cur = curs[i] if i < len(curs) else None
+        after = f', after: "{_escape(cur)}"' if cur else ""
         parts.append(
-            f'q{i}: search(query: "{_escape(q)}", type: REPOSITORY, first: {per_page}) '
-            f"{{ repos: nodes {{ ... on Repository {{ {_REPO_FIELDS} }} }} }}"
+            f'q{i}: search(query: "{_escape(q)}", type: REPOSITORY, first: {per_page}{after}) '
+            f"{{ repos: nodes {{ ... on Repository {{ {_REPO_FIELDS} }} }} "
+            f"pageInfo {{ endCursor hasNextPage }} }}"
         )
     return "query {\n  " + "\n  ".join(parts) + "\n}"
 
@@ -123,6 +130,7 @@ def gh_search_batch(
     retries: int = 1,
     max_rounds: int = 3,
     pace_s: float = 1.0,
+    follow_page2: bool = False,
 ) -> dict[str, list[dict]]:
     """Run all queries via batched GraphQL. Returns {query_string: [repo dicts]}.
 
@@ -136,31 +144,40 @@ def gh_search_batch(
       第 1 轮按 batch_size 分批并行执行；失败批退避重试 retries 次后，
       对半拆分进入下一轮（资源上限错误对半后通常可过）；单 query 的批
       失败即最终失败。最终失败的 query 从结果 mapping 缺失 — 调用方回退 REST。
+
+    follow_page2=True 时对"结果数 == per_page 且 hasNextPage"的 query 用
+    after 游标追一页（P1 修复：GraphQL 无 sort=stars，best-match 第 51-100 名
+    原本拿不到；单 alias per_page 提到 100 会撞资源上限，游标是唯一扩容手段）。
     """
     unique = list(dict.fromkeys(queries))  # 保序去重
     pending = [unique[i : i + batch_size] for i in range(0, len(unique), batch_size)]
 
-    def _run_batch(batch: list[str]):
+    def _run_batch(batch: list[str], cursors: list[str | None] | None = None):
         last_err = None
         for attempt in range(1 + max(0, retries)):
             if attempt:
                 time.sleep(2)  # 502/504 瞬时错误退避
             try:
-                data = _run_gh_graphql(_build_document(batch, per_page))
+                data = _run_gh_graphql(_build_document(batch, per_page, cursors))
             except Exception as e:
                 last_err = e
                 continue
             result: dict[str, list[dict]] = {}
+            cursors_out: dict[str, str | None] = {}
             for i, q in enumerate(batch):
-                nodes = ((data.get(f"q{i}") or {}).get("repos")) or []
+                blk = data.get(f"q{i}") or {}
+                nodes = blk.get("repos") or []
                 if nodes:
                     result[q] = [_node_to_repo(n) for n in nodes if n]
-            return result, None
-        return {}, last_err
+                pi = blk.get("pageInfo") or {}
+                cursors_out[q] = pi.get("endCursor") if pi.get("hasNextPage") else None
+            return result, cursors_out, None
+        return {}, {}, last_err
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     out: dict[str, list[dict]] = {}
+    cursors_all: dict[str, str | None] = {}  # query → 第二页游标（hasNextPage 时非空）
     rnd = 0
     while pending and rnd < max(1, max_rounds):
         rnd += 1
@@ -173,9 +190,10 @@ def gh_search_batch(
                 time.sleep(pace_s)  # 提交后小间隔，避免与上一次调用贴背
             for fut in as_completed(fut_to_batch):
                 batch = fut_to_batch[fut]
-                result, err = fut.result()
+                result, curs, err = fut.result()
                 if err is None:
                     out.update(result)
+                    cursors_all.update(curs)
                     n_repos = sum(len(v) for v in result.values())
                     print(
                         f"  · graphql r{rnd} batch: {len(result)}/{len(batch)} "
@@ -208,14 +226,59 @@ def gh_search_batch(
         with ThreadPoolExecutor(max_workers=max(1, max_workers)) as pool:
             fut_to_batch = {pool.submit(_run_batch, b): b for b in sweep}
             for fut in as_completed(fut_to_batch):
-                result, err = fut.result()
+                result, curs, err = fut.result()
                 if err is None:
                     out.update(result)
+                    cursors_all.update(curs)
         print(
             f"  · graphql sweep: {len(missing)} partial/failed queries re-run, "
             f"{len([q for q in unique if q in out])}/{len(unique)} total",
             file=sys.stderr,
         )
+
+    # P1 修复（2026-09）— 游标追第二页：结果满页且 hasNextPage 的 query 用
+    # after 游标再取 per_page 个。GraphQL search 无 sort=stars，best-match 第
+    # 51-100 名原本拿不到；单 alias per_page=100 撞资源上限，游标是唯一手段。
+    # 实测:带 after 的文档比首页更贵,满 batch_size 会撞资源上限 — 起步就
+    # 用半批(≤4),失败再对半拆分,两轮后放弃(该 query 只留第一页,无数据损失)。
+    if follow_page2:
+        full = [
+            q
+            for q in unique
+            if q in out and len(out[q]) >= per_page and cursors_all.get(q)
+        ]
+        if full:
+            n_added = 0
+            pending2 = [full[i : i + 4] for i in range(0, len(full), 4)]
+            for _round in range(3):
+                if not pending2:
+                    break
+                nxt: list[list[str]] = []
+                for chunk in pending2:
+                    result, _c2, err = _run_batch(
+                        chunk, cursors=[cursors_all[q] for q in chunk]
+                    )
+                    if err is not None:
+                        if len(chunk) > 1:
+                            mid = len(chunk) // 2
+                            nxt.extend([chunk[:mid], chunk[mid:]])
+                        else:
+                            print(
+                                f"  [warn] graphql page2 query failed: "
+                                f"{chunk[0][:50]} — {str(err)[:60]}",
+                                file=sys.stderr,
+                            )
+                        continue
+                    for q, repos2 in result.items():
+                        seen_names = {r["name"] for r in out[q]}
+                        fresh = [r for r in repos2 if r["name"] not in seen_names]
+                        out[q] = out[q] + fresh
+                        n_added += len(fresh)
+                pending2 = nxt
+            print(
+                f"  · graphql page2: {len(full)} full pages followed, +{n_added} repos",
+                file=sys.stderr,
+            )
     return out
 
 

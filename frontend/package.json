@@ -1,9 +1,9 @@
 {
-  "name": "lodestone-react",
+  "name": "lodestone-frontend",
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Lodestone — React 19 + Appica UI frontend for GitHub-crawled trending AI projects / skills / plugins",
+  "description": "Lodestone — React 19 + Appica UI frontend for the multi-source AI project / skill / plugin radar",
   "scripts": {
     "dev": "node dev.cjs",
     "vite-only": "vite",

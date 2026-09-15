@@ -1,0 +1,6 @@
+[db] pg8000 unavailable (No module named 'pg8000'); falling back to JSON-only mode
+[restart] OK: {'killed_pids': [], 'new_pid': 49092, 'port': 8765, 'old_pid': 49068, '_phase': 'forked'}
+[db] pg8000 unavailable (No module named 'pg8000'); falling back to JSON-only mode
+[restart] OK: {'killed_pids': [], 'new_pid': 50598, 'port': 8765, 'old_pid': 49100, '_phase': 'forked'}
+[db] pg8000 unavailable (No module named 'pg8000'); falling back to JSON-only mode
+[restart] OK: {'killed_pids': [], 'new_pid': 51568, 'port': 8765, 'old_pid': 50607, '_phase': 'forked'}

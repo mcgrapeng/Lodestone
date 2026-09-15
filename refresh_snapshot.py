@@ -88,7 +88,9 @@ def is_fresh(r, days=14):
 
 
 def load_local_installed_names():
-    """Build set of full names from ~/.claude/skills + ~/.codex/skills + plugins."""
+    """Build set of LOWERCASE names (bare repo seg + owner/repo) from detect_local_skills().
+    2026-09: 统一小写 + 覆盖全平台(claude/codex/opencode/easycode)+ 插件 bare 名 —
+    此前大小写敏感(affaan-m/ECC vs 链接名 ecc)且漏掉 opencode 装的技能与无 url 插件。"""
     try:
         import radar
         local = radar.detect_local_skills(force=True)
@@ -96,22 +98,20 @@ def load_local_installed_names():
         # skills / commands / agents are dicts {name: meta}
         for src in ("skills", "commands", "agents"):
             for n, meta in (local.get(src) or {}).items():
-                names.add(n)  # bare repo name
-                if (murl := meta.get("url")):
-                    # full owner/repo from url
-                    from urllib.parse import urlparse
-                    parts = urlparse(murl).path.strip("/").split("/")
-                    if len(parts) >= 2:
-                        names.add(f"{parts[0]}/{parts[1]}")
-        # plugins is a list
+                names.add(n.lower())  # bare repo name
+                if isinstance(meta, dict):
+                    full = meta.get("origin_full") or radar._owner_repo_from_url(
+                        meta.get("url") or ""
+                    )
+                    if full:
+                        names.add(full.lower())
+        # plugins is a list — 无 url 的插件(如 ecc@ecc)也贡献 bare 名兜底
         for p in (local.get("plugins") or []):
             if isinstance(p, dict):
-                url = p.get("url") or ""
-                if url:
-                    from urllib.parse import urlparse
-                    parts = urlparse(url).path.strip("/").split("/")
-                    if len(parts) >= 2:
-                        names.add(f"{parts[0]}/{parts[1]}")
+                names.add((p.get("name") or "").split("@")[0].lower())
+                full = radar._owner_repo_from_url(p.get("url") or "")
+                if full:
+                    names.add(full.lower())
         return names
     except Exception as e:
         print(f"  [warn] detect_local_skills failed: {e}", file=sys.stderr)
@@ -261,10 +261,10 @@ def main():
         # best_category: assign to 5k+ pool
         if not r.get("best_category"):
             r["best_category"] = assign_best_category(r)
-        # local_installed
+        # local_installed — 大小写不敏感匹配(installed_names 已统一小写)
         r["local_installed"] = (
-            r["name"].split() if False else  # noqa  — placeholder for clarity
-            (r["name"] in installed_names or r["name"].split("/")[-1] in installed_names)
+            r["name"].lower() in installed_names
+            or r["name"].split("/")[-1].lower() in installed_names
         )
         # trending
         r["trending"] = r["name"] in trending_names
