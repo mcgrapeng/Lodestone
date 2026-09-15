@@ -1,19 +1,59 @@
-# ponytail: 2026-09 — LLM settings UI 持久化 (含明文 API key, 不入 git)
+# ponytail: 2026-09 — LLM settings UI 持久化（含明文 API key）
 data/settings.json
 data/.settings.json.tmp
 
-# ponytail: 以下条目是历史遗留的 pre-existing debt, 本次不改。_pycache__ 早被
-# 误入 git,清理需 git rm -r --cached,留待后续统一整理。
+# ponytail: 2026-09 — open-source readiness, 整个 data/ 都是运行期缓存 + 抓取快照 +
+# dev 日志，不进 git。本地首次 crawl 会重新生成。
+data/
+!data/.gitkeep
+
+# ponytail: 2026-09 — session 内部分析/planning artifact，公开 repo 的人不需要看
+docs/superpowers/
+
+# ponytail: 2026-09 — 2.0 迁移/插件指南：源码内部参考，公开 repo 不发
+docs/2.0/
+
+# ponytail: 2026-09 — pre-existing debt 集中清理：pycache / venv / node_modules / IDE 配置
+# 历史 git 跟踪了这些，但新 clone 不应该拉（clone 重新生成 / 由各人 IDE 配置）。
 __pycache__/
 *.pyc
 .venv/
 frontend/node_modules/
 frontend/dist/
-data/serve.log
-data/restart.log
-data/crawl.lock
-data/crawl.lock.stale-*
-data/serve.log.*
-graphify-out/
+
+# ponytail: 2026-09 — pre-existing tracked IDE / harness 配置
 .idea/
 .serena/
+
+# ponytail: 2026-09 — 其他运行期日志
+data/serve.log
+data/restart.log
+data/serve.log.*
+data/crawl.lock
+data/crawl.lock.stale-*
+
+# ponytail: 2026-09 — pre-existing commit-time 残留（保留给 git rm --cached 用）
+graphify-out/
+
+# ponytail: 2026-09 — 个人 Claude Code slash-command (/lodestone /yz-ai /zp)，
+# 装在 ~/.claude/commands/ 即可，不该跟仓库走
+command/
+
+# ponytail: 2026-09 — Apify Crawlee 运行期 KV store / request queue state，
+# 本地 crawl 自动重建
+storage/
+
+# ponytail: 2026-09 — 个人 .env（不进 git，README 教用户自己创建）
+.env
+.env.local
+
+# ponytail: 2026-09 — 编辑器 swap 文件不进 git
+*.swp
+*.swo
+.DS_Store
+
+# ponytail: 2026-09 — Claude Code / harness 本地权限设置（含用户专属路径）
+.claude/settings.local.json
+frontend/.claude/
+.superpowers
+lodestone.egg-info

@@ -1447,7 +1447,7 @@ def web(port=8765):
         # ponytail: 不只探端口 — / 返回 HTML（带静态托管的新版 serve）且
         # /api/data 可达才是 lodestone；旧版纯 API 或无关服务都不算，
         # 端口被占时自动落到下一端口新起一个
-        # ponytail: ProxyHandler({}) 强制直连 — 用户 shell 常挂全局代理（7890），
+        # ponytail: ProxyHandler({}) 强制直连 — 用户 shell 可能挂 HTTP 代理，
         # urlopen 默认走代理会把 loopback 健康检查挂死
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         try:

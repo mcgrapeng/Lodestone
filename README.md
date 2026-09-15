@@ -97,10 +97,34 @@ GitHub 抗爬时其他 4 个源仍然工作 —— 你不会「今天啥都看�
 ```bash
 # .env
 RADAR_HOST=0.0.0.0          # 让 serve 监听外部接口（前面挂 nginx 做 TLS）
-AI_RADAR_HOME=/var/lib/lodestone   # 兼容旧名（推荐改用 LODESTONE_HOME）
-PGHOST=10.0.0.5            # PG 不在 localhost 时
+LODESTONE_HOME=/var/lib/lodestone  # 数据缓存目录（多用户服务器场景）
+AI_RADAR_HOME=/var/lib/lodestone   # 兼容旧名 — 等同 LODESTONE_HOME
+PGHOST=10.0.0.5             # PG 不在 localhost 时
 ```
 
 ## License
 
-MIT
+Apache-2.0 — see [LICENSE](LICENSE).
+
+## Authors
+
+All commits authored by **Lodestone** `<noreply@lodestone.dev>` (post
+open-source-release history rewrite). Future contributions welcome via
+Pull Request.
+
+If you commit to this repo, configure git to use the same no-reply
+identity so commit metadata stays consistent:
+
+```bash
+git config user.name "Your Name"
+git config user.email "you@example.com"
+```
+
+(The repo does NOT enforce a specific email — use whatever you prefer
+for your contributions.)
+
+## Related projects
+
+-- [`opencode`](https://github.com/sst/opencode) — terminal-based AI coding harness (this skill runs inside it)
+- [`serena`](https://github.com/oraios/serena) — IDE-like semantic code retrieval (used during dev)
+- [Claude Code](https://claude.com/claude-code), [Codex CLI](https://github.com/openai/codex), [EasyCode](https://easycode.ai) — other supported runtimes (skill works in all 4)

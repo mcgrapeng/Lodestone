@@ -937,12 +937,12 @@ MANUAL_SEED_REPOS = frozenset(
         "lllyasviel/Fooocus",           # 图像生成
         "coderamp-labs/gitingest",      # 代码库 → LLM 文本
         "VoltAgent/awesome-agent-skills", # skills 聚合清单
-        "lodestone/hallmark",  # anti-AI-slop design skill
+        # open-source release: removed "lodestone/hallmark" + "lodestone/ai-agent-book"
+        # (personal GitHub repos; open-source seed list shouldn't feature them).
         "Shubhamsaboo/awesome-llm-apps",  # 100+ AI agent apps (125k stars, generic topics)
         "stablyai/orca",  # desktop ADE for parallel coding agents (24k stars)
         "GaoSSR/best-claude-hud",  # Claude HUD plugin
         "lidge-jun/opencodex",  # universal LLM proxy for codex/claude-code
-        "lodestone/ai-agent-book",  # 《深入理解 AI Agent》开源书
         "volcengine/OpenViking",  # ByteDance context DB for agents (27k stars)
         "msitarzewski/agency-agents",  # complete AI agency (135k stars, no topics)
         # Safety net
