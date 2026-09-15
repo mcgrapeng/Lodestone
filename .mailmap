@@ -1,0 +1,12 @@
+# .mailmap — normalize author display for open-source release.
+#
+# git log uses this to rewrite historical authors. Format:
+#   <Proper Name> <proper@email> <commit@email>
+#
+# Pre-release: solo-dev zhangpeng authored all 50+ commits with personal email
+# lodestonezhang@gmail.com. Going forward commits use the GitHub no-reply
+# address (set `git config user.email lodestone@users.noreply.github.com`).
+#
+# This .mailmap doesn't rewrite git history — it only affects display in
+# `git log`, `git shortlog`, GitHub contributor stats, etc.
+zhangpeng <lodestone@users.noreply.github.com> <lodestonezhang@gmail.com>
