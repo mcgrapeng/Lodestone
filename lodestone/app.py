@@ -129,7 +129,7 @@ def create_app() -> FastAPI:
     # ---- 7 write endpoints ----
 
     from pydantic import BaseModel
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     class _ConfigBody(BaseModel):
         config: dict = {}
@@ -209,6 +209,25 @@ def create_app() -> FastAPI:
         tmp.write_text(json.dumps(body, ensure_ascii=False, indent=2))
         tmp.replace(p)
         return {"ok": True}
+
+    # ---- 1.x compatibility: GET /api/data ----
+    @app.get("/api/data")
+    async def get_data():
+        if app.state.pool is None:
+            raise HTTPException(503, "db unavailable")
+        async with app.state.pool.acquire() as conn:
+            store = Store(conn)
+            hot = await store.list_repos({"limit": 60})
+            cats_rows = await store.conn.fetch("""
+                SELECT category_id, COUNT(*) AS count
+                FROM repo_categories
+                GROUP BY category_id
+            """)
+            return {
+                "hot_now": hot,
+                "categories": [{"id": r["category_id"], "count": r["count"]} for r in cats_rows],
+                "fetched_at": datetime.now(timezone.utc).isoformat(),
+            }
 
     return app
 
