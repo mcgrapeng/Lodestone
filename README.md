@@ -37,7 +37,7 @@ git clone <仓库> ~/lodestone && cd ~/lodestone
 ./radar.py web                    # 后台起 serve + 自动开浏览器 → http://127.0.0.1:8765
 ```
 
-要不要装成 Claude Code 的 `/yz:ai` 命令？一行：
+要不要装成 Claude Code 的 `/yz-ai` 命令？一行：
 
 ```bash
 ./install.sh install              # 软链接到 ~/.claude/skills/yz-ai
@@ -96,7 +96,7 @@ GitHub 抗爬 → 其他 4 个源照常。**一个倒、其他不倒**。
 |----------|------|
 | 🚀 装好跑起来 | [安装说明](安装说明.md) |
 | 📖 命令清单 + 故障排查 + 加新数据源 | [使用手册](使用手册.md) |
-| 🤖 Claude Code 触发入口（`/yz:ai`） | [SKILL.md](../SKILL.md) |
+| 🤖 Claude Code 触发入口（`/yz-ai`） | [SKILL.md](../SKILL.md) |
 
 ---
 
