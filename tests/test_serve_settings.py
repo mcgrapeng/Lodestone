@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# ponytail: deviation from brief — user shell has http_proxy=127.0.0.1:7890
+# ponytail: deviation from brief — user shell may export http_proxy; this bypasses it
 # (Clash). urllib.request.urlopen routes loopback through it and times out.
 # serve.py itself uses ProxyHandler({}) for the same reason (line 1374).
 # Setting no_proxy here bypasses the proxy for 127.0.0.1 in this process's
