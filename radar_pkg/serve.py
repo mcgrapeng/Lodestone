@@ -26,7 +26,7 @@ from pathlib import Path
 
 from radar_pkg import core, detect
 import db  # ponytail: PG 查询(serve 各端点直接使用)
-from radar_pkg.crawl import audit, crawl, crawl_lock_held, today
+from radar_pkg.crawl import audit, crawl, crawl_lock_held, summarize_lock_held, today
 from radar_pkg.core import (
     DATA,
     MANUAL_SEED_REPOS,
@@ -47,7 +47,6 @@ from radar_pkg.install import (
     uninstall_skill,
 )
 from radar_pkg.match import _annotate_local_installed, _build_plugin_segs, _installed_segments, _load_repo_index
-from radar_pkg.translate import enrich_summaries, get_readme_zh, translate_batch
 
 """radar_pkg.serve — 由 radar.py 搬移(2026-09 架构拆分)。"""
 # ponytail: 2026-09 — /api/health 用的进程级启动时间戳(模块加载即设定一次)
@@ -345,6 +344,41 @@ def serve(port=8765):
                     "updated_at": (loaded or {}).get("updated_at"),
                 })
                 return
+            # ponytail: 2026-09 P3 — /api/llm/status 给前端 Settings 抽屉看
+            # 「模型配了没 + 上次生成于何时」。前端轮询此端点显示进度 / 上次结果。
+            if self.path == "/api/llm/status":
+                from radar_pkg import core, settings as _settings
+                status = {}
+                if core.LLM_STATUS_PATH.exists():
+                    try:
+                        status = json.loads(core.LLM_STATUS_PATH.read_text())
+                    except Exception:
+                        status = {}
+                running = summarize_lock_held()
+                provider, fields = _settings.active_config()
+                # ponytail: 2026-09 — configured 要看 provider 的必填字段真的填了。
+                # anthropic/openai 必须有 api_key;ollama 必须有 host。仅 base_url 默认值
+                # + 空 api_key 不算「已配」(用户能 save 但跑会失败,前端按钮不该亮)。
+                configured = False
+                if provider == "anthropic":
+                    configured = bool(fields.get("api_key"))
+                elif provider == "openai":
+                    configured = bool(fields.get("api_key")) and bool(fields.get("base_url"))
+                elif provider == "ollama":
+                    configured = bool(fields.get("host"))
+                self._json({
+                    "configured": configured,
+                    "provider": provider or None,
+                    "running": running,
+                    "last_run": status.get("last_run_at"),
+                    "last_analyzed": status.get("analyzed"),
+                    "last_total": status.get("total"),
+                    "last_duration_s": status.get("duration_s"),
+                    "last_source": status.get("source"),
+                    "last_model": status.get("model"),
+                    "updated_at": status.get("updated_at"),
+                })
+                return
             # ponytail: 2026-09 — /api/restart 给 /yz:ai skill 一键重启.
             # 杀掉当前端口的旧 serve 进程,启动新 detached serve,等就绪后返回.
             # 旧进程仍能继续响应本请求(200 返回后自杀).
@@ -549,34 +583,6 @@ def serve(port=8765):
                 except Exception as e:
                     self._json({"error": str(e)}, status=500)
                 return
-
-            # ponytail: comprehensive Chinese README on demand.
-            # GET /api/repo/<owner>/<repo>/readme[?force=1]
-            # Returns {text, source_url, fetched_at, translator, from_cache}.
-            if self.path.startswith("/api/repo/") and self.path.endswith("/readme"):
-                try:
-                    inner = self.path[len("/api/repo/") : -len("/readme")].strip("/")
-                    parsed_q = urllib.parse.urlparse(self.path)
-                    qs = urllib.parse.parse_qs(parsed_q.query)
-                    force = qs.get("force", ["0"])[0] in ("1", "true", "yes")
-                    full_name = urllib.parse.unquote(inner)
-                    result = get_readme_zh(full_name, force=force)
-                    if result.get("error") and not result.get("text"):
-                        return self._json(result, status=404)
-                    return self._json(
-                        {
-                            "ok": True,
-                            "repo": full_name,
-                            "text": result.get("text", ""),
-                            "source_url": result.get("source_url", ""),
-                            "fetched_at": result.get("fetched_at", ""),
-                            "translator": result.get("translator", ""),
-                            "from_cache": result.get("from_cache", False),
-                            "fallback": result.get("fallback", ""),
-                        }
-                    )
-                except Exception as e:
-                    return self._json({"ok": False, "error": str(e)}, status=500)
 
             if self.path == "/api/scrapers/status":
                 # ponytail: exposes the {engine: available} map for the 🛠 引擎
@@ -1385,10 +1391,13 @@ def serve(port=8765):
                 # ponytail: fire-and-forget background crawl so UI doesn't block.
                 # Log fd must be closed BEFORE Popen takes ownership so the parent doesn't
                 # leak it on every /api/crawl request (long-running dev server accumulates fds).
+                # ponytail: 2026-09 fix — 用 radar.py(根目录 facade,有 __main__ CLI),
+                # 而不是 radar_pkg/serve.py(没有 __main__,spawn 出来啥也不做).
                 log_fd = os.open(DATA / "crawl.log", os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+                _project_root = Path(__file__).resolve().parent.parent
                 subprocess.Popen(
-                    [sys.executable, str(Path(__file__).resolve()), "crawl"],
-                    cwd=str(Path(__file__).parent.resolve()),
+                    [sys.executable, str(_project_root / "radar.py"), "crawl"],
+                    cwd=str(_project_root),
                     stdout=log_fd,
                     stderr=subprocess.STDOUT,
                     start_new_session=True,
@@ -1396,6 +1405,44 @@ def serve(port=8765):
                 )
                 return self._json(
                     {"ok": True, "message": "crawl started in background"}
+                )
+            # ponytail: 2026-09 P3 — /api/llm/summarize 触发 LLM 5 桶分析。
+            # 前端 Settings 抽屉按钮调此端点,后端 spawn `radar.py summarize` 后台跑。
+            # 与 /api/crawl 同款:409 if running, Popen 拿 fd 后立刻关,start_new_session 防 ctrl-c。
+            if self.path == "/api/llm/summarize":
+                if summarize_lock_held():
+                    return self._json(
+                        {"ok": False, "error": "summarize already running"}, status=409
+                    )
+                from radar_pkg import settings as _settings
+                provider, fields = _settings.active_config()
+                # ponytail: 2026-09 — 与 /api/llm/status 同口径,要求 provider 必填字段已填。
+                configured = False
+                if provider == "anthropic":
+                    configured = bool(fields.get("api_key"))
+                elif provider == "openai":
+                    configured = bool(fields.get("api_key")) and bool(fields.get("base_url"))
+                elif provider == "ollama":
+                    configured = bool(fields.get("host"))
+                if not configured:
+                    return self._json(
+                        {"ok": False,
+                         "error": "no LLM provider configured — open Settings drawer first"},
+                        status=400,
+                    )
+                log_fd = os.open(DATA / "summarize.log", os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+                _project_root = Path(__file__).resolve().parent.parent
+                subprocess.Popen(
+                    [sys.executable, str(_project_root / "radar.py"), "summarize"],
+                    cwd=str(_project_root),
+                    stdout=log_fd,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                    close_fds=True,
+                )
+                return self._json(
+                    {"ok": True, "message": "summarize started in background",
+                     "provider": provider}
                 )
             self.send_error(404)
 
@@ -1431,7 +1478,7 @@ def serve(port=8765):
         # ponytail: machine-parseable port line for dev.cjs — keep the format stable.
         print(f"[serve-port] {actual_port}", flush=True)
         print(
-            f"[serve] {url}  (loopback only · API: /api/data /api/local /api/top /api/install /api/crawl · Ctrl-C to stop)"
+            f"[serve] {url}  (loopback only · API: /api/data /api/local /api/top /api/install /api/crawl /api/llm/summarize /api/llm/status · Ctrl-C to stop)"
         )
         try:
             httpd.serve_forever()

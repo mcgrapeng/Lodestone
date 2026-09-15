@@ -3,10 +3,14 @@
 lodestone: GitHub AI trending crawler + JSON API for the Vue 3 frontend.
 
 Commands:
-  radar.py crawl   - fetch trending AI repos from GitHub, write to PG (fallback: data/latest.json)
-  radar.py serve   - JSON API on http://localhost:PORT (loopback only; Vite at :5173 proxies /api/* here)
-  radar.py web     - one-shot dashboard: start serve in background (if needed) + open browser
-  radar.py today   - print today's top picks in terminal
+  radar.py crawl          - fetch trending AI repos from GitHub, write to PG (fallback: data/latest.json)
+                            2026-09 P3: 不再自动跑 LLM,需要走 --with-llm 显式打开
+  radar.py crawl --with-llm  - 同上,顺带跑 5 桶 LLM 分析(走已配好的 provider)
+  radar.py summarize      - 单独跑 LLM 5 桶分析(读 PG/JSON 已有 repos,跑已配好的 provider)
+                            /api/llm/summarize 与前端 Settings 按钮都调它
+  radar.py serve          - JSON API on http://localhost:PORT (loopback only; Vite at :5173 proxies /api/* here)
+  radar.py web            - one-shot dashboard: start serve in background (if needed) + open browser
+  radar.py today          - print today's top picks in terminal
 
 Reuses `gh` CLI for GitHub auth (avoids token management).
 Ponytail: minimum code, stdlib only, Vue UI lives in frontend/.
@@ -35,7 +39,6 @@ from radar_pkg.core import (  # noqa: F401
     DATA,
     SKILLS_CACHE,
     SKILL_ORIGINS,
-    TRANSLATE_CACHE,
     README_ZH_CACHE,
     CATEGORIES,
     TOP_5K_QUERIES,
@@ -92,19 +95,10 @@ from radar_pkg.gh import (  # noqa: F401
     fetch_github_trending,
     fetch_recent_active_repos,
 )
-from radar_pkg.translate import (  # noqa: F401
-    _LANG_NAV_WORDS,
-    _clean_readme_text,
-    _summary_from_entry,
-    _build_summary_zh,
-    enrich_summaries,
-    translate_text,
-    translate_batch,
+from radar_pkg.readme import (  # noqa: F401
+    _attach_competitive,
     _fetch_readme_from_github,
-    _strip_markdown_to_text,
-    _chunked_translate,
-    _looks_translated,
-    get_readme_zh,
+    fetch_and_cache_readmes,
 )
 from radar_pkg.install import (  # noqa: F401
     _GENERIC_TOPICS,
@@ -140,7 +134,6 @@ GH_SEARCH_STATS = _core.GH_SEARCH_STATS
 README_ZH_CACHE = _core.README_ZH_CACHE
 SKILLS_CACHE = _core.SKILLS_CACHE
 SKILL_ORIGINS = _core.SKILL_ORIGINS
-TRANSLATE_CACHE = _core.TRANSLATE_CACHE
 _SEARCH_PACE = _core._SEARCH_PACE
 _SKILL_PLATFORM_PATHS = _detect._SKILL_PLATFORM_PATHS
 
@@ -154,7 +147,10 @@ if __name__ == "__main__":
 
     cmd = sys.argv[1] if len(sys.argv) > 1 else "today"
     if cmd == "crawl":
-        crawl()
+        # ponytail: 2026-09 P3 — LLM 不再随 crawl 自动跑。需要旧行为的:
+        # `./radar.py crawl --with-llm`；正常用法 `./radar.py crawl` 只拉数据。
+        from radar_pkg.crawl import crawl as _crawl
+        _crawl(with_llm=("--with-llm" in sys.argv))
     elif cmd == "serve":
         serve(int(sys.argv[2]) if len(sys.argv) > 2 else 8765)
     elif cmd == "restart":
@@ -170,6 +166,15 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"[restart] FAILED: {e}", file=sys.stderr, flush=True)
             sys.exit(1)
+    elif cmd == "summarize":
+        # ponytail: 2026-09 P3 — 手动跑 LLM 5 桶分析。/api/llm/summarize 也调它。
+        # 配置好模型后 ./radar.py summarize 或前端 Settings 抽屉按钮触发。
+        from radar_pkg.crawl import summarize_repos
+        result = summarize_repos()
+        if not result.get("ok"):
+            print(f"[summarize] FAIL: {result.get('error')}", file=sys.stderr, flush=True)
+            sys.exit(1)
+        sys.exit(0)
     elif cmd == "web":
         web(int(sys.argv[2]) if len(sys.argv) > 2 else 8765)
     elif cmd == "today":

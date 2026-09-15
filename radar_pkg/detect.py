@@ -16,7 +16,6 @@ from radar_pkg.match import (
     _owner_repo_from_link_target,
     invalidate_repo_index,
 )
-from radar_pkg.translate import translate_batch
 
 _SKILL_PLATFORM_PATHS: dict[str, str] = {
     "claude": "~/.claude/skills",
@@ -196,17 +195,7 @@ def detect_local_skills(force: bool = False):
                         pass
                     break
 
-    # ponytail: any skill with desc_en but no desc_zh → translate via existing cache/translate_batch
-    to_translate = [
-        (name, meta["desc_en"])
-        for name, meta in out["skills"].items()
-        if meta.get("desc_en") and not meta.get("desc_zh")
-    ]
-    if to_translate:
-        zh_map = translate_batch(to_translate)
-        for name, zh in zh_map.items():
-            if zh and out["skills"][name].get("desc_zh") in (None, ""):
-                out["skills"][name]["desc_zh"] = zh
+    # ponytail: 2026-09 — 谷歌翻译管线已移除；desc_zh 不再自动翻译，保持空。
 
     # ponytail: Claude slash commands are *.md files (not subdirs) in commands/
     cmd_dir = Path.home() / ".claude" / "commands"

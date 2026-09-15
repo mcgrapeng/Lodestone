@@ -119,4 +119,25 @@ export const api = {
   ): Promise<TestLlmResult> {
     return post('/api/llm/test', { provider, [provider]: fields })
   },
+
+  // ponytail: 2026-09 P3 — 5 桶生成手动触发。前端 Settings 抽屉按钮调此端点,
+  // 后端 spawn `radar.py summarize` 后台跑,立即返 200。进度走 /api/llm/status 轮询。
+  async triggerSummarize(): Promise<{ ok: boolean; error?: string; provider?: string; message?: string }> {
+    return post('/api/llm/summarize', {})
+  },
+
+  async getLlmStatus(): Promise<{
+    configured: boolean
+    provider: string | null
+    running: boolean
+    last_run: string | null
+    last_analyzed: number | null
+    last_total: number | null
+    last_duration_s: number | null
+    last_source: 'pg' | 'json' | null
+    last_model: string | null
+    updated_at: string | null
+  }> {
+    return jsonOrThrow(await fetch(`${BASE}/api/llm/status`))
+  },
 }

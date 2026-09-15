@@ -3,7 +3,7 @@
 // stay in state so switching doesn't wipe typed values.
 
 import { useEffect, useState } from 'react'
-import { X, Check, AlertCircle } from 'lucide-react'
+import { X, Check, AlertCircle, Sparkles, Loader2 } from 'lucide-react'
 import { api } from '../lib/api'
 import type { Settings, TestLlmResult } from '../lib/types'
 
@@ -28,6 +28,21 @@ export function SettingsDrawer({ open, initial, onClose, onSaved }: Props) {
   const [testResult, setTestResult] = useState<TestLlmResult | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // ponytail: 2026-09 P3 — 5 桶生成手动触发相关 state。
+  // configured=false 时按钮禁用 + 显示「请先配置 Provider」;
+  // running 时轮询 /api/llm/status 看是否结束。
+  const [llmStatus, setLlmStatus] = useState<{
+    configured: boolean
+    provider: string | null
+    running: boolean
+    last_run: string | null
+    last_analyzed: number | null
+    last_total: number | null
+    last_duration_s: number | null
+    last_model: string | null
+  } | null>(null)
+  const [triggering, setTriggering] = useState(false)
+  const [triggerError, setTriggerError] = useState<string | null>(null)
 
   // Sync draft when initial loads (e.g. async after open)
   useEffect(() => {
@@ -43,6 +58,43 @@ export function SettingsDrawer({ open, initial, onClose, onSaved }: Props) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
+
+  // ponytail: 2026-09 P3 — drawer 打开时拉一次 LLM status。
+  // 用户保存 settings 后也重拉;triggerSummarize 后轮询到 running=false 为止。
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    const poll = async () => {
+      try {
+        const s = await api.getLlmStatus()
+        if (!cancelled) setLlmStatus(s)
+        return s
+      } catch {
+        return null
+      }
+    }
+    poll()
+    return () => { cancelled = true }
+  }, [open, draft.provider])  // re-poll after provider change
+
+  // ponytail: triggerSummarize 后每 2s 轮询直到 running=false,
+  // 让用户在 drawer 里看到实时进度(显示「正在跑」spinner → 「完成 N/总数 张」)
+  useEffect(() => {
+    if (!triggering) return
+    const t = setInterval(async () => {
+      try {
+        const s = await api.getLlmStatus()
+        setLlmStatus(s)
+        if (!s.running) {
+          setTriggering(false)
+          setTriggerError(null)
+        }
+      } catch {
+        setTriggering(false)
+      }
+    }, 2000)
+    return () => clearInterval(t)
+  }, [triggering])
 
   if (!open) return null
 
@@ -87,6 +139,29 @@ export function SettingsDrawer({ open, initial, onClose, onSaved }: Props) {
     }
   }
 
+  // ponytail: 2026-09 P3 — 手动触发 5 桶生成。
+  // 前端先看 llmStatus.configured:未配 → 提示去填字段;已配 → POST 触发 + 进入轮询。
+  const triggerSummarize = async () => {
+    setTriggerError(null)
+    // ponytail: 前端兜底。后端也会返 400,但前端检查能少一次 round-trip + 给出明确文案。
+    if (!llmStatus?.configured) {
+      setTriggerError('请先配置 Provider 的 API Key / Base URL / Model,然后点「保存」')
+      return
+    }
+    setTriggering(true)
+    try {
+      const res = await api.triggerSummarize()
+      if (!res.ok) {
+        setTriggerError(res.error ?? '触发失败')
+        setTriggering(false)
+      }
+      // 成功 → triggering=true,useEffect 开始轮询,直到 running=false
+    } catch (e) {
+      setTriggerError((e as Error).message)
+      setTriggering(false)
+    }
+  }
+
   return (
     <>
       {/* Backdrop */}
@@ -106,7 +181,8 @@ export function SettingsDrawer({ open, initial, onClose, onSaved }: Props) {
 
         <div className="space-y-4 overflow-y-auto p-5" style={{ maxHeight: 'calc(100vh - 130px)' }}>
           <p className="text-xs text-foreground-subtle">
-            用于 crawl 时自动生成每张卡的「5 桶介绍」（是什么 / 能干什么 / 解决什么问题 / 同类项目 / 何时选它）。
+            用于手动触发每张卡的「5 桶介绍」生成（是什么 / 能干什么 / 解决什么问题 / 同类项目 / 何时选它）。
+            配置完成后点下面「生成 5 桶分析」按钮 — 后端跑批,不占宿主 LLM 上下文,结果写回数据库。
             设置存于 <code>data/settings.json</code>（不入 git）。
           </p>
 
@@ -212,6 +288,59 @@ export function SettingsDrawer({ open, initial, onClose, onSaved }: Props) {
               ✗ {saveError}
             </div>
           )}
+
+          {/* ponytail: 2026-09 P3 — 5 桶生成触发区。配置好了才能跑,完成后显示上次结果。 */}
+          <div className="mt-4 rounded-lg border border-border-muted bg-background-muted/30 p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <Sparkles size={14} className="text-primary" />
+              <span className="text-sm font-medium text-foreground">5 桶介绍生成</span>
+              {llmStatus?.running && (
+                <Loader2 size={14} className="animate-spin text-primary" />
+              )}
+            </div>
+
+            {/* Last run summary */}
+            {llmStatus?.last_run && (
+              <p className="mb-2 text-xs text-foreground-subtle">
+                上次生成: {llmStatus.last_analyzed ?? 0}/{llmStatus.last_total ?? '?'} 张
+                {llmStatus.last_duration_s ? ` · ${llmStatus.last_duration_s}s` : ''}
+                {llmStatus.last_model ? ` · ${llmStatus.last_model}` : ''}
+                {' · '}
+                <span className="font-mono">{llmStatus.last_run.slice(0, 19).replace('T', ' ')}</span>
+              </p>
+            )}
+
+            <button
+              onClick={triggerSummarize}
+              disabled={triggering || !llmStatus?.configured}
+              title={
+                !llmStatus?.configured
+                  ? '请先填好下方 Provider 字段并点「保存」'
+                  : llmStatus.running
+                  ? '正在生成中…'
+                  : '用配置的 LLM 对所有 repos 跑一遍 5 桶分析'
+              }
+              className="w-full rounded bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {llmStatus?.running
+                ? '正在生成…'
+                : triggering
+                ? '已触发,等待后端启动…'
+                : '生成 5 桶分析'}
+            </button>
+
+            {!llmStatus?.configured && (
+              <p className="mt-1.5 text-xs text-foreground-subtle">
+                💡 先填上方 Provider 字段并「保存」,按钮才会亮起
+              </p>
+            )}
+
+            {triggerError && (
+              <div className="mt-2 rounded border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-400">
+                ✗ {triggerError}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer actions */}

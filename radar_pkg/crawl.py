@@ -35,7 +35,7 @@ from radar_pkg.match import (
     _build_plugin_segs,
     _installed_segments,
 )
-from radar_pkg.translate import enrich_summaries, translate_batch
+from radar_pkg.readme import fetch_and_cache_readmes
 
 
 def acquire_crawl_lock() -> bool:
@@ -71,19 +71,284 @@ def crawl_lock_held() -> bool:
     return True
 
 
-def crawl():
-    """Fetch all categories, dedupe, save. File-locked — one crawl at a time."""
+def crawl(with_llm: bool = False):
+    """Fetch all categories, dedupe, save. File-locked — one crawl at a time.
+
+    with_llm: 2026-09 P3 — 默认 False。LLM 5 桶分析改由 summarize_repos() 手动
+    触发（旧行为需要走 ./radar.py crawl --with-llm,服务侧 /api/crawl 仍不自动跑 LLM）。
+    """
     if not acquire_crawl_lock():
         print("[crawl] another crawl is already running — aborting", file=sys.stderr)
         return {"ok": False, "error": "crawl already running"}
     try:
-        return _crawl_inner()
+        return _crawl_inner(with_llm=with_llm)
     finally:
         release_crawl_lock()
 
 
-def _crawl_inner():
-    """Fetch all categories, dedupe, save."""
+def _run_llm_analysis(repos: list) -> int:
+    """对一批 repo 跑 LLM 5 桶分析,把 analysis_5d 写回每个 repo 字典。
+
+    Returns: 成功分析的 repo 数。供 _crawl_inner(with_llm=True) 和 summarize_repos()
+    共用 — 增量分析(llm_analysis_cache.json 命中跳过),失败静默,不抛异常打断爬取。
+
+    副作用: 把 analysis_5d 写回 repos[i].analysis_5d 字段(供 PG upsert 落库),
+    同步更新 readme_zh_cache.json 里对应 entry 的 analysis_5d 字段。
+    """
+    from radar_pkg.llm_analyze import analyze_many, _load_cache as _load_llm_cache
+
+    readme_cache: dict = {}
+    if core.README_ZH_CACHE.exists():
+        try:
+            readme_cache = json.loads(core.README_ZH_CACHE.read_text())
+        except Exception:
+            readme_cache = {}
+    llm_inputs = []
+    for r in repos:
+        name = (r.get("name") or "").lower()
+        entry = readme_cache.get(name) or {}
+        # 先把已有 analysis_5d 灌回 repo(让前端在跑分析时也能看到旧桶)
+        if entry.get("analysis_5d"):
+            r["analysis_5d"] = entry["analysis_5d"]
+        if entry.get("raw_md"):
+            llm_inputs.append(
+                {
+                    "name": r["name"],
+                    "readme": entry["raw_md"],
+                    "topics": r.get("topics") or [],
+                    "lang": r.get("lang"),
+                    "stars": r.get("stars") or 0,
+                }
+            )
+    if not llm_inputs:
+        return 0
+    n = analyze_many(llm_inputs, max_workers=4)
+    try:
+        llm_cache = _load_llm_cache()
+    except Exception:
+        llm_cache = {}
+    # ponytail: 2026-09 — 一次性 load llm cache（旧代码每 repo 重读磁盘）
+    # 把分析结果回写到 readme_zh_cache（共享缓存文件，避免再开一个）
+    for inp in llm_inputs:
+        key = inp["name"].lower()
+        if key in llm_cache:
+            readme_cache.setdefault(key, {})["analysis_5d"] = llm_cache[key]
+            for r in repos:
+                if (r.get("name") or "").lower() == key:
+                    r["analysis_5d"] = llm_cache[key]
+                    break
+    try:
+        core.README_ZH_CACHE.write_text(
+            json.dumps(readme_cache, ensure_ascii=False, indent=1)
+        )
+    except Exception as e:
+        print(f"  [warn] write analysis_5d back to cache: {e}", file=sys.stderr)
+    return n
+
+
+def _write_llm_status(**fields) -> None:
+    """更新 llm_status.json(给 /api/llm/status 读)。原子写。"""
+    payload = {}
+    if core.LLM_STATUS_PATH.exists():
+        try:
+            payload = json.loads(core.LLM_STATUS_PATH.read_text())
+        except Exception:
+            payload = {}
+    payload.update(fields)
+    payload["updated_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+    core.LLM_STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = core.LLM_STATUS_PATH.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1))
+    tmp.replace(core.LLM_STATUS_PATH)
+
+
+def summarize_repos(force: bool = False) -> dict:
+    """手动触发 LLM 5 桶分析 — 读取 PG/JSON snapshot 里的 repos,跑 LLM,
+    把 analysis_5d 写回 PG + data/latest.json + data/readme_zh_cache.json。
+
+    用法: ./radar.py summarize
+    /api/llm/summarize 也会调它（subprocess spawn）。
+
+    Returns: {ok, analyzed, skipped, source, duration_s, error?}
+    """
+    import db
+    from radar_pkg.llm_analyze import detect_provider, _provider_model
+
+    if not acquire_summarize_lock():
+        return {"ok": False, "error": "summarize already running"}
+    t0 = time.monotonic()
+    try:
+        provider = detect_provider()
+        if not provider:
+            return {
+                "ok": False,
+                "error": "no LLM provider configured — open Settings and set provider/api_key/base_url",
+            }
+        # ponytail: 2026-09 — PG 优先; 没有 PG 或读失败回退到 data/latest.json
+        repos: list = []
+        source = "json"
+        if db._DB_OK:
+            try:
+                conn = db.connect()
+                try:
+                    repos = db.query_all_repos_for_summarize(conn)
+                finally:
+                    conn.close()
+                source = "pg"
+            except Exception as e:
+                print(f"  [warn] summarize PG read failed ({e}); falling back to latest.json",
+                      file=sys.stderr)
+                repos = []
+        if not repos:
+            latest = DATA / "latest.json"
+            if not latest.exists():
+                return {"ok": False, "error": "no data — run ./radar.py crawl first"}
+            snap = json.loads(latest.read_text())
+            for r in snap.get("hot_now", []):
+                repos.append(r)
+            for c in snap.get("categories", []):
+                repos.extend(c.get("repos", []))
+            source = "json"
+        # ponytail: 2026-09 — 去重(同一 repo 跨多个 category 进来会重复算 LLM 配额)
+        seen = set()
+        unique = []
+        for r in repos:
+            n = (r.get("name") or "").lower()
+            if not n or "/" not in n:
+                continue
+            if n in seen:
+                continue
+            seen.add(n)
+            unique.append(r)
+        print(
+            f"[summarize] source={source} provider={provider} model={_provider_model(provider)} "
+            f"repos={len(unique)}"
+        )
+        # analyze_one 内部跳过 stars < threshold,所以 unique 全喂即可
+        n = _run_llm_analysis(unique)
+        # 写回存储
+        if source == "pg":
+            try:
+                _write_analysis_to_pg(unique)
+            except Exception as e:
+                print(f"  [warn] write analysis_5d to PG: {e}", file=sys.stderr)
+        _write_analysis_to_snapshot(unique)
+        # _run_llm_analysis 已经把 analysis_5d 写回 readme_zh_cache.json 了
+        duration = round(time.monotonic() - t0, 1)
+        _write_llm_status(
+            last_run_at=datetime.datetime.now().isoformat(timespec="seconds"),
+            analyzed=n,
+            total=len(unique),
+            source=source,
+            provider=provider,
+            model=_provider_model(provider),
+            duration_s=duration,
+        )
+        print(f"[summarize] ✓ {n}/{len(unique)} repos got 5d analysis in {duration}s")
+        return {
+            "ok": True,
+            "analyzed": n,
+            "total": len(unique),
+            "source": source,
+            "duration_s": duration,
+        }
+    finally:
+        release_summarize_lock()
+
+
+def acquire_summarize_lock() -> bool:
+    """True = acquired (caller must release); False = another summarize is running."""
+    try:
+        fd = os.open(core.SUMMARIZE_LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(fd, str(os.getpid()).encode())
+        os.close(fd)
+        return True
+    except FileExistsError:
+        try:
+            if time.time() - core.SUMMARIZE_LOCK.stat().st_mtime > core.SUMMARIZE_LOCK_STALE_S:
+                core.SUMMARIZE_LOCK.unlink(missing_ok=True)
+                return acquire_summarize_lock()
+        except OSError:
+            pass
+        return False
+
+
+def release_summarize_lock():
+    core.SUMMARIZE_LOCK.unlink(missing_ok=True)
+
+
+def summarize_lock_held() -> bool:
+    """Non-acquiring check for the API layer (returns 409 instead of spawning)."""
+    if not core.SUMMARIZE_LOCK.exists():
+        return False
+    try:
+        if time.time() - core.SUMMARIZE_LOCK.stat().st_mtime > core.SUMMARIZE_LOCK_STALE_S:
+            return False
+    except OSError:
+        return False
+    return True
+
+
+def _write_analysis_to_pg(repos: list) -> None:
+    """把 analysis_5d 写回 PG repos.analysis_5d_json 列。"""
+    import db
+
+    conn = db.connect()
+    try:
+        cur = conn.cursor()
+        # batch update — 只写有 analysis_5d 的行(空 dict 跳过)
+        rows = [
+            (json.dumps(r["analysis_5d"]), r["name"])
+            for r in repos
+            if r.get("analysis_5d")
+        ]
+        if not rows:
+            return
+        cur.executemany(
+            "UPDATE repos SET analysis_5d_json = %s::jsonb WHERE name = %s",
+            rows,
+        )
+        conn.commit()
+        print(f"  ✓ wrote analysis_5d to PG for {len(rows)} repos")
+    finally:
+        conn.close()
+
+
+def _write_analysis_to_snapshot(repos: list) -> None:
+    """把 analysis_5d 写回 data/latest.json 的每个 repo 条目。"""
+    latest = DATA / "latest.json"
+    if not latest.exists():
+        return
+    snap = json.loads(latest.read_text())
+    by_name = {(r.get("name") or "").lower(): r for r in repos if r.get("analysis_5d")}
+    if not by_name:
+        return
+    n_updated = 0
+    for bucket_key in ("hot_now", "trending"):
+        for r in snap.get(bucket_key, []) or []:
+            key = (r.get("name") or "").lower()
+            if key in by_name:
+                r["analysis_5d"] = by_name[key]["analysis_5d"]
+                n_updated += 1
+    for c in snap.get("categories", []) or []:
+        for r in c.get("repos", []) or []:
+            key = (r.get("name") or "").lower()
+            if key in by_name:
+                r["analysis_5d"] = by_name[key]["analysis_5d"]
+                n_updated += 1
+    tmp = latest.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(snap, ensure_ascii=False, indent=2))
+    tmp.replace(latest)
+    print(f"  ✓ wrote analysis_5d to latest.json for {n_updated} repo entries")
+
+
+def _crawl_inner(with_llm: bool = False):
+    """Fetch all categories, dedupe, save.
+
+    with_llm: 默认 False — 不再随 crawl 自动跑 LLM(2026-09 P3 拆分)。
+    用户配好模型后通过 ./radar.py summarize 或前端按钮手动触发。
+    需要旧行为的 CLI: ./radar.py crawl --with-llm
+    """
     today = datetime.date.today().isoformat()
     core.GH_SEARCH_STATS["failed"] = 0
     # ponytail: 2026-09 — 重置自适应限速 sleep。REST 限流恢复把 sleep 永久 bump 到 6.0
@@ -402,12 +667,7 @@ def _crawl_inner():
     except Exception as e:
         print(f"  [warn] skill probe failed: {e}", file=sys.stderr)
 
-    # ponytail: translate once, cache forever — descriptions don't change day-to-day
-    print("[crawl] translating to Chinese…")
-    pairs = [(f"{r['name']}::desc", r.get("desc", "")) for r in deduped]
-    zh = translate_batch(pairs)
     for r in deduped:
-        r["desc_zh"] = zh.get(f"{r['name']}::desc", "") or r.get("desc_zh", "")
         r["facts"] = facts_for_repo(r)
         r["local_installed"] = (
             r["name"].lower() in installed_segs
@@ -418,75 +678,24 @@ def _crawl_inner():
             r["name"] in MANUAL_SEED_REPOS
         )
 
-    # ponytail: 2026-09 — 详细中文描述（README 首段翻译，缓存复用）。
-    # 取代抽屉里的按需「中文详介」— 数据随快照就绪，前端零等待。
+    # ponytail: 2026-09 — 谷歌翻译管线已移除（本网络不可达，白烧 12 分钟超时）。
+    # 现在只抓 README 存 raw_md 缓存（llm_analyze 备料）+ 本地 topic 匹配
+    # competitive 桶；中文 5 桶由宿主 LLM /api/save_summary_batch 回写。
     try:
-        n_sum = enrich_summaries(deduped)
-        print(f"  ✓ summaries: {n_sum}/{len(deduped)} repos with zh summary")
+        n_readme = fetch_and_cache_readmes(deduped)
+        print(f"  ✓ readme cached: {n_readme} entries with raw_md")
     except Exception as e:
-        print(f"  [warn] summary enrichment failed: {e}", file=sys.stderr)
-        for r in deduped:
-            r.setdefault("summary_zh", r.get("desc_zh") or "")
+        print(f"  [warn] readme fetch failed: {e}", file=sys.stderr)
 
     # ponytail: 2026-09 — LLM 5 维度决策分析（什么 / 痛点 / 竞品 / 优缺 / 何时选）。
+    # 2026-09 P3 拆分:不再随 crawl 自动跑,改由 summarize_repos() 手动触发。
     # 仅在配置 ANTHROPIC_API_KEY / OPENAI_API_KEY / OLLAMA_HOST 时启用；否则降级
     # 到 summary_sections 三桶 README 摘要。增量分析 — cache 命中跳过。
-    try:
-        from radar_pkg.llm_analyze import analyze_many
-
-        # ponytail: 把已缓存的 raw README 喂给 LLM 模块 — 避免再走 GitHub
-        import json as _json
-
-        readme_cache: dict = {}
-        if core.README_ZH_CACHE.exists():
-            try:
-                readme_cache = _json.loads(core.README_ZH_CACHE.read_text())
-            except Exception:
-                readme_cache = {}
-        llm_inputs = []
-        for r in deduped:
-            entry = readme_cache.get((r.get("name") or "").lower()) or {}
-            r["analysis_5d"] = entry.get("analysis_5d") or readme_cache.get(
-                (r.get("name") or "").lower(), {}
-            ).get("analysis_5d")
-            if entry.get("raw_md"):
-                llm_inputs.append(
-                    {
-                        "name": r["name"],
-                        "readme": entry["raw_md"],
-                        "topics": r.get("topics") or [],
-                        "lang": r.get("lang"),
-                        "stars": r.get("stars") or 0,
-                    }
-                )
-        if llm_inputs:
-            n = analyze_many(llm_inputs, max_workers=4)
-            print(f"  ✓ llm analysis: {n} repos got 5d analysis")
-            # ponytail: 2026-09 — llm cache 一次性 load（旧代码每 repo 重读磁盘，1000 行→1000 次读）
-            try:
-                from radar_pkg.llm_analyze import _load_cache as _load_llm_cache
-
-                llm_cache = _load_llm_cache()
-            except Exception:
-                llm_cache = {}
-            # ponytail: 把分析结果回写到 readme_zh_cache（共享缓存文件，避免再开一个）
-            for inp in llm_inputs:
-                key = inp["name"].lower()
-                if key in llm_cache:
-                    readme_cache.setdefault(key, {})["analysis_5d"] = llm_cache[key]
-                    for r in deduped:
-                        if (r.get("name") or "").lower() == key:
-                            r["analysis_5d"] = llm_cache[key]
-                            break
-            # 把 analysis_5d 落回 readme_zh_cache.json
-            try:
-                core.README_ZH_CACHE.write_text(
-                    _json.dumps(readme_cache, ensure_ascii=False, indent=1)
-                )
-            except Exception as e:
-                print(f"  [warn] write analysis_5d back to cache: {e}", file=sys.stderr)
-    except Exception as e:
-        print(f"  [warn] llm analysis failed: {e}", file=sys.stderr)
+    if with_llm:
+        try:
+            _run_llm_analysis(deduped)
+        except Exception as e:
+            print(f"  [warn] llm analysis failed: {e}", file=sys.stderr)
 
     failed = core.GH_SEARCH_STATS["failed"]
     if failed:

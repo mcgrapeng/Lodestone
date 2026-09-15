@@ -180,6 +180,28 @@ def query_top_5k(conn, page: int = 1, size: int = 12, sort: str = "stars"):
     }
 
 
+def query_all_repos_for_summarize(conn):
+    """summarize_repos() 用:全量取 AI 相关 repos(stars+topic+raw_md 字段都带上)。
+
+    不分页 — summarize 是后台批量任务,一次跑完所有候选。LLM analyze_one
+    自己按 _min_stars() 阈值过滤(避免给 0⭐ 项目浪费 token)。
+    """
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT name, url, description, desc_zh, stars, forks, lang, topics,
+               pushed_at, updated_at, trending, first_seen_at, stars_today,
+               is_skill,
+               summary_sections_json AS summary_sections,
+               analysis_5d_json AS analysis_5d
+        FROM repos
+        WHERE is_ai_relevant
+        ORDER BY stars DESC
+    """
+    )
+    return [d | {"local_installed": False} for d in _dicts(cur)]
+
+
 def query_hot_now(conn, limit: int = 40):
     """Top AI repos by stars overall."""
     cur = conn.cursor()

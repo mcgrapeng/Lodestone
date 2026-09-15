@@ -140,50 +140,15 @@ def test_detect_local_skills_falls_back_to_skill_md():
             patch("radar_pkg.detect._load_repo_index", return_value={}),
             patch("radar_pkg.core.SKILL_ORIGINS", tmp / "origins.json"),
             patch("radar_pkg.detect._SKILL_PLATFORM_PATHS", _platforms_at(tmp)),
-            patch(
-                "radar_pkg.detect.translate_batch", return_value={"custom-skill": "我的自定义技能"}
-            ),
         ):
             radar.invalidate_local_scan()
             result = radar.detect_local_skills()
             meta = result["skills"]["custom-skill"]
             assert meta["source"] == "skillmd"
             assert meta["desc_en"] == "My custom skill"
-            assert meta["desc_zh"] == "我的自定义技能"
+            # 谷歌翻译管线已移除 — desc_zh 不再自动翻译
+            assert not meta.get("desc_zh")
             assert meta["url"] is None
-
-
-def test_detect_local_skills_translates_desc_en_when_no_zh():
-    """When desc_en is set but desc_zh is missing, detect_local_skills
-    auto-translates desc_en via translate_batch so user sees Chinese."""
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        skills_dir = tmp / ".claude" / "skills" / "english-only-skill"
-        skills_dir.mkdir(parents=True)
-        (skills_dir / "SKILL.md").write_text(
-            "---\nname: english-only\ndescription: An entirely English description\n---\n"
-        )
-        with (
-            patch("radar.Path.home", return_value=tmp),
-            patch("radar_pkg.detect._load_repo_index", return_value={}),
-            patch("radar_pkg.core.SKILL_ORIGINS", tmp / "origins.json"),
-            patch("radar_pkg.detect._SKILL_PLATFORM_PATHS", _platforms_at(tmp)),
-            patch(
-                "radar_pkg.detect.translate_batch",
-                return_value={"english-only-skill": "完全中文的描述"},
-            ) as mock_tb,
-        ):
-            radar.invalidate_local_scan()
-            result = radar.detect_local_skills()
-            meta = result["skills"]["english-only-skill"]
-            mock_tb.assert_called_once()
-            call_pairs = mock_tb.call_args[0][0]
-            assert (
-                "english-only-skill",
-                "An entirely English description",
-            ) in call_pairs
-            assert meta["desc_zh"] == "完全中文的描述"
-            assert meta["desc_en"] == "An entirely English description"
 
 
 def test_is_ai_relevant_requires_hard_topic():

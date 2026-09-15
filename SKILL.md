@@ -1,6 +1,6 @@
 ---
 name: yz-ai
-description: 当用户想了解 GitHub + HuggingFace + MCP Registry + arXiv 上最新的 AI 工具/Skills/项目（如 superpowers、agent-memory、LangChain、Coze 等）时触发。Lodestone（命令 /lodestone）是发现主流 AI 工具的多源聚合平台 — 自动聚合 GitHub AI 趋势（GraphQL 批量搜索 + 4 引擎分级爬取）+ HuggingFace Trending（Spaces + Models）+ 官方 MCP Server Registry + arXiv 最新论文，按 20 个用途分类（Agent/RAG/代码生成/MCP/Voice/Security/Robotics/论文 等），生成中文友好仪表盘。**触发 /lodestone 后，skill 会调用宿主模型（Claude Code CLI / Codex CLI / OpenCode / EasyCode）直接为每张卡片生成 5 桶中文详细介绍（是什么 / 能干什么 / 解决什么问题 / 同类竞品 / 何时选它），无需外部 LLM API key、无翻译限额**。「lodestone」（磁石）：航海家用磁石导航 — 这个 skill 把 AI 工程师引到该用的人工工具上。触发短语：「/lodestone」「看看最新AI项目」「AI radar」「GitHub AI趋势」「刷一下AI雷达」「最近有什么火的AI项目」。
+description: 当用户想了解 GitHub + HuggingFace + MCP Registry + arXiv 上最新的 AI 工具/Skills/项目（如 superpowers、agent-memory、LangChain、Coze 等）时触发。Lodestone（命令 /lodestone）是发现主流 AI 工具的多源聚合平台 — 自动聚合 GitHub AI 趋势（GraphQL 批量搜索 + 4 引擎分级爬取）+ HuggingFace Trending（Spaces + Models）+ 官方 MCP Server Registry + arXiv 最新论文，按 20 个用途分类（Agent/RAG/代码生成/MCP/Voice/Security/Robotics/论文 等），生成中文友好仪表盘。**2026-09 P3 拆分：/lodestone 只触发「启动 serve + 爬取数据」，5 桶中文介绍改由用户在 Settings 配置好模型地址（Anthropic / OpenAI 兼容 / Ollama）后，在前端点「生成 5 桶分析」按钮手动触发**。这样不污染宿主 LLM 上下文、不烧用户额度、可重复增量跑。「lodestone」（磁石）：航海家用磁石导航 — 这个 skill 把 AI 工程师引到该用的人工工具上。触发短语：「/lodestone」「看看最新AI项目」「AI radar」「GitHub AI趋势」「刷一下AI雷达」「最近有什么火的AI项目」。
 allowed-tools: Bash, Read, Write, Edit
 ---
 
@@ -31,34 +31,40 @@ allowed-tools: Bash, Read, Write, Edit
    - 后端独立子进程执行 kill + spawn 新 serve,旧进程安全死掉
    - 返回 `{"ok": true, "status": "restarting"}` 给 skill
    - 新 serve 大约 5s 内 listen 上 `/api/health`
-3. **拉数据**：`GET http://127.0.0.1:8765/api/data` 拿到全部 repo 列表
-4. **批量生成 5 桶中文介绍**：对每张卡片（首推 hot_now + gainers），按下面的 JSON schema 生成：
-   ```json
-   {
-     "intro": "是什么 — 一句话定位",
-     "can_do": "能干什么 — 3-5 个具体能力",
-     "problem": "解决什么问题 — 用户痛点",
-     "competitive": "同类项目:A、B、C（按 topic 匹配）",
-     "when_to_use": "何时选它 — 决策建议"
-   }
-   ```
-5. **回写**：`POST http://127.0.0.1:8765/api/save_summary_batch`，body:
-   ```json
-   {"items":[{"name":"owner/repo","sections":{...}}, ...]}
-   ```
-6. **告诉用户**：总共填了多少张卡、各 5 桶平均字数、哪些卡还需他补充
+3. **触发爬取**：`POST http://127.0.0.1:8765/api/crawl`
+   - 后端后台 spawn `radar.py crawl` 子进程（fire-and-forget,不阻塞 skill）
+   - 爬 5 个数据源（GitHub / HF Spaces / HF Models / MCP Registry / arXiv）+ 抓 README 缓存 + 入库到 PG（回退到 `data/latest.json`）
+   - 约 5-8 分钟完成；skill 不等,告诉用户后即退出
+4. **告知用户下一步**（关键变化 — 2026-09 P3）：
+   - 「**爬取已触发,请打开仪表盘配置模型地址**」
+   - 仪表盘 URL: `http://127.0.0.1:8765`
+   - 操作: 右上角齿轮 ⚙️ 打开 Settings → 选 Provider (Anthropic / OpenAI 兼容 / Ollama) → 填 Base URL + API Key + Model → 点「保存」
+   - 配置完成后点 Settings 抽屉里的「生成 5 桶分析」按钮（或终端跑 `radar.py summarize`）
+5. **skill 退出**,不再做任何 LLM 调用
 
-> **核心设计**：不再依赖 Google Translate 或外部 LLM API。模型就是调用 skill 的宿主 LLM — 读仓库名 + topics + lang + stars + 已有的 desc/desc_zh 就能生成优质介绍，无 API 限额、无翻译噪声、可部署到任意服务器。
+> **为什么拆开**？原流程让宿主 LLM 实时为每张卡生成 5 桶 — 对 hot_now 60+ 卡就是 60+ 次模型调用,污染上下文、慢、还要重复跑就重头算。改成本地配置的 LLM 后端（Anthropic/OpenAI/Ollama）独立跑批:
+> - 跑一次后写回 PG + latest.json,前端永久拿到 analysis_5d
+> - 不占宿主 LLM 上下文
+> - 用户用便宜模型(haiku / gpt-4o-mini / qwen2.5)按需刷,不烧用户额度
+> - 增量分析:cache 命中跳过,二次跑只算新加的卡
 
-> **为什么先检查+重启**？如果旧 serve 跑着旧代码（无 5 桶字段），skill 拉到的数据里 `analysis_5d` 全是 null,生成的摘要只能写到 `summary_sections`,刷新无效。重启确保代码与新功能一致。
+> **为什么先检查+重启**？如果旧 serve 跑着旧代码（无 `analysis_5d` / `summary_sections` 字段），前端 UI 显示老数据。重启确保代码与新功能一致。
+
+> **5 桶由谁填**？默认流程走**用户配置的 LLM 后端**（Anthropic / OpenAI 兼容 / Ollama）。后端检测:
+> 1. settings.json 有 `provider` + 必填字段 → 用该 provider
+> 2. 否则环境变量 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `OLLAMA_HOST` → 自动选
+> 3. 都没配 → summarize 报 `no provider configured` 错,前端按钮变灰 + 引导去 Settings
+>
+> 老的 `/api/save_summary_batch` 端点保留 — 如果用户想用宿主 LLM 现场填,可以 POST items 手动写回,与新的 summarize 路径不冲突。
 
 ## 一键执行（手动命令）
 
 ```bash
 # skill 安装后，从任意 cwd 都可调用
-~/.claude/skills/lodestone/radar.py web      # 一键仪表盘：后台起 serve + 自动打开浏览器（已在跑则直接打开）
-~/.claude/skills/lodestone/radar.py crawl    # 爬取 + 入库（约 5-8 分钟，含限速等待）
-~/.claude/skills/lodestone/radar.py today    # 终端直接看 Top 15 + 分类概览
+~/.claude/skills/lodestone/radar.py web         # 一键仪表盘：后台起 serve + 自动打开浏览器（已在跑则直接打开）
+~/.claude/skills/lodestone/radar.py crawl       # 爬取 + 入库（约 5-8 分钟，含限速等待）。**2026-09 P3:不再自动跑 LLM**
+~/.claude/skills/lodestone/radar.py summarize   # 单独跑 LLM 5 桶分析（读已爬数据 + 用已配 provider + 写回 PG/JSON）
+~/.claude/skills/lodestone/radar.py today       # 终端直接看 Top 15 + 分类概览
 ```
 
 > 安装器创建的是 symlink（不是复制），所以两个路径指向同一个源目录，编辑一处即时生效。
@@ -68,12 +74,24 @@ allowed-tools: Bash, Read, Write, Edit
 | 命令 | 作用 |
 |------|------|
 | `radar.py web [port]` | 一键仪表盘：检测到 serve 已在跑就直接开浏览器，否则后台拉起（detached）再开。幂等，重复执行无副作用 |
-| `radar.py crawl` | 拉取 GitHub（分类 + 5k 补捞 + trending + manual seed）+ HuggingFace Spaces + HuggingFace Models + MCP Registry → 写入 Postgres（无 PG 时回退 `data/latest.json`） |
+| `radar.py crawl` | 拉取 GitHub（分类 + 5k 补捞 + trending + manual seed）+ HuggingFace Spaces + HuggingFace Models + MCP Registry → 抓 README → 写 Postgres（无 PG 时回退 `data/latest.json`）。**2026-09 P3:不再自动跑 LLM**，需要走 `--with-llm` |
+| `radar.py crawl --with-llm` | 同上 + 顺带跑 5 桶分析（旧行为兼容） |
+| `radar.py summarize` | 单独跑 LLM 5 桶分析（读 PG/JSON 已有 repos,用 settings.json 的 provider）。前端 Settings 抽屉按钮和 `/api/llm/summarize` 都调它 |
 | `radar.py today` | 终端打印 Top 15 + 分类概览（PG 优先，latest.json 回退） |
 | `radar.py serve [port]` | 起 JSON API + 静态托管 `frontend/dist`（默认 8765，**RADAR_HOST 控制绑定地址**；默认 127.0.0.1 安全） |
-| `radar.py restart [port]` | **杀掉端口上的旧 serve + 启动新 detached serve + 等就绪**。`/lodestone` skill 自动调此（或通过 `POST /api/restart` HTTP endpoint）。 |
+| `radar.py restart [port]` | **杀掉端口上的旧 serve + 启动新 detached serve + 等就绪**。`/lodestone` skill 自动调此（或通过 `POST /api/restart` HTTP endpoint） |
 
-crawl 全程持文件锁（`data/crawl.lock`），并发触发会自动拒绝，不互相打爆 GitHub 限流。
+crawl / summarize 各持独立文件锁（`data/crawl.lock` / `data/summarize.lock`），并发触发会自动拒绝，不互相打爆 GitHub 限流或 LLM 配额。
+
+## LLM 5 桶相关端点
+
+| 端点 | 方法 | 作用 |
+|---|---|---|
+| `/api/settings` | GET/POST | 读写 settings.json（provider + 各 provider 字段） |
+| `/api/llm/test` | POST | 用 provider + 临时字段测试连通性（不落盘） |
+| `/api/llm/status` | GET | 当前 provider 是否配置 + 上次生成于何时 + 跑了多少张卡 |
+| `/api/llm/summarize` | POST | 后台 spawn `radar.py summarize`,立即返 200 |
+| `/api/save_summary_batch` | POST | 老的宿主 LLM 路径 — items 数组一次写多张卡（与新 summarize 不冲突,作为可选手动路径保留） |
 
 ## 数据源（5 个 — 互补且独立）
 
@@ -141,5 +159,5 @@ httpx → cloudscraper → playwright_stealth → jina（本地轻 → 本地重
 ## 已知限制
 
 - GitHub Search secondary rate limit：30 req/min。所有 search 查询间已加 2s 间隔 + 限流自动退避；MCP / HF 源不占 Search 配额。
-- 5 桶中文介绍由宿主 LLM（运行 skill 的模型）实时生成 — 不需要 API key，但需要 LLM 上下文可用（即用户必须通过 `/yz:ai` 或在 skill 里触发）。
+- 5 桶中文介绍（2026-09 P3）由用户在 Settings 配置的 LLM 后端生成 — 需要 API key + 可达 base_url。未配置时 summarize 报 `no provider configured`,前端按钮自动禁用 + 引导。
 - 24h 增长（`/api/gain`）需要连续多天定时 crawl 积累快照，冷启动首日无数据（UI 有提示）。

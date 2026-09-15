@@ -25,8 +25,6 @@ SKILLS_CACHE = _HOME / "skills"
 
 SKILL_ORIGINS = _HOME / "origins.json"
 
-TRANSLATE_CACHE = DATA / "zh_cache.json"
-
 README_ZH_CACHE = DATA / "readme_zh_cache.json"
 
 # ponytail: 2026-09 — SKILL.md 探测缓存。{owner/repo: {is_skill, probed_at, branch}}。
@@ -836,6 +834,17 @@ GH_SEARCH_STATS = {"failed": 0}
 CRAWL_LOCK = DATA / "crawl.lock"
 
 CRAWL_LOCK_STALE_S = 30 * 60
+
+# ponytail: 2026-09 — summarize (LLM 5-bucket) 用独立锁。crawl 与 summarize 是
+# 两件事,前端「生成 5 桶」按钮触发 summarize 时不应被运行中的 crawl 阻塞
+# （crawl 不再自动跑 LLM,二者只共享 README 缓存）。
+SUMMARIZE_LOCK = DATA / "summarize.lock"
+
+SUMMARIZE_LOCK_STALE_S = 30 * 60
+
+# LLM 摘要状态 — /api/llm/status 给前端「上次生成于 X · 共 N 张卡」展示。
+# 由 summarize_repos() 写,UI 轮询时读。
+LLM_STATUS_PATH = DATA / "llm_status.json"
 
 FRONTMATTER_DESC = re.compile(
     r"^description:\s*(.+?)(?=\n[a-z\-]+:|\n---|\Z)", re.MULTILINE | re.DOTALL

@@ -107,7 +107,7 @@ GitHub 抗爬 → 其他 4 个源照常。**一个倒、其他不倒**。
 - **爬虫**：4 引擎分级 fallback，stdlib + 可选依赖
 - **数据源**：5 个互补源（GitHub + HF × 2 + MCP + arXiv）
 - **前端**：React 19 + Vite 6 + Appica UI + Tailwind v4
-- **依赖**：`gh` CLI 已认证；翻译走 Google Translate；可选 LLM 走 Claude / OpenAI / Ollama
+- **依赖**：`gh` CLI 已认证；中文 5 桶由宿主 LLM（`/lodestone`）回写；可选自动分析走 Claude / OpenAI / Ollama
 
 ---
 
