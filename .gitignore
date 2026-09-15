@@ -40,3 +40,7 @@ graphify-out/
 *.swp
 *.swo
 .DS_Store
+
+# ponytail: 2026-09 — Claude Code / harness 本地权限设置（含用户专属路径）
+.claude/settings.local.json
+frontend/.claude/
