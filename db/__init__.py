@@ -27,6 +27,8 @@ try:
         query_hot_now,
         query_categories,
         query_gain,
+        query_all_repos_for_summarize,
+        _dicts,
     )
 
     _DB_OK = not _FORCE_JSON

@@ -103,7 +103,7 @@ crawl / summarize 各持独立文件锁（`data/crawl.lock` / `data/summarize.lo
 | **MCP Server Registry** | `registry.modelcontextprotocol.io/v0/servers` | Model Context Protocol 官方注册表 |
 | **arXiv 论文** | `export.arxiv.org/api/query` | cs.AI / cs.CL / cs.LG 最新提交 |
 
-## 20 个分类
+## 27 个分类
 
 | 编号 | 分类 |
 |---|---|
@@ -127,6 +127,13 @@ crawl / summarize 各持独立文件锁（`data/crawl.lock` / `data/summarize.lo
 | 18 | 🛡 AI 安全 & 隐私（prompt injection 防御 / 红队 / 水印） |
 | 19 | 🤖 机器人 / Embodied AI（具身智能 / sim-to-real / 机器人学习） |
 | 20 | 📄 arXiv 论文（cs.AI / cs.CL / cs.LG 最新提交） |
+| 21 | ⚡ Inference Serving（vLLM / TGI / sglang / 推理优化） |
+| 22 | 🧬 Code KG（图谱 / 代码知识图谱 / repo mining） |
+| 23 | 🌐 Search & Web（agent search / browser search / RAG over web） |
+| 24 | 💬 Chat UI（chatbot 前端 / chat-ui 模板） |
+| 25 | 📄 Doc Parse（PDF / OCR / 文档解析） |
+| 26 | 🎛 AI UI（low-code AI 工作流 / AI 应用搭建） |
+| 27 | 🔌 MCP 开发与自托管（自部署 MCP 服务器 / dev tooling） |
 
 ## 4 精选爬虫引擎 · 分级 fallback
 

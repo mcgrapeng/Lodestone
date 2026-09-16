@@ -13,6 +13,7 @@ import datetime
 import http.server
 import json
 import os
+import signal as _signal
 import socketserver
 import subprocess
 import sys
@@ -25,8 +26,22 @@ import urllib.request
 from pathlib import Path
 
 from radar_pkg import core, detect
+_core_local = core  # ponytail: 2026-09 — /api/local 用 core.start_upgradable_refresh_daemon 等缓存助手
 import db  # ponytail: PG 查询(serve 各端点直接使用)
 from radar_pkg.crawl import audit, crawl, crawl_lock_held, summarize_lock_held, today
+
+
+def _pid_alive(pid: int) -> bool:
+    """共用:跨平台检测 pid 是否还活着(serve.py cancel 路径 + core.py lock 路径)。"""
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # 进程存在,只是当前用户没权限信号
 from radar_pkg.core import (
     DATA,
     MANUAL_SEED_REPOS,
@@ -202,19 +217,13 @@ def _restart_serve(port: int = 8765) -> dict:
     # ponytail: 不等 alive. 子进程已经 setsid detach, OLD serve 已被 kill,
     # 我们 sys.exit(0) 不会影响它. 这里只 Popen + 立即退出 — 失败的 bind 会在
     # 子进程自己的日志里显式出现,我们不需要在这里确认.
+    # ponytail: 2026-09 P4 — 删 dead code。之前 `_alive_check` 函数定义在 sys.exit(0)
+    # 之后,永远不会执行(reader 困惑,audit 误判)。`_alive` 也已被此函数下面注释
+    # 取代为「不等 alive」,整段删除。
     with open(DATA / "serve.log", "a") as f:
         f.write(f"[restart] spawning done, exiting child (new_pid={proc.pid} port={port})\n")
         f.flush()
     sys.exit(0)
-
-    # 4. Wait for alive
-    def _alive_check(p: int) -> bool:
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        try:
-            with opener.open(f"http://127.0.0.1:{p}/api/health", timeout=1) as r:
-                return r.status == 200
-        except Exception:
-            return False
 
 
 def serve(port=8765):
@@ -245,9 +254,21 @@ def serve(port=8765):
             origin = (self.headers.get("Origin") or "").strip().lower()
             if not origin:
                 return False
-            return not origin.startswith(
-                ("http://localhost", "http://127.0.0.1", "http://[::1]")
+            # ponytail: 2026-09 P3 修复 — 接受 http + https + 用户自定义 ALLOWED_ORIGINS。
+            # 旧实现只允许 http://localhost* — Codespaces / GitHub Pages / 自建域
+            # HTTPS 部署全部 403。环境变量 RADAR_ALLOWED_ORIGINS 用逗号分隔覆盖。
+            allowed = (
+                "http://localhost",
+                "http://127.0.0.1",
+                "http://[::1]",
+                "https://localhost",
+                "https://127.0.0.1",
+                "https://[::1]",
             )
+            extra = os.environ.get("RADAR_ALLOWED_ORIGINS", "")
+            if extra:
+                allowed = allowed + tuple(o.strip().lower() for o in extra.split(",") if o.strip())
+            return not any(origin.startswith(prefix) for prefix in allowed)
 
         def _json(self, data, status=200, etag=False):
             body = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -300,7 +321,10 @@ def serve(port=8765):
                 )
                 return
             path = urllib.parse.urlparse(self.path).path
-            if path.startswith("/assets/"):
+            # ponytail: 2026-09 — /assets/* 与白名单静态文件(favicon.svg /
+            # vite.svg 等)从 dist 直返;其他路径 SPA 兜底回 index.html。旧实现只放行
+            # /assets/* → /favicon.svg 被 SPA 兜底吃掉,浏览器 tab 没图标。
+            if path.startswith("/assets/") or path in {"/favicon.svg", "/favicon.ico", "/vite.svg"}:
                 f = (root / path.lstrip("/")).resolve()
                 # ponytail: path-traversal guard — /assets/../radar.py 不许读源码
                 if root not in f.parents or not f.is_file():
@@ -327,6 +351,10 @@ def serve(port=8765):
         def do_GET(self):
             # ponytail: 2026-09 — /api/health 给 /yz:ai skill 用于探测 serve 存活。
             # 返回 {ok, port, pid, uptime_seconds} — skill 据此决定是否要 /api/restart 杀旧进程。
+            # ponytail: 2026-09 — 提前 import core。下方 /api/install/status 等新端点
+            # 用 core.read_install_status()。原本只有 /api/llm/status 内嵌 `from radar_pkg
+            # import core`,在那个 if 分支之后才执行 — 触发 UnboundLocalError。
+            from radar_pkg import core as _core_get
             if self.path == "/api/health":
                 self._json({
                     "ok": True,
@@ -397,6 +425,11 @@ def serve(port=8765):
             # ponytail: 2026-09 — /api/crawl/progress 给前端进度条 banner。
             # 解析 data/crawl.log 最近阶段 + 当前 bar；running 走 crawl_lock_held，
             # 不在时返 last_done_at 让前端知道上次成功于何时。
+            # ponytail: 2026-09 — /api/install/status 给本机 tab UpgradeProgressBanner。
+            # 镜像 /api/llm/status 极简结构(running/current/total/label/started_at/finished_at)。
+            if self.path == "/api/install/status":
+                self._json(_core_get.read_install_status())
+                return
             if self.path == "/api/crawl/progress":
                 import re as _re
                 log_path = DATA / "crawl.log"
@@ -495,6 +528,20 @@ def serve(port=8765):
                         try:
                             hot = db.query_hot_now(conn, limit=40)
                             cats = db.query_categories(conn)
+                            # ponytail: 2026-09 P0 修复 — PG 模式此前不返 stars_today/trending,
+                            # HeroStats "今日上榜" 永远 0、Trending tab 标题下显示星标榜。
+                            # 单查 trending 行,与 JSON 模式对齐两个字段。
+                            cur = conn.cursor()
+                            cur.execute(
+                                "SELECT name, url, description, desc_zh, stars, forks, lang, "
+                                "topics, pushed_at, updated_at, trending, first_seen_at, "
+                                "stars_today, is_skill, summary_sections_json AS summary_sections, "
+                                "analysis_5d_json AS analysis_5d "
+                                "FROM repos WHERE is_ai_relevant AND stars_today IS NOT NULL "
+                                "ORDER BY stars_today DESC"
+                            )
+                            trending_rows = [d | {"local_installed": False, "trending": True} for d in db._dicts(cur)]
+                            stars_today = {r["name"]: r["stars_today"] for r in trending_rows if r.get("stars_today") is not None}
                         finally:
                             conn.close()
                         # ponytail: per-request annotation — the DB doesn't know what's installed locally
@@ -503,11 +550,15 @@ def serve(port=8765):
                         plugin_segs = _build_plugin_segs(local_sk)
                         _annotate_local_installed(hot, segs, plugin_segs)
                         _annotate_local_installed(cats, segs, plugin_segs)
+                        _annotate_local_installed(trending_rows, segs, plugin_segs)
                         return self._json(
                             {
                                 "hot_now": hot,
                                 "categories": cats,
                                 "fetched_at": datetime.datetime.now().isoformat(),
+                                # 2026-09 P0 — 与 JSON 路径对齐,前端 HeroStats/Trending tab 不再退化
+                                "stars_today": stars_today,
+                                "trending": trending_rows,
                             },
                             etag=True,
                         )
@@ -561,9 +612,52 @@ def serve(port=8765):
                     merged_clis[group] = (
                         items  # e.g. {"brew": [...834 names...], "uv": [...]}
                     )
+                # ponytail: 2026-09 — 本机 tab 核心数据。每项 skill 带 status (up_to_date /
+                # behind / cache_missing / check_failed / orphan),upgradable 布尔,local/remote SHA。
+                # ponytail: 2026-09 — stale-while-revalidate 改造:upgradable 走 5min
+                # 缓存,后台 daemon 周期性刷新(serve.py 启动时 start_upgradable_refresh_daemon),
+                # /api/local handler 永远秒返(老 cache 也返,后台刷新后下次拿到新的)。
+                # 旧实现每个 HTTP 请求都跑 ls-remote — 100 个 skill = 25 min 阻塞线程。
+                from radar_pkg.install import compute_upgradable
+                skills_data = local["skills"]
+                # ponytail: 启动后台 daemon(幂等)。id(skills) 作 key,但 skills_data
+                # 是新 dict — 用稳定 key:"local-skills-v1"。daemon 会持续刷整个全局 cache,
+                # 但需在第一次 /api/local 调用后才知道有哪些 skill,所以这里 lazy 启动。
+                _core_local.start_upgradable_refresh_daemon()
+                upgradable_map = _core_local.read_upgradable_cache_or_none()
+                # ponytail: 2026-09 P1 修复 — 缓存 miss 时只算缺失子集,不再全量重算。
+                # 旧实现 cache_stale=True 就跑全量 compute_upgradable → 100 skill × 15s
+                # = 25 min 阻塞 HTTP 线程;同时与 daemon 竞争触发 GitHub 60/hr 限流。
+                # 现在:cache 完全空 → 不阻塞(让 daemon 首次填),返回空 dict(UI 显示"未检查")。
+                #      cache 存在但缺 N 个 → 只算这 N 个,daemon 5min 内填全。
+                if upgradable_map is None:
+                    upgradable_map = {}  # daemon 5min 内首次填充;UI 显示 dashed "未检查"
+                else:
+                    missing = [n for n in skills_data if n not in upgradable_map]
+                    if missing:
+                        try:
+                            fresh = compute_upgradable(
+                                {n: skills_data[n] for n in missing}
+                            )
+                            upgradable_map = {**upgradable_map, **fresh}
+                            _core_local.write_upgradable_cache(upgradable_map)
+                        except Exception:
+                            pass
+                # ponytail: 把 status + sha 注入到每个 skill 节点
+                for name, info in skills_data.items():
+                    if name in upgradable_map:
+                        u = upgradable_map[name]
+                        info["upgradable"] = bool(u.get("upgradable"))
+                        info["upgrade_reason"] = u.get("reason")
+                        info["local_sha"] = u.get("local_sha")
+                        info["remote_sha"] = u.get("remote_sha")
+                upgradable_count = sum(
+                    1 for name, v in upgradable_map.items()
+                    if name in skills_data and v.get("upgradable")
+                )
                 return self._json(
                     {
-                        "skills": local["skills"],
+                        "skills": skills_data,
                         "commands": local["commands"],
                         "agents": local["agents"],
                         "plugins": local["plugins"],
@@ -571,8 +665,9 @@ def serve(port=8765):
                         "mcp_servers": local.get("mcp_servers") or [],
                         "groups": group_capabilities_by_origin(local),
                         "replacements": replacements,
+                        "upgradable": upgradable_map,
                         "counts": {
-                            "skills": len(local["skills"]),
+                            "skills": len(skills_data),
                             "commands": len(local["commands"]),
                             "agents": len(local["agents"]),
                             "plugins": len(local["plugins"]),
@@ -581,9 +676,10 @@ def serve(port=8765):
                                 for v in merged_clis.values()
                             ),
                             "mcp_servers": len(local.get("mcp_servers") or []),
+                            "upgradable": upgradable_count,
                         },
                         "total": (
-                            len(local["skills"])
+                            len(skills_data)
                             + len(local["commands"])
                             + len(local["agents"])
                             + len(local["plugins"])
@@ -593,8 +689,38 @@ def serve(port=8765):
                             )
                             + len(local.get("mcp_servers") or [])
                         ),
+                        # ponytail: 2026-09 — cache 元信息,给前端 banner 用(exists / age_s /
+                        # total / computing)。"未检查"徽章的"未"是因为 cache 没算,
+                        # banner 应该显示这个原因而不是 292 个相同徽章。
+                        "cache_state": {
+                            **_core_local.read_upgradable_cache_meta(),
+                            "computing": bool(_core_local.read_refresh_status().get("computing")),
+                            "last_trigger_at": _core_local.read_refresh_status().get("started_at"),
+                            # ponytail: 2026-09 — error 字段(compute 失败 / 已取消)也透出。
+                            # 前端 banner 否则会一直显示"在算",但 status 实际已终态。
+                            "error": _core_local.read_refresh_status().get("error"),
+                        },
                     }
                 )
+            # ponytail: 2026-09 — 手动触发 upgradable 重算。
+            # POST 触发后台线程(立即返 200,不阻塞),GET 轮询状态。
+            # (POST handler 实现在 do_POST 里;这里 do_GET 只返 status)
+            if self.path == "/api/local/refresh/status":
+                self._json({
+                    **_core_local.read_refresh_status(),
+                    "cache": _core_local.read_upgradable_cache_meta(),
+                })
+                return
+            # ponytail: 2026-09 — 手动触发 upgradable 重算。前端首次进 tab 或用户点
+            # "立即重新计算"按钮时调。后台 fork 线程跑(立即返 200,不阻塞 HTTP),
+            # 跑完写 cache + 清 computing 标志。前端轮询 /api/local/refresh/status 看进度。
+            # (实现在 do_POST 里; GET 这里只返 /refresh/status 状态)
+            if self.path == "/api/local/refresh/status":
+                self._json({
+                    **_core_local.read_refresh_status(),
+                    "cache": _core_local.read_upgradable_cache_meta(),
+                })
+                return
             # ponytail: /api/stats — lightweight digest for the 📊 RTK-style token economy
             # panel + ecosystem breakdown. Computed from PG (or JSON snapshot fallback).
             if self.path == "/api/stats":
@@ -1296,7 +1422,21 @@ def serve(port=8765):
                         close_fds=True,
                     )
                     os.close(log_fd)
+                    # ponytail: 2026-09 P3 修复 — 重启子进程会 kill 父 serve。
+                    # 父进程必须在子进程 kill 自己之前把 HTTP response 完整 flush 到 socket,
+                    # 否则客户端拿 connection reset。BaseHTTPRequestHandler 不自动 flush,
+                    # 这里显式 flush + shutdown write-half。
                     self._json({"ok": True, "status": "restarting", "port": port})
+                    try:
+                        self.wfile.flush()
+                    except Exception:
+                        pass
+                    try:
+                        # shutdown(1) = 关闭 socket 的写半边,客户端能干净 EOF。
+                        # 关之前服务端仍能 continue serving 片刻(已被子进程在 5s 内 SIGTERM)。
+                        self.connection.shutdown(1)
+                    except Exception:
+                        pass
                 except Exception as e:
                     self._json({"ok": False, "error": str(e)}, status=500)
                 return
@@ -1474,6 +1614,71 @@ def serve(port=8765):
                 except Exception as e:
                     self._json({"ok": False, "error": str(e)}, status=400)
                 return
+            # ponytail: 2026-09 — 本机 tab 核心端点。
+            # /api/upgrade?name=owner/repo: 单个 skill 升级(同步返,前端 toast)。
+            # /api/upgrade-all: 批量升级,后台 Popen(因为 ls-remote 慢),前端轮询 /api/install/status。
+            if self.path == "/api/upgrade" or self.path.startswith("/api/upgrade?"):
+                try:
+                    from radar_pkg.install import upgrade_one
+                    qs = urllib.parse.urlparse(self.path).query
+                    name = urllib.parse.parse_qs(qs).get("name", [""])[0].strip()
+                    if not name:
+                        self._json({"ok": False, "error": "name query param required"},
+                                   status=400)
+                        return
+                    result = upgrade_one(name)
+                    status = 200 if result.get("ok") else 400
+                    self._json(result, status=status)
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=400)
+                return
+            if self.path == "/api/upgrade-all":
+                # ponytail: 2026-09 — 批量升级 fork 子进程异步跑(ls-remote 100 项 ~ 8 分钟,
+                # 阻塞 handler 会让前端 spinner 失去响应)。
+                try:
+                    # ponytail: 2026-09 P3 修复 — handler 不写 install_status,
+                    # 单点源改由 subprocess 写。旧实现 handler 写 total=n_up,
+                    # subprocess 立刻覆盖 total=0 + label="扫描中",再算一遍可能 n_up=3,
+                    # banner 跳 5 → 0 → 3 用户被骗。
+                    # ponytail: 2026-09 P5 修复 — 加了 --upgradable JSON argv 后,
+                    # subprocess 写 total 与 handler 算的 n_up 一致(都来自同一个 dict),
+                    # 没有闪烁风险。handler 写 initial status 立即给前端反馈,
+                    # 消除 "2-5s 无 banner" 窗口。
+                    from radar_pkg.install import compute_upgradable
+                    import datetime as _dt
+                    local = detect_local_skills()
+                    up = compute_upgradable(local.get("skills") or {})
+                    n_up = sum(1 for v in up.values() if v.get("upgradable"))
+                    if n_up == 0:
+                        self._json({"ok": True, "skipped": True,
+                                    "message": "没有可升级的 skill"})
+                        return
+                    _project_root = Path(__file__).resolve().parent.parent
+                    log_fd = os.open(
+                        core.DATA / "upgrade_all.log",
+                        os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644,
+                    )
+                    import json as _json
+                    subprocess.Popen(
+                        [sys.executable, str(_project_root / "radar.py"),
+                         "upgrade_all", "--upgradable", _json.dumps(up)],
+                        cwd=str(_project_root),
+                        stdout=log_fd, stderr=subprocess.STDOUT,
+                        start_new_session=True, close_fds=True,
+                    )
+                    # ponytail: 写 initial status — 同 total,subprocess 写入只是覆盖
+                    # current 0 → 0,label 微调(0/N → 升级 X),无 flash。
+                    _core_local.write_install_status(
+                        running=True, current=0, total=n_up,
+                        label=f"升级全部 (0/{n_up})",
+                        started_at=_dt.datetime.now().isoformat(timespec="seconds"),
+                    )
+                    self._json({"ok": True, "started": True,
+                                "total": n_up,
+                                "message": f"开始升级 {n_up} 个 skill"})
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=400)
+                return
             if self.path == "/api/local/origin":
                 try:
                     body = self._read_body()
@@ -1493,6 +1698,18 @@ def serve(port=8765):
                     return self._json(
                         {"ok": False, "error": "crawl already running"}, status=409
                     )
+                # ponytail: 2026-09 P3 修复 — TOCTOU:handler 检查 lock 之后 Popen 之前
+                # 可能有第二个 Popen 跑过 lock check 进来 — 两个 Popen 启动的子进程
+                # 都进 crawl(),一个拿锁跑、另一个 fail silent 死,浪费 spawn + 困惑 stderr。
+                # 修法:handler 立刻写 lock(自写),子进程在 crawl() 里不再 acquire 改 release。
+                from radar_pkg.crawl import (
+                    acquire_crawl_lock as _acquire,
+                    release_crawl_lock as _release,
+                )
+                if not _acquire():
+                    return self._json(
+                        {"ok": False, "error": "crawl already running"}, status=409
+                    )
                 # ponytail: fire-and-forget background crawl so UI doesn't block.
                 # Log fd must be closed BEFORE Popen takes ownership so the parent doesn't
                 # leak it on every /api/crawl request (long-running dev server accumulates fds).
@@ -1508,9 +1725,67 @@ def serve(port=8765):
                     start_new_session=True,
                     close_fds=True,
                 )
+                # ponytail: 2026-09 P3 — 子进程会自己重新 acquire(覆盖我们的 PID)。
+                # 我们写下的 lock 仅用于把 handler 之间序列化;它会被子进程覆盖。
+                # 30s 后若子进程还没覆盖(异常退出),自动清掉,免得 409 卡死。
+                def _cleanup_handler_lock():
+                    import time as _t
+                    _t.sleep(30)
+                    try:
+                        if core.CRAWL_LOCK.exists():
+                            pid = int(core.CRAWL_LOCK.read_text().strip())
+                            if pid == os.getpid():
+                                _release()
+                    except (OSError, ValueError):
+                        pass
+                import threading as _thr
+                _thr.Thread(target=_cleanup_handler_lock, daemon=True).start()
                 return self._json(
                     {"ok": True, "message": "crawl started in background"}
                 )
+            # ponytail: 2026-09 — 手动触发 upgradable cache 重算。
+            # POST 触发后台线程(立即返 200,不阻塞),GET 轮询状态。
+            if self.path == "/api/local/refresh":
+                try:
+                    _status = _core_local.read_refresh_status()
+                    if _status.get("computing"):
+                        return self._json({"ok": True, "already_running": True})
+                    import threading as _thr
+
+                    def _do_refresh():
+                        from radar_pkg.install import compute_upgradable as _cu
+                        from radar_pkg.detect import detect_local_skills as _dls
+                        def _cb(cur, total, name):
+                            # ponytail: 2026-09 — 进度回调,前端 banner
+                            # 显示「5/292 正在检查 X」实时反馈。
+                            try:
+                                _core_local.set_refresh_status(
+                                    computing=True, current=cur, total=total,
+                                    current_name=name,
+                                )
+                            except Exception:
+                                pass
+                        try:
+                            _core_local.set_refresh_status(
+                                computing=True,
+                                current=0, total=0,
+                                started_at=datetime.datetime.now().isoformat(timespec="seconds"),
+                            )
+                            _local = _dls()
+                            _payload = _cu(_local.get("skills") or {}, progress_callback=_cb)
+                            _core_local.write_upgradable_cache(_payload)
+                        except Exception as exc:
+                            _core_local.set_refresh_status(
+                                computing=False,
+                                error=f"{type(exc).__name__}: {exc}",
+                            )
+                        else:
+                            _core_local.set_refresh_status(computing=False, error=None)
+
+                    _thr.Thread(target=_do_refresh, daemon=True, name="manual-refresh").start()
+                    return self._json({"ok": True, "started": True})
+                except Exception as e:
+                    return self._json({"ok": False, "error": str(e)}, status=500)
             # ponytail: 2026-09 P3 — /api/llm/summarize 触发 LLM 5 桶分析。
             # 前端 Settings 抽屉按钮调此端点,后端 spawn `radar.py summarize` 后台跑。
             # 与 /api/crawl 同款:409 if running, Popen 拿 fd 后立刻关,start_new_session 防 ctrl-c。
@@ -1537,7 +1812,7 @@ def serve(port=8765):
                     )
                 log_fd = os.open(DATA / "summarize.log", os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
                 _project_root = Path(__file__).resolve().parent.parent
-                subprocess.Popen(
+                proc = subprocess.Popen(
                     [sys.executable, str(_project_root / "radar.py"), "summarize"],
                     cwd=str(_project_root),
                     stdout=log_fd,
@@ -1545,10 +1820,56 @@ def serve(port=8765):
                     start_new_session=True,
                     close_fds=True,
                 )
+                # ponytail: 2026-09 — 写 PID 到 llm_status.json,前端 cancel 端点靠它
+                # 找进程并 kill。set_refresh_status 类似机制但写 llm_status.json。
+                try:
+                    core.write_install_status(
+                        running=True, current=0, total=0, label="生成 5 桶",
+                        started_at=datetime.datetime.now().isoformat(timespec="seconds"),
+                    )
+                    # ponytail: pid 单独存到 LLM_STATUS_PATH 外的辅助文件 —
+                    # 写 PID 不会污染 install_status 的字段语义
+                    pid_path = core.DATA / "summarize.pid"
+                    pid_path.write_text(str(proc.pid))
+                except Exception:
+                    pass
                 return self._json(
                     {"ok": True, "message": "summarize started in background",
-                     "provider": provider}
+                     "provider": provider, "pid": proc.pid}
                 )
+            # ponytail: 2026-09 — 用户主动取消。读 pid 文件 → kill 进程组
+            # (start_new_session=True 时,kill PID 不够,要 killpg)→ 写 status 标志取消。
+            if self.path == "/api/llm/cancel":
+                try:
+                    pid_path = core.DATA / "summarize.pid"
+                    pid = int(pid_path.read_text().strip()) if pid_path.exists() else 0
+                    if pid <= 0 or not _pid_alive(pid):
+                        return self._json({"ok": False, "error": "summarize not running"})
+                    # killpg 保证子进程组里的所有线程/子进程一起结束,而不是漏
+                    # LLM 客户端的 keep-alive 连接/超时重试
+                    try:
+                        os.killpg(pid, _signal.SIGTERM)
+                    except (OSError, ProcessLookupError, AttributeError):
+                        # 退化: 退到单进程 kill(老 OS / macOS 不一定支持 killpg)
+                        os.kill(pid, _signal.SIGTERM)
+                    # ponytail: 给 3s 软退出 → 还没死就 SIGKILL。卡死的 LLM 调用
+                    # 不响应 SIGTERM,只能硬杀。
+                    for _ in range(30):
+                        if not _pid_alive(pid):
+                            break
+                        time.sleep(0.1)
+                    else:
+                        try: os.kill(pid, _signal.SIGKILL)
+                        except Exception: pass
+                    core.write_install_status(
+                        running=False, current=0, total=0,
+                        label="生成 5 桶 (已取消)",
+                        finished_at=datetime.datetime.now().isoformat(timespec="seconds"),
+                        error="cancelled by user",
+                    )
+                    return self._json({"ok": True, "cancelled": True, "pid": pid})
+                except Exception as e:
+                    return self._json({"ok": False, "error": str(e)}, status=500)
             self.send_error(404)
 
     # ponytail: bind host configurable via RADAR_HOST env (default 127.0.0.1).

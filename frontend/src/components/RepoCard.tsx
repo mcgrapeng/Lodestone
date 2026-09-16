@@ -1,6 +1,7 @@
-import { Star, GitFork, ExternalLink, Flame, Sparkles, Download } from 'lucide-react'
+import { Star, GitFork, ExternalLink, Flame, Sparkles, Download, Plus } from 'lucide-react'
 import type { Repo } from '../lib/types'
 import { formatStars, repoOwner, repoSlug } from '../lib/format'
+import { sourceOf } from '../lib/filters'
 
 export interface RepoCardProps {
   repo: Repo
@@ -14,13 +15,19 @@ export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
   const intro = repo.summary_sections?.intro?.trim()
   const displayName = intro || repo.summary_zh || repo.desc_zh || repo.desc || '—'
   const topics = (repo.topics ?? []).slice(0, 3)
+  // ponytail: 2026-09 — 是否是可安装的 skill(github 源 + 是 SKILL.md)。
+  // 未装时 RepoCard 显示「+ 安装」按钮,让用户一眼看到可装的。点开 drawer 选平台。
+  const installable =
+    !repo.local_installed &&
+    sourceOf(repo) === 'github' &&
+    repo.is_skill === true
 
   if (variant === 'row') {
     return (
       <button
         type="button"
         onClick={() => onOpen(repo)}
-        className="group card-surface flex w-full items-center gap-4 p-4 text-left transition-colors hover:border-primary/30 hover:bg-background-subtle"
+        className="group card-surface flex w-full items-center gap-4 p-4 text-left transition-colors hover:border-primary/30 hover:bg-background-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -35,6 +42,11 @@ export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
             {repo.local_installed && (
               <span className="chip text-[10px]">
                 <Download className="h-2.5 w-2.5" /> 已装
+              </span>
+            )}
+            {installable && (
+              <span className="chip text-[10px] text-primary" title="该 skill 仓库包含 SKILL.md,可一键安装">
+                <Plus className="h-2.5 w-2.5" /> 可装
               </span>
             )}
           </div>
@@ -73,12 +85,10 @@ export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
     <button
       type="button"
       onClick={() => onOpen(repo)}
-      className="group card-surface relative flex h-48 w-full flex-col p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-brand-500/10"
+      className="group card-surface relative flex h-48 w-full flex-col p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-brand-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       {/* 顶部 accent 线 — hover 时从左到右亮起 */}
       <span className="absolute inset-x-4 top-0 h-px origin-left scale-x-0 bg-gradient-to-r from-primary/60 via-secondary/40 to-transparent transition-transform duration-300 group-hover:scale-x-100" />
-      {/* 视觉审查修正：状态徽章与标题同行、文档流内布局 — 标题 truncate 收缩、
-          徽章 shrink-0 固定右侧，任何长度都不会重叠（替代旧的 absolute 悬浮定位） */}
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
           <div className="truncate font-mono text-[13px] font-medium text-primary">
@@ -89,6 +99,11 @@ export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
           {repo.local_installed && (
             <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success ring-1 ring-success/30">
               <Download className="h-2.5 w-2.5" /> 已装
+            </span>
+          )}
+          {installable && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary ring-1 ring-primary/30" title="该 skill 仓库包含 SKILL.md,可一键安装">
+              <Plus className="h-2.5 w-2.5" /> 可装
             </span>
           )}
           {repo.trending && (

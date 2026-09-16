@@ -191,6 +191,14 @@ def detect_local_skills(force: bool = False):
                         if m:
                             meta["desc_en"] = m.group(1).strip().strip('"').strip("'")
                             meta["source"] = "skillmd"
+                        # ponytail: 2026-09 — 解析 frontmatter 里的 metadata.stars
+                        # (e.g. `metadata:\n  stars: 1234`)。原实现 fallback 路径没设 stars,
+                        # 282 个 skillmd 的 skill 都显示 0★。GitHub metadata 字段名是
+                        # `stars`(用 _ 而不是 - 跟其他字段对齐)。
+                        import re as _re
+                        stars_m = _re.search(r"^\s*stars:\s*(\d+)", text, _re.M)
+                        if stars_m:
+                            meta["stars"] = int(stars_m.group(1))
                     except OSError:
                         pass
                     break
@@ -255,15 +263,19 @@ def detect_local_skills(force: bool = False):
         except (OSError, ValueError):
             pass
     plugins_file = Path.home() / ".claude" / "plugins" / "installed_plugins.json"
-    # ponytail: read enabledPlugins from settings.json — only show actually-enabled plugins (skip disabled)
+    # ponytail: 2026-09 P3 修复 — settings.json 之前读两次(plugins block + mcpServers
+    # block)。两次 stat + 解析,且如果文件在两次读之间被改,两视图不一致。
+    # 改成函数顶部一次读,后续 enabledPlugins + mcpServers 都从同一 dict 取。
     enabled_set: set[str] = set()
+    mcp_servers: list[str] = []
     settings_path = Path.home() / ".claude" / "settings.json"
     if settings_path.exists():
         try:
-            s = json.loads(settings_path.read_text())
-            for k, v in (s.get("enabledPlugins") or {}).items():
+            _settings = json.loads(settings_path.read_text())
+            for k, v in (_settings.get("enabledPlugins") or {}).items():
                 if v is True:
                     enabled_set.add(k)
+            mcp_servers = sorted((_settings.get("mcpServers") or {}).keys())
         except (OSError, ValueError):
             pass
     if plugins_file.exists():
@@ -301,14 +313,9 @@ def detect_local_skills(force: bool = False):
         except (OSError, ValueError, TypeError):
             pass
 
-    # ponytail: MCP servers (context7 / chrome-devtools-mcp / etc) — settings.json mcpServers
-    settings_file = Path.home() / ".claude" / "settings.json"
-    if settings_file.exists():
-        try:
-            s = json.loads(settings_file.read_text())
-            out["mcp_servers"] = sorted((s.get("mcpServers") or {}).keys())
-        except (OSError, ValueError):
-            pass
+    # ponytail: MCP servers (context7 / chrome-devtools-mcp / etc) — 用上方已读
+    # 的 _settings 即可,不再二次 stat+read settings.json。
+    out["mcp_servers"] = mcp_servers
 
     # ponytail: CLI integrations grouped by installer — drives the "本机 CLI" card.
     out["clis"] = {}

@@ -214,7 +214,11 @@ export function RepoDrawer({ repo, open, onClose, onRepoChanged }: RepoDrawerPro
                       <span className="h-6 w-px bg-background-strong" />
                       <button
                         type="button"
-                        onClick={() => act('uninstall')}
+                        onClick={() => {
+                          if (window.confirm(`确定卸载「${repo.name}」吗?\n\n本地 skill 文件会被删除,skills cache 标记会清除。`)) {
+                            act('uninstall')
+                          }
+                        }}
                         disabled={busy !== null}
                         className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium text-foreground-subtle transition hover:bg-error/10 hover:text-error disabled:opacity-50"
                       >

@@ -150,5 +150,118 @@ export type CrawlProgress = {
   last_lines: string[]
 }
 
+// ponytail: 2026-09 — 本机 tab 数据类型,与 /api/local 返回一致。
+// skill 项的 source=origin/skillmd/none/cache,upgradable=true 时 UI 高亮。
+export type LocalSkill = {
+  claude?: boolean
+  codex?: boolean
+  opencode?: boolean
+  easycode?: boolean
+  url?: string
+  desc_zh?: string
+  desc_en?: string
+  topics?: string[]
+  stars?: number
+  source?: string
+  origin_full?: string
+  pushed_at?: string
+  upgradable?: boolean
+  upgrade_reason?: string
+  local_sha?: string | null
+  remote_sha?: string | null
+}
+
+export type LocalPlugin = {
+  name: string
+  marketplace: string
+  version: string
+  install_path: string
+  url?: string
+  desc_zh?: string
+  desc_en?: string
+  enabled: boolean
+}
+
+export type LocalData = {
+  skills: Record<string, LocalSkill>
+  commands: Record<string, { claude?: boolean; path?: string; url?: string; desc_zh?: string; desc_en?: string }>
+  agents: Record<string, { claude?: boolean; path?: string; url?: string; desc_zh?: string; desc_en?: string }>
+  plugins: LocalPlugin[]
+  clis: Record<string, string[] | Record<string, { path: string; version: string }>>
+  mcp_servers: string[]
+  upgradable?: Record<string, { upgradable: boolean; reason: string; local_sha?: string | null; remote_sha?: string | null; url?: string }>
+  // ponytail: 2026-09 — /api/local 新增 cache_state 字段,前端 banner 用
+  cache_state?: {
+    exists: boolean
+    mtime: number | null
+    age_s: number | null
+    total: number
+    computing: boolean
+    last_trigger_at: string | null
+  }
+  counts: {
+    skills: number
+    commands: number
+    agents: number
+    plugins: number
+    clis: number
+    mcp_servers: number
+    upgradable?: number
+  }
+  total: number
+}
+
+// ponytail: 2026-09 — /api/local/refresh/status 类型
+export type RefreshStatus = {
+  computing: boolean
+  started_at?: string | null
+  updated_at?: string | null
+  error?: string | null
+  // ponytail: 进度上报(compute_upgradable progress_callback 写入)
+  current?: number
+  total?: number
+  current_name?: string
+  cache?: {
+    exists: boolean
+    mtime: number | null
+    age_s: number | null
+    total: number
+    computing: boolean
+    last_trigger_at: string | null
+  }
+}
+
+// ponytail: 2026-09 — install 进度状态(/api/install/status 轮询用)。
+// 镜像 LlmStatus 结构。running=true 时 current/total 持续增长;false 后 6s 内显示结果。
+export type InstallStatus = {
+  running: boolean
+  current: number | null
+  total: number | null
+  label: string | null
+  started_at?: string | null
+  finished_at?: string | null
+  updated_at?: string | null
+}
+
+// ponytail: 2026-09 — 升级单条结果(/api/upgrade 同步返回)。
+export type UpgradeResult = {
+  ok: boolean
+  name: string
+  status: string  // upgraded / fetch_failed / no_origin / cache_missing / invalid / locked
+  detail?: string
+  links?: Record<string, { status: string; detail?: string; link?: string }>
+}
+
+// ponytail: 2026-09 — 批量升级结果(/api/upgrade-all 启动后由前端轮询 install_status,
+// 终态由 UpgradeProgressBanner 自身根据 status 拼装)。
+export type UpgradeAllResult = {
+  ok: boolean
+  started?: boolean
+  skipped?: boolean
+  total?: number
+  message?: string
+  error?: string
+}
+
 // ponytail: 兼容旧名
 export type crawlProgress = CrawlProgress

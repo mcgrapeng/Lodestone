@@ -86,7 +86,7 @@ GitHub 抗爬 → 其他 4 个源照常。**一个倒、其他不倒**。
 | **Postgres + JSON 双模** | PG 优先（24h 星增、历史快照），PG 不可达回退 JSON |
 | **决策支持** | LLM 5 桶分析（是什么 / 痛点 / 同类 / 优缺 / 何时选），可选 Claude/GPT/Ollama |
 | **Skill 一键安装** | 探测 SKILL.md → 标记 is_skill → 卡片显示"装"按钮 |
-| **20 个分类** | Agent · RAG · LLM · IDE · MCP · Voice · 安全 · 机器人 · 论文 … |
+| **27 个分类** | Agent · RAG · LLM · IDE · MCP · Voice · 安全 · 机器人 · 论文 … |
 
 ---
 

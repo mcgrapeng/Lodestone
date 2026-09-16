@@ -70,9 +70,17 @@ export function applyFilters(
   if (sort === 'stars') {
     sorted.sort((a, b) => (b.stars ?? 0) - (a.stars ?? 0))
   } else if (sort === 'recent') {
-    // pushed（最后 push）优先，缺失退回 updated，都无则排最后
+    // pushed（最后 push）优先，缺失退回 updated，**都无则排最后**。
+    // 旧实现 `key(b).localeCompare(key(a))` 对空字符串排序会把无日期的排最前，
+    // 与注释意图相反;用显式 missing-last 比较修正。
     const key = (r: Repo) => r.pushed ?? r.updated ?? ''
-    sorted.sort((a, b) => key(b).localeCompare(key(a)))
+    sorted.sort((a, b) => {
+      const ka = key(a); const kb = key(b)
+      if (!ka && !kb) return 0
+      if (!ka) return 1
+      if (!kb) return -1
+      return kb.localeCompare(ka)
+    })
   } else {
     sorted.sort((a, b) => a.name.localeCompare(b.name))
   }

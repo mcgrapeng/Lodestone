@@ -39,16 +39,16 @@ export function HeroStats({ snapshot, stats }: HeroStatsProps) {
   ]
 
   return (
-    <section className="px-6 pt-6">
+    <section aria-label="仪表盘概览" className="px-6 pt-6">
       <div className="mx-auto max-w-7xl">
         <div className="mb-5">
-          {/* 视觉审查修正：仪表盘不是落地页 — 标题一行、去副标题、去徽章行 */}
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Lodestone
+          {/* ponytail: 2026-09 — 顶层 H1 移到 Header(每页都有),这里改 h2 + 描述。 */}
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+            仪表盘
             <span className="ml-3 align-middle text-sm font-normal text-foreground-subtle">
               主流 AI 开源项目 · Skills · Plugins · 论文，{snapshot.categories.length} 个分类
             </span>
-          </h1>
+          </h2>
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -35,7 +35,11 @@ def _git_head_sha(path: Path) -> str | None:
     return None
 
 def _git_pull_fast_forward(path: Path) -> tuple[bool, str]:
-    """Fetch + reset to origin/HEAD on a --depth=1 clone. Returns (ok, detail)."""
+    """Fetch + reset to origin/HEAD on a --depth=1 clone. Returns (ok, detail).
+    ponytail: 2026-09 — fetch 后必须 `git remote set-head origin --auto` 刷新 symbolic ref,
+    否则上游改了默认分支名(master → main 等)时 `git reset --hard origin/HEAD` 找不到
+    ref,cache 半坏,后续 compute_upgradable 永远报「可升级」但升不动。
+    """
     try:
         # Unshallow so we can compare against origin; cheap if already shallow.
         # For --depth=1 clones, fetch will get the latest commit only.
@@ -48,6 +52,14 @@ def _git_pull_fast_forward(path: Path) -> tuple[bool, str]:
         )
         if fetch.returncode != 0:
             return False, f"fetch failed: {fetch.stderr.strip()[:120]}"
+        # ponytail: 刷新 symbolic ref (HEAD → auto-detect current default branch on origin)
+        subprocess.run(
+            ["git", "remote", "set-head", "origin", "--auto"],
+            cwd=str(path),
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
         reset = subprocess.run(
             ["git", "reset", "--hard", "origin/HEAD"],
             cwd=str(path),
@@ -87,6 +99,8 @@ def install_skill_from_github(name, url, targets=None, force_update=False):
     targets: list of CLI names to install into; default = all three.
     force_update: if True, always git pull even if local cache appears fresh.
     Returns dict {target: {status: 'installed'|'updated'|'up_to_date'|'skipped'|'replaced', detail: str}}.
+    ponytail: 2026-09 — 持 INSTALL_LOCK 防止与并发 uninstall / set_capability_origin
+    撞 SKILL_ORIGINS 与 symlink。validation 早返回不做(无效输入不该占锁)。
     """
     if targets is None:
         # ponytail: 2026-09 用户决策 — 默认只装 Claude Code(config.toml [install]
@@ -124,9 +138,37 @@ def install_skill_from_github(name, url, targets=None, force_update=False):
             raise ValueError(
                 f"url {url!r} does not match name {name!r} — refusing to clone mismatch"
             )
+    if not core.acquire_named_lock(core.INSTALL_LOCK, core.INSTALL_LOCK_STALE_S):
+        raise RuntimeError(
+            "another install/upgrade is running — retry in a moment"
+        )
+    try:
+        return _install_skill_from_github_locked(
+            name, url, owner, repo, targets, force_update
+        )
+    finally:
+        core.release_named_lock(core.INSTALL_LOCK)
+
+
+def _install_skill_from_github_locked(
+    name, url, owner, repo, targets, force_update
+):
+    """install_skill_from_github 的临界区 — 调用方必须已持 INSTALL_LOCK。
+    拆分出来让 validation 在锁外完成,锁只保护副作用。"""
 
     target = core.SKILLS_CACHE / f"{owner}__{repo}"
     cache_state = "fresh"
+    # ponytail: 2026-09 P5 修复 — 检测半残 clone dir(目录在但不是 git repo,
+    # 之前 partial clone 失败留下的)。不直接走 git pull,会报 "not a git repository"
+    # 然后 symlink 指向坏 dir,用户看到 installed 但所有 git 操作失败。
+    is_broken_dir = (
+        target.exists() and not (target / ".git").is_dir()
+    )
+    if is_broken_dir:
+        shutil.rmtree(target, ignore_errors=True)
+        raise RuntimeError(
+            f"corrupted cache at {target} (missing .git); removed, retry install"
+        )
     if not target.exists():
         target.parent.mkdir(parents=True, exist_ok=True)
         result = subprocess.run(
@@ -136,6 +178,10 @@ def install_skill_from_github(name, url, targets=None, force_update=False):
             timeout=120,
         )
         if result.returncode != 0:
+            # ponytail: 清半残 dir — 否则下次 install 进 elif 分支,在破损 .git 上
+            # git pull 报 "not a git repository",symlink 指向坏 dir,用户看到 installed
+            # 但 git 都失败。
+            shutil.rmtree(target, ignore_errors=True)
             raise RuntimeError(f"git clone failed: {result.stderr.strip()[:200]}")
         cache_state = "cloned"
     elif force_update:
@@ -186,7 +232,10 @@ def install_skill_from_github(name, url, targets=None, force_update=False):
             link.symlink_to(target)
         out["targets"][cli] = {"status": action, "detail": detail, "link": str(link)}
 
-    # ponytail: write sidecar so origin URL survives latest.json roll; idempotent update
+    # ponytail: write sidecar so origin URL survives latest.json roll; idempotent update.
+    # ponytail: 2026-09 P3 修复 — sidecar 写失败时回滚所有刚建的 symlink。sidecar
+    # 是关键状态(不可重建),symlink 是派生(可重建);失败处理必须按这个顺序,
+    # 否则「装了但系统不知道」 — compute_upgradable 找不到该记录,upgrade 永远跳过。
     try:
         core.SKILL_ORIGINS.parent.mkdir(parents=True, exist_ok=True)
         origins = {}
@@ -202,23 +251,362 @@ def install_skill_from_github(name, url, targets=None, force_update=False):
             "installed_at": datetime.datetime.now().isoformat(timespec="seconds"),
             "targets": list(targets),
         }
-        core.SKILL_ORIGINS.write_text(json.dumps(origins, ensure_ascii=False, indent=2))
+        core.atomic_json_write(core.SKILL_ORIGINS, origins)
     except OSError as e:
-        sys.stderr.write(f"  [warn] sidecar write failed: {e}\n")
+        # ponytail: 回滚所有刚建的 symlink(原 dir 我们不动 — 用户可能有真数据)。
+        # `.bak` 文件是 install_skill 流程 `replaced` 分支被重命名的旧内容,保留。
+        for _cli, info in out.get("targets", {}).items():
+            link_str = info.get("link", "")
+            if link_str:
+                _link = Path(link_str)
+                if _link.is_symlink() or _link.exists():
+                    try:
+                        _link.unlink()
+                    except OSError:
+                        pass
+        raise RuntimeError(f"sidecar write failed: {e}") from e
 
     invalidate_local_scan()
     invalidate_repo_index()
     return out
+
+
+# ponytail: 2026-09 — install 中心化三件套。
+# upgrade / upgrade-all / preflight 共享 install lock + status 写盘 + log append,
+# 不再各自重复。每件 return 一个 dict 描述结果(便于 UI 透出)。
+
+def _load_origins() -> dict:
+    if not core.SKILL_ORIGINS.exists():
+        return {}
+    try:
+        return json.loads(core.SKILL_ORIGINS.read_text())
+    except Exception:
+        return {}
+
+
+def _save_origins(origins: dict) -> None:
+    core.atomic_json_write(core.SKILL_ORIGINS, origins)
+
+
+def compute_upgradable(
+    skills: dict,
+    origins: dict | None = None,
+    progress_callback=None,
+) -> dict:
+    """对每个已装 skill (skills[name].source=origin|skillmd) 比 local HEAD vs remote HEAD。
+
+    progress_callback(current, total, latest_name) 可选,每 ~5 个 skill 触发一次,
+    让 daemon / 手动 refresh 都能上报进度,前端 banner 可见「5/292 正在检查」。
+
+    返回 {name: {local_sha, remote_sha, upgradable: bool, reason: str}}。
+    ponytail: 故意一次查所有 ls-remote 串行 5s/个 → 100 项 ~ 8min,后续可并发。
+    MVP 不并发:简单 + 限流友好 + 失败时只丢一项而不是炸全。"""
+    if origins is None:
+        origins = _load_origins()
+    skill_origins = (origins or {}).get("skills") or {}
+    out: dict = {}
+    # ponytail: 2026-09 P7 修复 — 进度分母只算"实际做了 ls-remote 的 skill",
+    # 不算 orphan 裸名(无 origin,直接 continue,无实际工作)。否则用户看到
+    # 292/292 (100%) 以为检查完毕,实际 286 个被瞬间跳过,前端进度条完全不准。
+    relevant = [
+        (n, info) for n, info in (skills or {}).items()
+        if n and "/" in n and skill_origins.get(n, {}).get("url")
+    ]
+    total = len(relevant)
+    # ponytail: 2026-09 — 进度上报。daemon 周期跑 / 用户点 "立即重算" 时
+    # compute_upgradable 是长耗时操作,前端 banner 需要 current/total 实时反馈。
+    # 这里用 try/except 包裹回调防单个 callback 抛错影响 compute 主流程。
+    last_reported = 0
+    for idx, (name, info) in enumerate(relevant, 1):
+        origin = skill_origins.get(name)
+        # 总在 relevant 里的都有 origin(上面 filter 过了),但 double-check 防 race
+        if not origin or not origin.get("url"):
+            continue
+        owner, repo = name.split("/", 1)
+        cache = core.SKILLS_CACHE / f"{owner}__{repo}"
+        if not cache.exists():
+            out[name] = {
+                "local_sha": None,
+                "remote_sha": None,
+                "upgradable": False,
+                "reason": "cache_missing",
+                "url": origin["url"],
+            }
+            # ponytail: 有 origin 但无 cache(刚装的 skill)— 也算实际工作,上报
+            _maybe_report(progress_callback, idx, total, name, last_reported, lambda v: (v, idx))
+            last_reported = idx
+            continue
+        local = _git_head_sha(cache)
+        remote = _git_remote_head_sha(origin["url"])
+        # ponytail: 任一查不到 → 不假设 upgradable,留 reason 让 UI 显示「无法检查」
+        if not local or not remote:
+            out[name] = {
+                "local_sha": local,
+                "remote_sha": remote,
+                "upgradable": False,
+                "reason": "check_failed",
+                "url": origin["url"],
+            }
+        elif local == remote:
+            out[name] = {
+                "local_sha": local,
+                "remote_sha": remote,
+                "upgradable": False,
+                "reason": "up_to_date",
+                "url": origin["url"],
+            }
+        else:
+            out[name] = {
+                "local_sha": local,
+                "remote_sha": remote,
+                "upgradable": True,
+                "reason": "behind",
+                "url": origin["url"],
+            }
+        # ponytail: ls-remote 跑完(本地 cache 存在的)— 这是真正有网络 I/O 的工作,
+        # 上报进度。orphan 裸名无 origin 不会进 relevant,不计入分母/分子。
+        _maybe_report(progress_callback, idx, total, name, last_reported, lambda v: (v, idx))
+        last_reported = idx
+    # ponytail: 最后 100% 进度上报(分母若为 0,所有 skill 都无 origin,直接报 0/0)
+    if progress_callback and total > 0:
+        try: progress_callback(total, total, "")
+        except Exception: pass
+    elif progress_callback:
+        # 无可检查的 skill — banner 不显示进度条,但仍通知 computing=false
+        try: progress_callback(0, 0, "")
+        except Exception: pass
+    return out
+
+
+def _maybe_report(cb, idx, total, name, last_reported, current_fn):
+    """进度上报:每 ~5 个 skill 触发一次,带 try/except 防 callback 抛错影响主流程。
+    current_fn:lambda(v)→int,从 v 推 current;v 是回环当前 idx 外的局部变量。"""
+    if not cb or idx - last_reported < 5:
+        return
+    try:
+        cb(current_fn(last_reported), total, name)
+    except Exception:
+        pass
+
+
+def upgrade_one(name: str) -> dict:
+    """升级单个已装 skill:
+      1. 拿 install lock
+      2. 读 origin → fetch + reset
+      3. 强制重建所有平台的 symlink
+      4. 写 install_log
+      5. 释放锁
+    返回 {ok, name, status, detail}。"""
+    if not name or "/" not in name:
+        return {"ok": False, "name": name, "status": "invalid", "detail": "name 必须 owner/repo"}
+    if not core.acquire_named_lock(core.INSTALL_LOCK, core.INSTALL_LOCK_STALE_S):
+        return {"ok": False, "name": name, "status": "locked", "detail": "另一个 install/upgrade 正在跑"}
+    try:
+        origins = _load_origins()
+        skill_origins = origins.get("skills") or {}
+        origin = skill_origins.get(name)
+        if not origin or not origin.get("url"):
+            return {"ok": False, "name": name, "status": "no_origin",
+                    "detail": "没找到 origin 记录,无法升级"}
+        owner, repo = name.split("/", 1)
+        cache = core.SKILLS_CACHE / f"{owner}__{repo}"
+        if not cache.exists():
+            return {"ok": False, "name": name, "status": "cache_missing",
+                    "detail": f"本地缓存 {cache} 不存在,先 install"}
+        ok, detail = _git_pull_fast_forward(cache)
+        if not ok:
+            core.append_install_log({"action": "upgrade", "name": name, "ok": False, "detail": detail})
+            return {"ok": False, "name": name, "status": "fetch_failed", "detail": detail}
+        # ponytail: 2026-09 P3 修复 — fetch 成功后立刻让 cache 反映新 SHA,
+        # 否则 5 min 内用户看到旧"可升级"徽标 + 升级按钮被禁用。
+        core.invalidate_upgradable_cache_for(name)
+        # ponytail: fetch 成功后重建 symlink(用户可能换了 platform 或 link 被破坏)
+        targets = origin.get("targets") or list(_DEFAULT_INSTALL_TARGETS)
+        link_results = {}
+        for cli in targets:
+            if cli not in SUPPORTED_CLIS:
+                continue
+            skills_root = _skills_root_for(cli)
+            skills_root.mkdir(parents=True, exist_ok=True)
+            link = skills_root / repo
+            # ponytail: 2026-09 — 原子 rename + 失败回滚。旧实现 unlink + symlink_to 非原子,
+            # symlink_to 失败时 link 已删 → skill 在该平台消失,symlink_to OSError 静默吞掉,
+            # 函数仍返 ok=True。修法:rename 是同 fs 原子操作,把旧 link/dir 重命名备份,
+            # 再尝试创建新 symlink;失败时 rename 回原位。
+            old_backup = None
+            if link.is_symlink() or link.exists():
+                try:
+                    old_backup = link.with_name(f"{link.name}.upgrade-tmp")
+                    if old_backup.exists():
+                        old_backup.unlink()
+                    link.rename(old_backup)
+                except OSError as e:
+                    # ponytail: 备份失败 — 旧 link 不动,记录错误,继续下一个 platform
+                    link_results[cli] = {"status": "skipped", "detail": f"backup rename failed: {e}"}
+                    continue
+            try:
+                link.symlink_to(cache)
+                if old_backup is not None:
+                    old_backup.unlink(missing_ok=True)
+                link_results[cli] = {"status": "linked", "link": str(link)}
+            except OSError as e:
+                # ponytail: 新 symlink 失败 — 把 backup rename 回去,平台不变
+                if old_backup is not None:
+                    try:
+                        link.unlink(missing_ok=True)
+                        old_backup.rename(link)
+                    except OSError as rollback_err:
+                        # rollback 也失败 — 报双重错,留给人工
+                        link_results[cli] = {
+                            "status": "rollback_failed",
+                            "detail": f"symlink failed: {e}; rollback failed: {rollback_err}",
+                        }
+                        continue
+                link_results[cli] = {"status": "skipped", "detail": str(e)}
+        invalidate_local_scan()
+        # ponytail: 2026-09 — 反映部分失败。至少一个 platform rollback_failed/失败
+        # → ok=False,status=partial;全部成功才 status=upgraded。前端据此切绿/红勾。
+        n_linked = sum(1 for r in link_results.values() if r.get("status") == "linked")
+        n_skipped = sum(1 for r in link_results.values() if r.get("status") == "skipped")
+        n_rollback_failed = sum(
+            1 for r in link_results.values() if r.get("status") == "rollback_failed"
+        )
+        all_ok = n_rollback_failed == 0 and n_skipped == 0 and n_linked > 0
+        core.append_install_log({
+            "action": "upgrade",
+            "name": name,
+            "ok": all_ok,
+            "linked": n_linked,
+            "skipped": n_skipped,
+            "rollback_failed": n_rollback_failed,
+        })
+        return {
+            "ok": all_ok,
+            "name": name,
+            "status": "upgraded" if all_ok else "partial",
+            "detail": detail,
+            "links": link_results,
+        }
+    finally:
+        core.release_named_lock(core.INSTALL_LOCK)
+
+
+def upgrade_all(skills: dict, callback=None, upgradable: dict | None = None) -> dict:
+    """批量升级。callback(current, total, name, result) 用于进度回调(可选)。
+    upgradable: handler 算好的 dict;非 None 时直接用,跳过本地 compute(避免
+    handler+subprocess 双算、total 闪烁、GitHub 限流)。
+    返回 {upgraded, skipped, failed, total, results: [{name, status, detail}]}。
+    ponytail: 串行而非并发 — git ls-remote 是限流重灾区,100 个并发直接 429。
+    ponytail: 2026-09 — try/finally + BaseException 兜底。OOM / Ctrl-C / 子进程
+    被 kill 时 running=True 会被清掉,前端 banner 不卡死。
+    ponytail: 2026-09 P4 修复 — 整批启动时先抢锁,抢不到立刻报错退出,不再让 5→0→0
+    静默饿死 banner(旧实现每个 target 抢不到锁就 total-=1,user 看着 banner
+    5→4→3→2→1→0 跑完,实际什么都没升)。"""
+    started = datetime.datetime.now().isoformat(timespec="seconds")
+    # ponytail: 启动时抢锁 — 抢不到说明另一个 install/upgrade 在跑,立刻失败退出。
+    # 代价:整批 8 min 持有锁,sync /api/upgrade 期间返 locked 立刻给用户反馈,
+    # 比静默饿死好太多。
+    if not core.acquire_named_lock(core.INSTALL_LOCK, core.INSTALL_LOCK_STALE_S):
+        core.write_install_status(
+            running=False, current=0, total=0,
+            label="升级全部 (锁定中)", started_at=started,
+            finished_at=datetime.datetime.now().isoformat(timespec="seconds"),
+            error="另一个 install/upgrade 正在跑,稍后重试",
+        )
+        return {
+            "upgradable": 0, "skipped": 0, "failed": 0, "total": 0,
+            "results": [], "error": "another install/upgrade in progress",
+        }
+    try:
+        if upgradable is None:
+            upgradable = compute_upgradable(skills)
+        targets = [(n, info) for n, info in upgradable.items() if info.get("upgradable")]
+        total = len(targets)
+        results: list[dict] = []
+        upgraded = 0
+        skipped = 0
+        failed = 0
+        # ponytail: 单点写入 total — handler 不再写,subprocess 是唯一 owner。
+        core.write_install_status(
+            running=True, current=0, total=total,
+            label="升级全部", started_at=started,
+        )
+        for i, (name, _info) in enumerate(targets, 1):
+            core.write_install_status(current=i - 1, total=total, label=f"升级 {name}")
+            result = upgrade_one(name)
+            results.append({"name": name, "ok": result.get("ok"),
+                            "status": result.get("status"), "detail": result.get("detail", "")})
+            if result.get("ok"):
+                upgraded += 1
+            elif result.get("status") in ("no_origin", "cache_missing", "locked"):
+                # ponytail: 2026-09 P3 修复 — 锁期间 origin 被并发进程删了,
+                # 不算 failed/skipped,直接从 total 减去,避免 banner 卡在 ghost skill。
+                total -= 1
+                core.write_install_status(current=i - 1, total=max(1, total),
+                                          label=f"升级 {name} (跳过)")
+            else:
+                failed += 1
+            if callback:
+                try:
+                    callback(i, total, name, result)
+                except Exception:
+                    pass
+        return {"upgradable": upgraded, "skipped": skipped, "failed": failed, "total": total, "results": results}
+    except BaseException as e:
+        # ponytail: 包括 KeyboardInterrupt + SystemExit — Ctrl-C / OOM 都走这里。
+        # 不抛 — 让 daemon fork 出去的进程静默退出(主进程 Popen 不再读 stdout)。
+        core.write_install_status(
+            running=False, current=0, total=0,
+            label=f"升级全部 (中断:{type(e).__name__})",
+            started_at=started,
+            finished_at=datetime.datetime.now().isoformat(timespec="seconds"),
+            error=f"{type(e).__name__}: {e}",
+        )
+        # ponytail: 仍然返一份 dict 给可能的 in-process 调用者 — 但 daemon 路径不在乎。
+        return {"upgradable": 0, "skipped": 0, "failed": 0, "total": 0,
+                "results": [], "error": f"{type(e).__name__}: {e}"}
+    finally:
+        # ponytail: 成功路径已返 dict;但 finally 必须清 running=False,否则上面
+        # return 路径异常时不会走(if 上面的 return 走了,这里再写一次覆盖;BaseException
+        # 路径已自己写过,这里也再覆盖保证 idempotent)。
+        # 实测 finally 在 try 内的 return 后也会跑 — 标准 Python 语义。
+        try:
+            from radar_pkg.core import read_install_status
+            cur = read_install_status()
+            if cur.get("running"):
+                core.write_install_status(
+                    running=False, current=cur.get("current", 0), total=cur.get("total", 0),
+                    label=cur.get("label", "升级全部"),
+                    started_at=cur.get("started_at"),
+                    finished_at=datetime.datetime.now().isoformat(timespec="seconds"),
+                )
+        except Exception:
+            pass
+        # ponytail: 2026-09 P4 — 整批结束释放锁,避免升级期间任何 sync 调用都被卡30 min。
+        core.release_named_lock(core.INSTALL_LOCK)
 
 def uninstall_skill(name: str) -> dict:
     """Remove a skill: unlink from ALL platform skills dirs, drop cache dir, remove sidecar entry.
     Returns {removed_links: [paths], cache: path_or_null}.
     2026-09 闭环修复:① 名字校验与 install 契约对齐(owner/repo 或裸 repo 段均可,
     此前字符集不含 '/' 直接 400);② 链接清理遍历平台表全平台(此前硬编码
-    claude/codex,opencode/easycode 链接残留导致卸载后「已装」徽标不消失)。"""
+    claude/codex,opencode/easycode 链接残留导致卸载后「已装」徽标不消失)。
+    ponytail: 2026-09 — 持 INSTALL_LOCK 防止与并发 install/upgrade 撞 SKILL_ORIGINS
+    与 symlink。撞锁返 409-like 错误让前端能给用户清晰反馈。"""
+    # ponytail: 持锁 — 名字校验先做(避免无效输入占锁)
     seg = name.split("/")[-1] if "/" in name else name
     if not seg or not all(c.isalnum() or c in "-_." for c in seg) or ".." in seg:
         raise ValueError(f"invalid skill name: {name!r}")
+    if not core.acquire_named_lock(core.INSTALL_LOCK, core.INSTALL_LOCK_STALE_S):
+        return {"ok": False, "error": "另一个 install/upgrade 正在跑,稍后重试"}
+    try:
+        return _uninstall_skill_locked(seg)
+    finally:
+        core.release_named_lock(core.INSTALL_LOCK)
+
+
+def _uninstall_skill_locked(seg: str) -> dict:
+    """uninstall_skill 的临界区实现 — 调用方必须已持 INSTALL_LOCK。"""
     removed = []
     for skills_root in [
         Path(p).expanduser() for p in detect._SKILL_PLATFORM_PATHS.values()
@@ -237,7 +625,26 @@ def uninstall_skill(name: str) -> dict:
     if core.SKILL_ORIGINS.exists():
         try:
             origins = json.loads(core.SKILL_ORIGINS.read_text())
-            entry = (origins.get("skills") or {}).pop(seg, None)
+            skill_map = origins.get("skills") or {}
+            # ponytail: 2026-09 — 修复 cache 残留 bug。sidecar key 可能是 "test/e2e-skill"
+            # (全名)或 "e2e-skill" (裸名,legacy),但 uninstall 调用方传 seg(裸名)。
+            # 必须两种都试 pop,不然 cache 永远留着。
+            entry = skill_map.pop(seg, None)
+            if not entry and "/" in seg:
+                # seg 不带斜杠(legacy 形态),但 sidecar 里的 key 是 seg——重试无意义
+                pass
+            # 上面 seg pop 失败的话,再按全名 owner/repo 试 — caller 可能传了 "owner/repo"
+            if not entry:
+                # ponytail: 这个分支处理 caller 传全名 "owner/repo" 但 _uninstall_skill_locked
+                # 内部仍用裸 seg —— 改用 seg 在两边试。复用"test__e2e-skill"格式来 lookup。
+                pass
+            # 实际修复: 同时按"全名"和"裸 seg"两种 key 找 entry
+            if not entry:
+                # seg 可能拼写错或 key 用了全名 —— 用全名 / seg 都试
+                for k in list(skill_map.keys()):
+                    if k == seg or k.endswith("/" + seg):
+                        entry = skill_map.pop(k)
+                        break
             if entry:
                 owner = entry.get("owner", "")
                 repo = entry.get("repo", seg)
@@ -246,7 +653,7 @@ def uninstall_skill(name: str) -> dict:
                 if owner:
                     candidates.append(core.SKILLS_CACHE / repo)
                 still_used = False
-                for r in (origins.get("skills") or {}).values():
+                for r in skill_map.values():
                     if r.get("owner") == owner and r.get("repo") == repo:
                         still_used = True
                         break
@@ -256,12 +663,12 @@ def uninstall_skill(name: str) -> dict:
                             shutil.rmtree(cache_dir)
                         except OSError:
                             pass
-            core.SKILL_ORIGINS.write_text(json.dumps(origins, ensure_ascii=False, indent=2))
+            core.atomic_json_write(core.SKILL_ORIGINS, origins)
         except (OSError, ValueError):
             pass
     invalidate_local_scan()
     invalidate_repo_index()
-    return {"removed_links": removed}
+    return {"ok": True, "removed_links": removed}
 
 def replace_skill(old_name: str, new_name: str, new_url: str = "") -> dict:
     """Install `new_name` then remove `old_name`. Used when user picks a superior alternative.
@@ -441,40 +848,45 @@ def set_capability_origin(
 ):
     """Write/edit GitHub origin for a command/agent/plugin in the sidecar.
     `kind` ∈ {commands, agents, plugins}. For plugins, `name` is the full plugin key (name@marketplace).
-    Empty `url` clears the entry. Returns the merged origin dict for this item."""
+    Empty `url` clears the entry. Returns the merged origin dict for this item.
+    ponytail: 2026-09 — 持 INSTALL_LOCK 防止与并发 install/uninstall 撞 sidecar。"""
     if kind not in ("commands", "agents", "plugins"):
         raise ValueError(f"unsupported kind: {kind!r}")
     if not name or "/" in name and kind != "plugins":
         raise ValueError(f"invalid name: {name!r}")
     if url and not url.startswith("https://github.com/"):
         raise ValueError(f"only github.com urls allowed: {url!r}")
+    if not core.acquire_named_lock(core.INSTALL_LOCK, core.INSTALL_LOCK_STALE_S):
+        return {"ok": False, "error": "另一个 install/upgrade 正在跑,稍后重试"}
+    try:
+        core.SKILL_ORIGINS.parent.mkdir(parents=True, exist_ok=True)
+        origins = {}
+        if core.SKILL_ORIGINS.exists():
+            try:
+                origins = json.loads(core.SKILL_ORIGINS.read_text())
+            except (OSError, ValueError):
+                origins = {}  # ponytail: corrupted sidecar — start fresh
 
-    core.SKILL_ORIGINS.parent.mkdir(parents=True, exist_ok=True)
-    origins = {}
-    if core.SKILL_ORIGINS.exists():
-        try:
-            origins = json.loads(core.SKILL_ORIGINS.read_text())
-        except (OSError, ValueError):
-            origins = {}  # ponytail: corrupted sidecar — start fresh
+        bucket = origins.setdefault(kind, {})
+        if url or desc_zh or desc_en:
+            entry = bucket.get(name, {})
+            if url:
+                entry["url"] = url
+            if desc_zh:
+                entry["desc_zh"] = desc_zh
+            if desc_en:
+                entry["desc_en"] = desc_en
+            entry["updated_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+            bucket[name] = entry
+        else:
+            bucket.pop(name, None)
 
-    bucket = origins.setdefault(kind, {})
-    if url or desc_zh or desc_en:
-        entry = bucket.get(name, {})
-        if url:
-            entry["url"] = url
-        if desc_zh:
-            entry["desc_zh"] = desc_zh
-        if desc_en:
-            entry["desc_en"] = desc_en
-        entry["updated_at"] = datetime.datetime.now().isoformat(timespec="seconds")
-        bucket[name] = entry
-    else:
-        bucket.pop(name, None)
-
-    core.SKILL_ORIGINS.write_text(json.dumps(origins, ensure_ascii=False, indent=2))
-    invalidate_local_scan()
-    invalidate_repo_index()
-    return bucket.get(name, {})
+        core.atomic_json_write(core.SKILL_ORIGINS, origins)
+        invalidate_local_scan()
+        invalidate_repo_index()
+        return bucket.get(name, {})
+    finally:
+        core.release_named_lock(core.INSTALL_LOCK)
 
 def group_capabilities_by_origin(local: dict) -> list[dict]:
     """Bucket skills/commands/agents/plugins by their `url` (source repo). Only items with

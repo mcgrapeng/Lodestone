@@ -16,9 +16,11 @@ const SORTS: Array<{ key: SortKey; label: string }> = [
 ]
 
 export function FilterBar({ filters, onChange, availableSources }: FilterBarProps) {
+  // ponytail: 2026-09 — 包含全部 5 个 SourceKind + all,让 arxiv/other 也能 chip 选中。
+  // 旧 fallback 只列 3 个,URL ?src=arxiv 时 FilterBar 不显示对应 chip,用户看不到过滤生效。
   const srcOptions: Array<SourceKind | 'all'> = availableSources?.length
     ? ['all', ...availableSources]
-    : ['all', 'github', 'huggingface', 'mcp']
+    : ['all', 'github', 'huggingface', 'mcp', 'arxiv', 'other']
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">

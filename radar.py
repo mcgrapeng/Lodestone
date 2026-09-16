@@ -18,6 +18,7 @@ Ponytail: minimum code, stdlib only, Vue UI lives in frontend/.
 
 import json
 import subprocess
+import argparse
 import sys
 import os
 import re
@@ -138,6 +139,13 @@ _SEARCH_PACE = _core._SEARCH_PACE
 _SKILL_PLATFORM_PATHS = _detect._SKILL_PLATFORM_PATHS
 
 
+def _parse_port() -> int:
+    """共用:解析 `radar.py serve 8765` / `restart 8766` 的可选端口参数。"""
+    parser = argparse.ArgumentParser(prog="radar.py", add_help=False)
+    parser.add_argument("port", nargs="?", type=int, default=8765)
+    return parser.parse_known_args(sys.argv[2:])[0].port
+
+
 if __name__ == "__main__":
     # ponytail: 2026-09 — load project .env once at entry so every command
     # (crawl/serve/web/today/audit) sees GH_TOKEN / FIRECRAWL_API_KEY /
@@ -152,13 +160,13 @@ if __name__ == "__main__":
         from radar_pkg.crawl import crawl as _crawl
         _crawl(with_llm=("--with-llm" in sys.argv))
     elif cmd == "serve":
-        serve(int(sys.argv[2]) if len(sys.argv) > 2 else 8765)
+        serve(_parse_port())
     elif cmd == "restart":
         # ponytail: 2026-09 — 独立 CLI 子命令,做 kill 旧 + spawn 新 + wait alive,
         # 与 /yz:ai skill 配合(/api/restart 调用此命令).
         # 独立进程避免 fork+inherit 父 serve 监听 socket 的复杂性.
         from radar_pkg.serve import _restart_serve
-        port = int(sys.argv[2]) if len(sys.argv) > 2 else 8765
+        port = _parse_port()
         try:
             result = _restart_serve(port)
             print(f"[restart] OK: {result}", flush=True)
@@ -176,11 +184,44 @@ if __name__ == "__main__":
             sys.exit(1)
         sys.exit(0)
     elif cmd == "web":
-        web(int(sys.argv[2]) if len(sys.argv) > 2 else 8765)
+        _port = _parse_port()
+        web(_port)
     elif cmd == "today":
         today()
     elif cmd == "audit":
         audit()
+    elif cmd == "upgrade_all":
+        # ponytail: 2026-09 — 批量升级 CLI 子命令,/api/upgrade-all 触发。
+        # 串行跑 ls-remote + fetch,慢但不爆炸 GitHub rate limit。
+        # ponytail: 2026-09 P3 修复 — 接收 --upgradable JSON 参数(handler 算过,
+        # 避免 subprocess 自己再算一遍导致 total 闪烁)。用 argparse 替代手写
+        # sys.argv 循环(原实现 _ua(..., upgradable=...) LSP 不识别,因为
+        # import 在分支内 lazy,静态分析器看不到签名)。
+        import json as _json
+        from radar_pkg.detect import detect_local_skills
+        from radar_pkg.install import upgrade_all as _ua
+        parser = argparse.ArgumentParser(prog="radar.py upgrade_all")
+        parser.add_argument(
+            "--upgradable",
+            type=_json.loads,
+            default=None,
+            help="JSON dict from /api/local upgradable field; if omitted, computes locally",
+        )
+        ua_args = parser.parse_args(sys.argv[2:])
+        local = detect_local_skills()
+        result = _ua(local.get("skills") or {}, upgradable=ua_args.upgradable)
+        # ponytail: 2026-09 — 字段名是 upgradable(不是 upgraded),与 upgrade_all return dict 对齐。
+        # 之前 typo 在新加的 try/finally BaseException 路径下被显形(error 路径返 upgradable=0)。
+        if result.get("error"):
+            print(f"[upgrade_all] FAIL: {result['error']}", file=sys.stderr, flush=True)
+            sys.exit(1)
+        print(
+            f"[upgrade_all] upgradable={result.get('upgradable', 0)} "
+            f"skipped={result.get('skipped', 0)} "
+            f"failed={result.get('failed', 0)} total={result.get('total', 0)}",
+            flush=True,
+        )
+        sys.exit(0)
     else:
         print(__doc__)
         sys.exit(1)

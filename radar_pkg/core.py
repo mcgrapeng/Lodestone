@@ -842,6 +842,23 @@ SUMMARIZE_LOCK = DATA / "summarize.lock"
 
 SUMMARIZE_LOCK_STALE_S = 30 * 60
 
+# ponytail: 2026-09 — install / uninstall / upgrade 共享一把锁。
+# 与 crawl / summarize 并行不互斥(用户可以一边看数据一边升级 skill),
+# 但 install 本身必须串行 — 同时两个 Popen 都 git clone 到同目录会断链。
+# 同一 PID-aware 模式:crawl_lock_held / summarize_lock_held 都已实现,
+# 这里复用 acquire_lock / release_lock + lock_held 三件套,所有锁共享语义。
+INSTALL_LOCK = DATA / "install.lock"
+INSTALL_LOCK_STALE_S = 30 * 60
+
+# ponytail: 2026-09 — install 进度状态(给前端 UpgradeProgressBanner 轮询)。
+# 与 LLM_STATUS_PATH 同款结构:{running, current, total, label, started_at, ...}
+INSTALL_STATUS_PATH = DATA / "install_status.json"
+
+# ponytail: 2026-09 — install 事件追加日志(append-only)。每次 install/uninstall/upgrade
+# 写一行,UI 可选展示「历史」。文件不存在时首次写入自动建。
+INSTALL_LOG_PATH = DATA / "install_log.json"
+INSTALL_LOG_MAX = 500  # 环形 buffer,超过截断前半
+
 # LLM 摘要状态 — /api/llm/status 给前端「上次生成于 X · 共 N 张卡」展示。
 # 由 summarize_repos() 写,UI 轮询时读。
 LLM_STATUS_PATH = DATA / "llm_status.json"
@@ -885,7 +902,11 @@ def is_ai_relevant(repo):
     if topics and any(t in NON_AI_TOPIC_BLOCKLIST for t in topics):
         return False
     blob_topics = " ".join(topics)
-    if any(h in blob_topics for h in AI_TOPIC_HARD):
+    # ponytail: 2026-09 P3 修复 — 词边界匹配替代子串匹配。AI_TOPIC_HARD 是硬编码
+    # 短 token,未来若加 "ai" / "ml" 这类 2 字母串,旧的子串匹配会误命中任何含
+    # "ai" 子串的 topic("available", "tailwind"...)。改用整词包含;topics 数组已
+    # 规范化为 token,用 `h in topics` 即可。
+    if any(h in topics for h in AI_TOPIC_HARD):
         return True
     # fallback: name + description must contain a strong AI phrase
     name = (repo.get("name") or "").lower()
@@ -970,3 +991,356 @@ def facts_for_repo(repo):
         parts.append("🏷 " + " · ".join(topics))
     parts.append(f"⭐ {repo['stars']:,}")
     return " · ".join(parts)
+
+
+def atomic_json_write(path, payload) -> None:
+    """ponytail: 2026-09 — 集中原子写。tmp + replace 防两类数据丢失:
+    1. 进程被杀中途截断 → tmp 留下垃圾,.json 仍是上一次完整数据
+    2. 并发 writer A 写到一半被 B 覆盖 → A 丢 B 写完,B 写完不丢
+    替代原 7 处 `Path(path).write_text(json.dumps(...))` 直写。"""
+    import json
+    from pathlib import Path as _P
+    p = _P(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(p.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1))
+    tmp.replace(p)
+
+
+# ponytail: 2026-09 — install / upgrade / uninstall 共用锁三件套。
+# 与 crawl_lock_held / summarize_lock_held 同模式(PID alive + 30min stale),
+# 抽成参数化函数减少重复。返回 bool 表示锁当前是否 held。
+# ponytail: 2026-09 — PID-aware link(2) 锁。原子性靠 OS 层 link(2) 而不是 O_EXCL,
+# 防止 30min stale 撞锁时链式踩踏(原实现释放时不验证 PID,任何进程都能删任何 lock)。
+# 锁文件 = 指向 PID file 的硬链,holder 进程死后 OS 自动清理。
+def _pid_alive(pid: int) -> bool:
+    import os as _os
+    if pid <= 0: return False
+    try: _os.kill(pid, 0); return True
+    except ProcessLookupError: return False
+    except PermissionError: return True  # 进程存在但无权限,算活
+
+
+def _parse_pid_from_lock(lock_path) -> int:
+    import re
+    # 文件名格式: install.lock.<PID>;lock_path.name = "install.lock"
+    # 当 O_EXCL 写时只写数字 (旧路径),文件名 .<pid> 是新路径。
+    try:
+        text = lock_path.read_text().strip()
+        return int(text)
+    except (ValueError, OSError):
+        pass
+    # 尝试文件名后缀
+    m = re.search(r"\.(\d+)$", lock_path.name)
+    return int(m.group(1)) if m else 0
+
+
+def acquire_named_lock(lock_path, stale_s: int) -> bool:
+    """True = acquired; False = another lock-holder is active (or holder alive).
+    旧实现:O_EXCL + 文件内容 PID;新实现:link(2) 原子创建(在锁文件 inode 不存在时)。
+    stale 检测同时清理死 PID 子锁文件(防止锁泄漏)。
+    ponytail: 锁文件内容写 PID — link(2) 复用 inode 后文件名虽不直接带 pid,
+    但 read_text() 仍能解析。release 时按文件名后缀 OR 内容 PID 都兼容。"""
+    import os as _os, time as _t
+    pid = _os.getpid()
+    pidfile = lock_path.with_name(f"{lock_path.name}.{pid}")
+    # ponytail: 先清理任何 stale 的子锁文件(死 PID 或超时),为 link(2) 扫清场地。
+    try:
+        for old in list(lock_path.parent.glob(f"{lock_path.name}.*")):
+            try:
+                # 跳过主锁文件本身 — 主锁文件名是 install.lock (无 .<pid> 后缀),
+                # glob 不会匹到 (require literal "." between lock and pid).
+                if old == lock_path:
+                    continue
+                old_pid = int(old.name.rsplit(".", 1)[1])
+                age = _t.time() - old.stat().st_mtime
+                if not _pid_alive(old_pid) or age > stale_s:
+                    old.unlink(missing_ok=True)
+            except (ValueError, OSError):
+                old.unlink(missing_ok=True)
+    except OSError:
+        pass
+    # link(2) 原子创建主锁 + 写 PID 进 inode。已有则失败。
+    try:
+        pidfile.write_text(str(pid))
+        _os.link(str(pidfile), str(lock_path))
+        pidfile.unlink(missing_ok=True)
+        return True
+    except FileExistsError:
+        # 锁已存在 — 三种 steal 条件:
+        #   (A) holder_pid > 0 + 进程已死 → 安全偷
+        #   (B) holder_pid > 0 + 进程活 + age > stale_s → D-state,信号收不到但锁很久没动,偷
+        #   (C) holder_pid == 0 → 内容损坏(不知真假死活),保守不偷,等真死或 30min 过期
+        holder_pid = _parse_pid_from_lock(lock_path)
+        try:
+            age = _t.time() - lock_path.stat().st_mtime
+        except OSError:
+            age = 0
+        if holder_pid == 0:
+            # ponytail: 内容损坏的锁不偷 — 万一真有别的进程在用(只是 metadata 损坏),
+            # 我们偷了会跟他 race。安全起见等 stale 后再试。
+            if age > stale_s:
+                lock_path.unlink(missing_ok=True)
+                return acquire_named_lock(lock_path, stale_s)
+            return False
+        if _pid_alive(holder_pid):
+            # 进程活但可能 D-state — 只在超 stale_s 时偷
+            if age > stale_s:
+                lock_path.unlink(missing_ok=True)
+                return acquire_named_lock(lock_path, stale_s)
+            return False
+        # 进程死了 — 偷
+        lock_path.unlink(missing_ok=True)
+        return acquire_named_lock(lock_path, stale_s)
+
+
+def release_named_lock(lock_path) -> None:
+    """只删自己 PID 的锁(防止链式踩踏)。"""
+    import os as _os
+    pid = _os.getpid()
+    pidfile = lock_path.with_name(f"{lock_path.name}.{pid}")
+    # 兼容旧锁(无 .<pid> 后缀,只写数字):删 lock_path 自身
+    try:
+        lock_path.unlink(missing_ok=True)
+    except OSError:
+        pass
+    pidfile.unlink(missing_ok=True)
+
+
+def named_lock_held(lock_path, stale_s: int) -> bool:
+    """Non-acquiring probe。mtime 内 = True;mtime 超 = 看 PID 活否。"""
+    import os as _os
+    import time as _t
+    if not lock_path.exists():
+        return False
+    try:
+        st_mtime = lock_path.stat().st_mtime
+    except OSError:
+        return False
+    if _t.time() - st_mtime <= stale_s:
+        return True
+    try:
+        pid = int(lock_path.read_text().strip())
+    except (OSError, ValueError):
+        return False
+    try:
+        _os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+# ponytail: 2026-09 — install 进度状态写盘。analyze_many 风格的 _write_progress
+# 但通用化 — 任何 install 操作都能调。可选字段:label (e.g. "升级 anthropic/skills"),
+# current/total,started_at,finished_at。
+def write_install_status(**fields) -> None:
+    """与 _write_llm_status 同款 atomic,带 updated_at 自动戳。"""
+    import datetime as _dt
+    import json as _json
+    payload = {}
+    if INSTALL_STATUS_PATH.exists():
+        try:
+            payload = _json.loads(INSTALL_STATUS_PATH.read_text())
+        except Exception:
+            payload = {}
+    payload.update(fields)
+    payload["updated_at"] = _dt.datetime.now().isoformat(timespec="seconds")
+    atomic_json_write(INSTALL_STATUS_PATH, payload)
+
+
+# ponytail: 2026-09 — upgradable cache(/api/local 给前端展示 "可升级" 用)。
+# compute_upgradable 要 N 次 ls-remote,100 个 skill 串行 ~5-15s/个 = 25min。
+# stale-while-revalidate:cache 文件 mtime < 5min 直接返回,过期触发后台线程刷新
+# 旧 cache 同时返 — UI 永远秒开,后台静默刷新,下次刷新拿到最新。
+UPGRADABLE_CACHE_PATH = DATA / "upgradable_cache.json"
+UPGRADABLE_CACHE_TTL_S = 5 * 60  # 5 min
+
+
+def read_upgradable_cache_or_none() -> dict | None:
+    """返回 upgradable 字典(若 cache 存在且 < TTL),否则 None。"""
+    import json as _json
+    import time as _t
+    if not UPGRADABLE_CACHE_PATH.exists():
+        return None
+    try:
+        age = _t.time() - UPGRADABLE_CACHE_PATH.stat().st_mtime
+        if age > UPGRADABLE_CACHE_TTL_S:
+            return None
+        return _json.loads(UPGRADABLE_CACHE_PATH.read_text())
+    except (OSError, ValueError):
+        return None
+
+
+# ponytail: 2026-09 — 返回 cache 元信息(age / mtime / entries)给前端 banner。
+# 之前 /api/local 只返 upgradable_map dict,前端不知道 cache 是新的还是 6h 前的,
+# 也无法显示"正在算"等中间态。
+def read_upgradable_cache_meta() -> dict:
+    """返回 {exists, mtime, age_s, total, computing, last_trigger_at}。"""
+    import time as _t
+    info = {
+        "exists": False,
+        "mtime": None,
+        "age_s": None,
+        "total": 0,
+        "computing": False,
+        "last_trigger_at": None,
+    }
+    if not UPGRADABLE_CACHE_PATH.exists():
+        return info
+    try:
+        st = UPGRADABLE_CACHE_PATH.stat()
+        cache = _t.time() - st.st_mtime
+        info.update({
+            "exists": True,
+            "mtime": st.st_mtime,
+            "age_s": cache,
+        })
+        try:
+            data = __import__("json").loads(UPGRADABLE_CACHE_PATH.read_text())
+            info["total"] = len(data)
+        except Exception:
+            pass
+    except OSError:
+        pass
+    return info
+
+
+# ponytail: 2026-09 — compute 状态标记。Popen 起来时 /api/local/refresh 写
+# `computing=True`,跑完(成功/失败)写 `computing=False` + updated_at。
+# 跨进程:Popen 进程死亡但 computing=True 残留 → 看 PID 活否,死了就清掉
+# (与 install_lock 同模式,防 daemon 死锁了状态)。
+_REFRESH_STATUS_PATH = DATA / "refresh_status.json"
+
+
+def set_refresh_status(**fields) -> None:
+    payload = {}
+    if _REFRESH_STATUS_PATH.exists():
+        try:
+            payload = __import__("json").loads(_REFRESH_STATUS_PATH.read_text())
+        except Exception:
+            payload = {}
+    payload.update(fields)
+    payload["updated_at"] = __import__("datetime").datetime.now().isoformat(timespec="seconds")
+    atomic_json_write(_REFRESH_STATUS_PATH, payload)
+
+
+def read_refresh_status() -> dict:
+    if not _REFRESH_STATUS_PATH.exists():
+        return {}
+    try:
+        return __import__("json").loads(_REFRESH_STATUS_PATH.read_text())
+    except Exception:
+        return {}
+
+
+def write_upgradable_cache(payload: dict) -> None:
+    try:
+        atomic_json_write(UPGRADABLE_CACHE_PATH, payload)
+    except OSError:
+        pass  # 缓存写失败不影响主流程
+
+
+# ponytail: 2026-09 P3 — 单条 skill 升级/卸载后立刻让 cache 反映新状态,而不是
+# 等 daemon 5 min 周期。调用方:install.upgrade_one 成功分支 + uninstall_skill。
+def invalidate_upgradable_cache_for(name: str) -> None:
+    """把 cache 里该 skill 标为 up_to_date(或直接删除),写回。"""
+    cache = read_upgradable_cache_or_none()
+    if cache is None:
+        return
+    if name in cache:
+        cache[name]["upgradable"] = False
+        cache[name]["reason"] = "up_to_date"
+        cache[name]["local_sha"] = (
+            cache[name].get("remote_sha")
+            or cache[name].get("local_sha")
+        )
+    else:
+        # 不在 cache(刚装的 skill)— 删它不影响,daemon 下次会算
+        return
+    write_upgradable_cache(cache)
+
+
+_UPGRADABLE_DAEMON_STARTED: set = set()
+
+
+def start_upgradable_refresh_daemon(interval_s: int = 300) -> None:
+    """后台 daemon 线程 — 每 interval_s 秒重算一次 upgradable 并写 cache。
+
+    ponytail: 2026-09 — dedup 用稳定字符串 key,而非 id(skills)。前者每次 /api/local
+    调用都新建 dict → id 永远不同 → daemon线程无限泄漏,触发 GitHub 60/hr 限流,
+    整个 upgradable 系统静默失效。
+    ponytail: 2026-09 — 每次循环内 re-detect 拿最新 skills,而非闭包捕获首次调用,
+    否则新装的 skill 永远不进 cache。
+    """
+    import threading as _thr
+    import time as _t
+
+    cache_key = "local-skills-v1"
+    if cache_key in _UPGRADABLE_DAEMON_STARTED:
+        return
+    _UPGRADABLE_DAEMON_STARTED.add(cache_key)
+
+    def _loop():
+        from radar_pkg.detect import detect_local_skills
+        from radar_pkg.install import compute_upgradable
+        def _cb(cur, total, name):
+            # ponytail: 2026-09 — daemon 跑 compute 时也上报进度,前端 banner
+            # 不只在手动 refresh 时显示「5/292」,daemon 自动周期跑也有。
+            try:
+                set_refresh_status(
+                    computing=True, current=cur, total=total,
+                    current_name=name,
+                )
+            except Exception:
+                pass
+        while True:
+            try:
+                local = detect_local_skills()
+                # 仅在确实要写进度时启用 callback(否则默认空函数开销 0)
+                skills = local.get("skills") or {}
+                payload = compute_upgradable(skills, progress_callback=_cb)
+                write_upgradable_cache(payload)
+            except Exception:
+                pass
+            finally:
+                # ponytail: 不管成功失败,daemon 跑完一轮必须 computing=False。
+                # 之前漏了 finally,导致 daemon 跑完后 computing 永远 true。
+                try:
+                    set_refresh_status(computing=False, current_name="")
+                except Exception:
+                    pass
+            _t.sleep(interval_s)
+
+    _thr.Thread(target=_loop, daemon=True, name="upgradable-refresher").start()
+
+
+def read_install_status() -> dict:
+    """Mirror of _write_llm_status read side。"""
+    import json as _json
+    if INSTALL_STATUS_PATH.exists():
+        try:
+            return _json.loads(INSTALL_STATUS_PATH.read_text())
+        except Exception:
+            return {}
+    return {}
+
+
+def append_install_log(entry: dict) -> None:
+    """追加到 INSTALL_LOG_PATH(append-only 环形)。失败静默,日志不该破坏主流程。"""
+    import datetime as _dt
+    import json as _json
+    entry = {"at": _dt.datetime.now().isoformat(timespec="seconds"), **entry}
+    try:
+        if INSTALL_LOG_PATH.exists():
+            try:
+                data = _json.loads(INSTALL_LOG_PATH.read_text())
+            except Exception:
+                data = []
+        else:
+            data = []
+        data.append(entry)
+        if len(data) > INSTALL_LOG_MAX:
+            data = data[-INSTALL_LOG_MAX:]
+        atomic_json_write(INSTALL_LOG_PATH, data)
+    except Exception:
+        pass

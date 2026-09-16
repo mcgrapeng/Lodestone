@@ -4,11 +4,16 @@
 import type {
   CrawlProgress,
   GainPage,
+  InstallStatus,
   LlmStatus,
+  LocalData,
+  RefreshStatus,
+  Settings,
   Snapshot,
   Stats,
-  Settings,
   TestLlmResult,
+  UpgradeAllResult,
+  UpgradeResult,
 } from './types'
 
 const BASE = ''  // same-origin via Vite proxy
@@ -124,8 +129,14 @@ export const api = {
 
   // ponytail: 2026-09 P3 — 5 桶生成手动触发。前端 Settings 抽屉按钮调此端点,
   // 后端 spawn `radar.py summarize` 后台跑,立即返 200。进度走 /api/llm/status 轮询。
-  async triggerSummarize(): Promise<{ ok: boolean; error?: string; provider?: string; message?: string }> {
+  async triggerSummarize(): Promise<{ ok: boolean; error?: string; provider?: string; message?: string; pid?: number }> {
     return post('/api/llm/summarize', {})
+  },
+
+  // ponytail: 2026-09 — 取消正在跑的 5 桶生成。后端 killpg + 等 3s 软退出 +
+  // 必要时 SIGKILL,最后写 running=False + error="cancelled by user"。
+  async cancelSummarize(): Promise<{ ok: boolean; cancelled?: boolean; error?: string; pid?: number }> {
+    return post('/api/llm/cancel', {})
   },
 
   async getLlmStatus(): Promise<LlmStatus> {
@@ -140,5 +151,34 @@ export const api = {
     } catch {
       return { running: false, phase: null, label: null, current: null, total: null, pct: null, eta: null, pid: null, started_at: null, elapsed_s: null, log_mtime: null, last_lines: [] }
     }
+  },
+
+  // ponytail: 2026-09 — 本机 tab 核心 API。
+  // /api/local: 整库 inventory + 每项 status(up_toable / behind / cache_missing 等)。
+  // /api/upgrade?name=X: 同步升级单个 skill(快路径,后端 ls-remote 限流 ~5s)。
+  // /api/upgrade-all: 后台 fork 子进程异步跑批量升级,前端转去轮询 install/status。
+  async getLocal(): Promise<LocalData> {
+    return jsonOrThrow<LocalData>(await fetch(`${BASE}/api/local`))
+  },
+
+  async upgradeSkill(name: string): Promise<UpgradeResult> {
+    return post(`/api/upgrade?name=${encodeURIComponent(name)}`, {})
+  },
+
+  async upgradeAll(): Promise<UpgradeAllResult> {
+    return post('/api/upgrade-all', {})
+  },
+
+  async getInstallStatus(): Promise<InstallStatus> {
+    return jsonOrThrow<InstallStatus>(await fetch(`${BASE}/api/install/status`))
+  },
+
+  // ponytail: 2026-09 — 手动触发 upgradable 重算 + 轮询状态。
+  // 首次进本机 tab / 看到 0 项可升级时点「立即重算」按钮调。
+  async triggerRefresh(): Promise<{ ok: boolean; started?: boolean; already_running?: boolean; error?: string }> {
+    return post('/api/local/refresh', {})
+  },
+  async getRefreshStatus(): Promise<RefreshStatus> {
+    return jsonOrThrow<RefreshStatus>(await fetch(`${BASE}/api/local/refresh/status`))
   },
 }

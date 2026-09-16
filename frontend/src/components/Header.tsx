@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Github, RefreshCw, Loader2, Settings } from 'lucide-react'
 import { RadarFilled } from '@appica/icons-react'
 import { Button } from '@appica/ui-react'
@@ -34,6 +35,16 @@ export function Header({
   totalCategories,
   sourceSummary,
 }: HeaderProps) {
+  // ponytail: 2026-09 — 相对时间 tick。旧实现 fetch-at 时算一次后定格,刷新后
+  // "刚刚" / "1 分钟前" 不变。每 30s 触发一次 setState 让组件重渲染,
+  //  让"相对时间"保持新鲜直到时变换一次。
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (!fetchedAt) return
+    const t = setInterval(() => setTick((n) => n + 1), 30_000)
+    return () => clearInterval(t)
+  }, [fetchedAt])
+
   return (
     <header className="sticky top-0 z-40 border-b border-border-muted bg-background/85 backdrop-blur-md">
       {/* 品牌色 hairline — 顶栏与内容之间的精致分割 */}
@@ -45,9 +56,11 @@ export function Header({
             <RadarFilled className="h-5 w-5 text-primary" />
           </div>
           <div className="leading-tight">
-            <div className="text-[15px] font-semibold tracking-tight text-foreground">
+            {/* ponytail: 2026-09 — 升级到 h1。screen reader 用户在 Trending/Cats/
+                Search/Stats tab 没顶层标题;HeroStats 里的 h1 移到 Header 让每页都可见。 */}
+            <h1 className="text-[15px] font-semibold tracking-tight text-foreground">
               Lodestone
-            </div>
+            </h1>
             <div className="text-[11px] text-foreground-subtle">
               GitHub 热门 AI · Skills · Plugins
             </div>
@@ -58,7 +71,10 @@ export function Header({
           <div className="flex items-center gap-1.5">
             <Github className="h-3.5 w-3.5" />
             <span>{sourceSummary || `${totalRepos.toLocaleString()} 个仓库`}</span>
-            <span className="text-foreground-subtle">·</span>
+            {/* ponytail: 2026-09 — `·` 分隔符条件渲染。旧实现无条件渲染,出现
+                「· 0 分类」前导孤立点。同时 sourceSummary 与 totalRepos 互斥:
+                有 sourceSummary 时不要再重复仓库总数。 */}
+            {(sourceSummary || totalRepos > 0) && <span className="text-foreground-subtle">·</span>}
             <span>{totalCategories} 分类</span>
           </div>
           {fetchedAt && (
@@ -71,17 +87,20 @@ export function Header({
           )}
         </div>
 
+        {/* ponytail: 2026-09 — Settings 按钮加 title 提示(mouse 用户可见),状态点
+            从 `right-1 top-1` 改 `right-2 top-2`,避开 p-2 的 padding 让点不被裁切。 */}
         <button
           onClick={onSettings}
           aria-label="LLM 设置"
+          title="LLM 设置"
           className="relative rounded p-2 text-foreground-subtle hover:bg-background-muted hover:text-foreground"
         >
           <Settings size={16} />
           {settingsStatus === 'configured' && (
-            <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-emerald-500" />
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-emerald-500" />
           )}
           {settingsStatus === 'untested' && (
-            <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-amber-500" />
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-amber-500" />
           )}
         </button>
 

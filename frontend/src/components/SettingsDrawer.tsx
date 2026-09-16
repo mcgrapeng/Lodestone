@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { X, Check, AlertCircle, Sparkles, Loader2 } from 'lucide-react'
 import { api } from '../lib/api'
 import type { LlmStatus, Settings, TestLlmResult } from '../lib/types'
+import { LlmProgressBar } from './LlmProgressBar'
 
 interface Props {
   open: boolean
@@ -290,42 +291,10 @@ export function SettingsDrawer({ open, initial, onClose, onSaved }: Props) {
               )}
             </div>
 
-            {/* ponytail: 2026-09 — 实时进度条。running 时显示 current/total 进度条;done 或未跑时显示上次结果摘要。 */}
-            {llmStatus?.running ? (
-              <div className="mb-2">
-                <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="text-foreground-subtle">
-                    正在分析 {llmStatus.current ?? 0}/{llmStatus.total ?? '?'} 张
-                    {llmStatus.analyzed_running != null && (
-                      <span className="ml-1 text-primary">· 成功 {llmStatus.analyzed_running}</span>
-                    )}
-                  </span>
-                  <span className="font-mono text-foreground-subtle">
-                    {llmStatus.total && llmStatus.current != null
-                      ? `${Math.round(100 * llmStatus.current / llmStatus.total)}%`
-                      : '启动中…'}
-                  </span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-primary/15">
-                  <div
-                    className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
-                    style={{
-                      width: llmStatus.total && llmStatus.current != null
-                        ? `${Math.min(100, Math.max(0, 100 * llmStatus.current / llmStatus.total))}%`
-                        : '25%',
-                    }}
-                  />
-                </div>
-              </div>
-            ) : llmStatus?.last_run ? (
-              <p className="mb-2 text-xs text-foreground-subtle">
-                上次生成: {llmStatus.last_analyzed ?? 0}/{llmStatus.last_total ?? '?'} 张
-                {llmStatus.last_duration_s ? ` · ${llmStatus.last_duration_s}s` : ''}
-                {llmStatus.last_model ? ` · ${llmStatus.last_model}` : ''}
-                {' · '}
-                <span className="font-mono">{llmStatus.last_run.slice(0, 19).replace('T', ' ')}</span>
-              </p>
-            ) : null}
+            {/* ponytail: 2026-09 — 进度条交给独立组件 LlmProgressBar,自带 enter/exit
+                动画 + BorderBeam 流动光带 + running/done/failed 三态切换。
+                不再在抽屉里堆嵌套 div。 */}
+            <LlmProgressBar status={llmStatus} />
 
             <button
               onClick={triggerSummarize}

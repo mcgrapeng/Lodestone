@@ -143,19 +143,19 @@ def _run_llm_analysis(repos: list) -> int:
     except Exception:
         llm_cache = {}
     # ponytail: 2026-09 — 一次性 load llm cache（旧代码每 repo 重读磁盘）
-    # 把分析结果回写到 readme_zh_cache（共享缓存文件，避免再开一个）
+    # 把分析结果回写到 readme_zh_cache（共享缓存文件，避免再开一个）。
+    # ponytail: 2026-09 P3 修复 — O(N) dict 索引替代 O(N×M) 内嵌 for。
+    # 250 个 repo × 250 个输入 = 62.5k 次比较降到 ~250 次（构建 by_name 一次再 O(1) get）。
+    by_name_lower = {(r.get("name") or "").lower(): r for r in repos}
     for inp in llm_inputs:
         key = inp["name"].lower()
         if key in llm_cache:
             readme_cache.setdefault(key, {})["analysis_5d"] = llm_cache[key]
-            for r in repos:
-                if (r.get("name") or "").lower() == key:
-                    r["analysis_5d"] = llm_cache[key]
-                    break
+            r = by_name_lower.get(key)
+            if r is not None:
+                r["analysis_5d"] = llm_cache[key]
     try:
-        core.README_ZH_CACHE.write_text(
-            json.dumps(readme_cache, ensure_ascii=False, indent=1)
-        )
+        core.atomic_json_write(core.README_ZH_CACHE, readme_cache)
     except Exception as e:
         print(f"  [warn] write analysis_5d back to cache: {e}", file=sys.stderr)
     return n
@@ -192,9 +192,30 @@ def summarize_repos(force: bool = False) -> dict:
     if not acquire_summarize_lock():
         return {"ok": False, "error": "summarize already running"}
     t0 = time.monotonic()
+    # ponytail: 2026-09 — 立刻写 running=True + started_at。前端 banner 立刻显示
+    # 进度条(哪怕数据 fetch 还在跑或失败);否则用户点完按钮 0.5s 内看不到任何反馈。
+    from radar_pkg.llm_analyze import detect_provider as _dp, _provider_model as _pm
+    _prov = _dp()
+    _started_at = datetime.datetime.now().isoformat(timespec="seconds")
+    _write_llm_status(
+        running=True,
+        current=0,
+        total=0,
+        analyzed_running=0,
+        started_at=_started_at,
+        provider=_prov,
+        model=_pm(_prov) if _prov else None,
+    )
     try:
-        provider = detect_provider()
+        provider = _prov
         if not provider:
+            _write_llm_status(
+                running=False,
+                current=None,
+                total=None,
+                analyzed_running=None,
+                started_at=None,
+            )
             return {
                 "ok": False,
                 "error": "no LLM provider configured — open Settings and set provider/api_key/base_url",
@@ -217,6 +238,14 @@ def summarize_repos(force: bool = False) -> dict:
         if not repos:
             latest = DATA / "latest.json"
             if not latest.exists():
+                # ponytail: 2026-09 — 清掉 running 状态,前端 banner 切到 done/失败态。
+                _write_llm_status(
+                    running=False,
+                    current=None,
+                    total=None,
+                    analyzed_running=None,
+                    started_at=None,
+                )
                 return {"ok": False, "error": "no data — run ./radar.py crawl first"}
             snap = json.loads(latest.read_text())
             for r in snap.get("hot_now", []):
@@ -250,6 +279,31 @@ def summarize_repos(force: bool = False) -> dict:
         _write_analysis_to_snapshot(unique)
         # _run_llm_analysis 已经把 analysis_5d 写回 readme_zh_cache.json 了
         duration = round(time.monotonic() - t0, 1)
+        # ponytail: 2026-09 P4 修复 — SIGKILL 兜底清理。如果 subprocess 被 kill -9,
+        # analyze_many() 里 try/finally 不会跑,llm_status.json 残留 running=True +
+        # analyzed_running=last_value,前端 banner 显示「上次跑的中间状态」。
+        # 注册 atexit 钩子 + SIGTERM/SIGINT 处理器,任何非自然退出都会清掉。
+        def _cleanup_running_state():
+            try:
+                _write_llm_status(
+                    running=False,
+                    current=None,
+                    analyzed_running=None,
+                    started_at=None,
+                )
+            except Exception:
+                pass
+        import atexit as _atexit, signal as _signal
+        _atexit.register(_cleanup_running_state)
+        def _handler(signum, frame):
+            _cleanup_running_state()
+            import sys as _sys
+            _sys.exit(128 + signum)
+        for _sig in (_signal.SIGTERM, _signal.SIGINT):
+            try:
+                _signal.signal(_sig, _handler)
+            except (ValueError, OSError):
+                pass  # 某些环境(如主线程之外的线程)不让改 signal
         _write_llm_status(
             last_run_at=datetime.datetime.now().isoformat(timespec="seconds"),
             running=False,  # ponytail: 2026-09 — 跑完清掉 running + 进度,前端知道跑完了
@@ -296,15 +350,28 @@ def release_summarize_lock():
 
 
 def summarize_lock_held() -> bool:
-    """Non-acquiring check for the API layer (returns 409 instead of spawning)."""
+    """Non-acquiring check for the API layer (returns 409 instead of spawning)。
+    ponytail: 2026-09 — 与 crawl_lock_held 对齐:lock mtime 超 stale 但 PID 还活,
+    视为 held(慢但没卡死);PID 死了才 False。避免 kill -9 后 30min 内 /api/llm/summarize
+    永远 409。"""
     if not core.SUMMARIZE_LOCK.exists():
         return False
     try:
-        if time.time() - core.SUMMARIZE_LOCK.stat().st_mtime > core.SUMMARIZE_LOCK_STALE_S:
-            return False
+        st_mtime = core.SUMMARIZE_LOCK.stat().st_mtime
     except OSError:
         return False
-    return True
+    if time.time() - st_mtime <= core.SUMMARIZE_LOCK_STALE_S:
+        return True
+    # mtime 超 stale — 检查 PID
+    try:
+        pid = int(core.SUMMARIZE_LOCK.read_text().strip())
+    except (OSError, ValueError):
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
 
 
 def _write_analysis_to_pg(repos: list) -> None:
@@ -626,9 +693,9 @@ def _crawl_inner(with_llm: bool = False):
         f"  ✓ trending: {len(trending_daily)} daily + {len(trending_weekly)} weekly + "
         f"{len(_trend_lang)} lang-variant → {len(trending)} unique → {len(trending_ai)} AI-relevant → merged into 5k+ pool"
     )
-    # ponytail: keep trending SEPARATELY so the 300-row TOP_5K_LIMIT truncation below can't
+    # ponytail: keep trending SEPARATELY so the 800-row TOP_5K_LIMIT truncation below can't
     # drop their stars_today. Trending repos are low-star by definition (the whole point is
-    # "new today" / "rising this week") — they'd otherwise be at the bottom of the 300-row slice.
+    # "new today" / "rising this week") — they'd otherwise be at the bottom of the 800-row slice.
     top_5k_sorted = sorted(
         top_5k_repos.values(), key=lambda x: x.get("stars", 0), reverse=True
     )[:TOP_5K_LIMIT]
@@ -835,7 +902,7 @@ def _crawl_inner(with_llm: bool = False):
         },
     }
     latest_file = DATA / "latest.json"
-    latest_file.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2))
+    core.atomic_json_write(latest_file, snapshot)
     print(f"[crawl] saved → {latest_file} ({len(deduped)} repos, JSON mode)", flush=True)
     done(f"crawl done — {time.monotonic()-_t_crawl:.0f}s total")
     return {"total_unique": len(deduped), "fallback": "json", "queries_failed": failed}

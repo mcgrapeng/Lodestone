@@ -14,7 +14,7 @@ export interface UrlState {
 
 const DEFAULT_STATE: UrlState = { tab: 'hot', q: '', cat: null, sort: 'stars', src: 'all' }
 
-const VALID_TABS = new Set(['hot', 'trending', 'cats', 'stats', 'search'])
+const VALID_TABS = new Set(['hot', 'trending', 'cats', 'local', 'stats', 'search'])
 const VALID_SORTS = new Set(['stars', 'recent', 'name'])
 const VALID_SRCS = new Set(['all', 'github', 'huggingface', 'mcp', 'arxiv'])
 

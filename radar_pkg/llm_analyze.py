@@ -327,10 +327,7 @@ def _load_cache() -> dict:
 
 def _save_cache(cache: dict) -> None:
     try:
-        core.LLM_ANALYSIS_CACHE.parent.mkdir(parents=True, exist_ok=True)
-        core.LLM_ANALYSIS_CACHE.write_text(
-            json.dumps(cache, ensure_ascii=False, indent=1)
-        )
+        core.atomic_json_write(core.LLM_ANALYSIS_CACHE, cache)
     except OSError as e:
         print(f"  [warn] llm cache write failed: {e}", file=sys.stderr)
 
@@ -426,9 +423,28 @@ def analyze_many(repos: list, max_workers: int = 4) -> int:
             pass  # 状态写盘失败不影响主流程
 
     _write_progress(running=True, current=0, total=len(todo), analyzed=0)
+    # ponytail: 2026-09 P4 修复 — started_at 前端 LlmStatus 声明但后端没写,
+    # 现在写一次。前端 banner 可显示「开始于 HH:MM:SS」。
+    try:
+        _payload: dict = {}
+        if core.LLM_STATUS_PATH.exists():
+            try:
+                _payload = json.loads(core.LLM_STATUS_PATH.read_text())
+            except Exception:
+                _payload = {}
+        _payload["started_at"] = _dt.datetime.now().isoformat(timespec="seconds")
+        core.LLM_STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp = core.LLM_STATUS_PATH.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(_payload, ensure_ascii=False, indent=1))
+        tmp.replace(core.LLM_STATUS_PATH)
+    except Exception:
+        pass
     completed = 0
     n_ok = 0
-    _step = max(1, len(todo) // 40)  # ~40 次进度更新
+    # ponytail: 2026-09 — 用户反馈「看不到效果」。旧 _step=1015//40=25 — 第一个
+    # 进度更新要等 25 个 repo 跑完(LLM 慢,可能 5+ 分钟),期间 banner 永远 indeterminate。
+    # 改成每 5 个就刷 + 强制 first update 在 1 个完成时立即刷。让用户 10-30s 内看到首条进度。
+    _step = max(1, min(5, len(todo) // 100))
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
         futs = {
             ex.submit(
@@ -454,7 +470,8 @@ def analyze_many(repos: list, max_workers: int = 4) -> int:
             if completed % 25 == 0:
                 _save_cache(cache)
                 print(f"    ... {completed}/{len(todo)} done, {n_ok} ok")
-            if completed % _step == 0 or completed == len(todo):
+            # ponytail: 2026-09 — first update 在第一个完成时立即刷,后续每 _step 刷。
+            if completed == 1 or completed % _step == 0 or completed == len(todo):
                 _write_progress(running=True, current=completed, total=len(todo), analyzed=n_ok)
     _save_cache(cache)
     print(f"  ✓ llm analysis: {n_ok}/{len(todo)} ok")

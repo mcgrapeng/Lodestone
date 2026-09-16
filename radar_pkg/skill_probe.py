@@ -140,10 +140,7 @@ def _load_cache() -> dict:
 def _save_cache(cache: dict) -> None:
     """整文件写一次（dict 在 GIL 下线程安全，但写盘需要串行）。"""
     try:
-        core.SKILL_PROBE_CACHE.parent.mkdir(parents=True, exist_ok=True)
-        core.SKILL_PROBE_CACHE.write_text(
-            json.dumps(cache, ensure_ascii=False, indent=1)
-        )
+        core.atomic_json_write(core.SKILL_PROBE_CACHE, cache)
     except OSError as e:
         print(f"  [warn] skill probe cache write failed: {e}", file=sys.stderr)
 
