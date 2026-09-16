@@ -366,7 +366,10 @@ def analyze_one(
 
 def analyze_many(repos: list, max_workers: int = 4) -> int:
     """批量分析：并发探测 + 调 LLM + 落盘。返回成功数量。
-    输入 repos: list of {name, readme, topics, lang, stars}。"""
+    输入 repos: list of {name, readme, topics, lang, stars}。
+    ponytail: 2026-09 — 每完成 N 条写一次 llm_status.json(current/total/analyzed),
+    /api/llm/status 轮询读。前端 Settings 抽屉 5 桶按钮实时显示进度条。"""
+    import datetime as _dt
     provider = detect_provider()
     if not provider:
         print(
@@ -394,8 +397,38 @@ def analyze_many(repos: list, max_workers: int = 4) -> int:
     print(
         f"  · llm analysis: {len(todo)} repos to analyze (cache: {sum(1 for r in todo if r['name'].lower() in cache)})"
     )
+
+    # ponytail: 2026-09 — 进度状态写盘。让前端能实时看到进度条,不必等全部跑完。
+    def _write_progress(running: bool, current: int, total: int, analyzed: int) -> None:
+        try:
+            payload: dict = {}
+            if core.LLM_STATUS_PATH.exists():
+                try:
+                    payload = json.loads(core.LLM_STATUS_PATH.read_text())
+                except Exception:
+                    payload = {}
+            payload.update(
+                {
+                    "running": running,
+                    "current": current,
+                    "total": total,
+                    "analyzed_running": analyzed,
+                    "provider": provider,
+                    "model": _provider_model(provider),
+                    "updated_at": _dt.datetime.now().isoformat(timespec="seconds"),
+                }
+            )
+            core.LLM_STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
+            tmp = core.LLM_STATUS_PATH.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1))
+            tmp.replace(core.LLM_STATUS_PATH)
+        except Exception:
+            pass  # 状态写盘失败不影响主流程
+
+    _write_progress(running=True, current=0, total=len(todo), analyzed=0)
     completed = 0
     n_ok = 0
+    _step = max(1, len(todo) // 40)  # ~40 次进度更新
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
         futs = {
             ex.submit(
@@ -421,6 +454,8 @@ def analyze_many(repos: list, max_workers: int = 4) -> int:
             if completed % 25 == 0:
                 _save_cache(cache)
                 print(f"    ... {completed}/{len(todo)} done, {n_ok} ok")
+            if completed % _step == 0 or completed == len(todo):
+                _write_progress(running=True, current=completed, total=len(todo), analyzed=n_ok)
     _save_cache(cache)
     print(f"  ✓ llm analysis: {n_ok}/{len(todo)} ok")
     return n_ok

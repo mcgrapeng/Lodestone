@@ -319,7 +319,6 @@ def query_gain(
         ranked AS (
             SELECT c.name, r.url, r.description, r.desc_zh, r.stars, r.lang,
                    r.topics, r.pushed_at, c.delta_24h, c.cold_start,
-                   r.summary_zh,
                    r.summary_sections_json AS summary_sections,
                    r.analysis_5d_json AS analysis_5d,
                    r.is_skill, r.stars_today

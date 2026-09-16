@@ -12,6 +12,7 @@ scraper adapters. Secrets never go into config.toml (it's committed).
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 _ENV_PATH = Path(__file__).parent / ".env"
@@ -37,4 +38,17 @@ def load_env(quiet: bool = True) -> list[str]:
     except Exception as e:
         if not quiet:
             print(f"  [warn] .env load failed: {e}", file=__import__("sys").stderr)
+
+    # ponytail: 2026-09 — .env 用 DATABASE_URL 时,把它拆成 PG* 让 db/connection.py 也认。
+    # 不动 PG* 已设的(shell wins 语义);只补缺的。URL 格式: postgres://user:pwd@host:port/db
+    url = os.environ.get("DATABASE_URL", "")
+    m = re.match(r"^postgres(?:ql)?://([^:]+):([^@]*)@([^:/]+)(?::(\d+))?/([^?#]+)", url)
+    if m:
+        u, p, h, port, dbname = m.groups()
+        os.environ.setdefault("PGUSER", u)
+        if p:
+            os.environ.setdefault("PGPASSWORD", p)
+        os.environ.setdefault("PGHOST", h)
+        os.environ.setdefault("PGPORT", port or "5432")
+        os.environ.setdefault("PGDATABASE", dbname)
     return loaded

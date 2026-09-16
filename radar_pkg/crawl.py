@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from radar_pkg import core
+from radar_pkg.progress import phase, bar, eta, log, done
 import db
 from radar_pkg.core import (
     AI_TOPIC_BLOCKLIST,
@@ -60,15 +61,29 @@ def release_crawl_lock():
 
 
 def crawl_lock_held() -> bool:
-    """Non-acquiring check for the API layer (returns 409 instead of spawning)."""
+    """Non-acquiring check for the API layer (returns 409 instead of spawning)。
+    ponytail: 2026-09 — lock 文件存在但 mtime 超过 CRAWL_LOCK_STALE_S 时,仍要
+    看 lock 里的 PID 还活没活:活就当 held(只是慢,没卡死);死才返 False 让 API
+    能重启。旧逻辑只看 mtime,长 README 抓取阶段(>30min 没写 log)会被误判 stale,
+    前端 banner 瞬间消失 + 显示 stale 的「trending 6/6 100%」。"""
     if not CRAWL_LOCK.exists():
         return False
     try:
-        if time.time() - CRAWL_LOCK.stat().st_mtime > CRAWL_LOCK_STALE_S:
-            return False
+        st_mtime = CRAWL_LOCK.stat().st_mtime
     except OSError:
         return False
-    return True
+    if time.time() - st_mtime <= CRAWL_LOCK_STALE_S:
+        return True
+    # ponytail: 超 stale 但 PID 还活 → held;死了 → False
+    try:
+        pid = int(CRAWL_LOCK.read_text().strip())
+    except (OSError, ValueError):
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
 
 
 def crawl(with_llm: bool = False):
@@ -237,8 +252,11 @@ def summarize_repos(force: bool = False) -> dict:
         duration = round(time.monotonic() - t0, 1)
         _write_llm_status(
             last_run_at=datetime.datetime.now().isoformat(timespec="seconds"),
-            analyzed=n,
+            running=False,  # ponytail: 2026-09 — 跑完清掉 running + 进度,前端知道跑完了
+            current=None,
             total=len(unique),
+            analyzed_running=None,
+            analyzed=n,
             source=source,
             provider=provider,
             model=_provider_model(provider),
@@ -354,7 +372,8 @@ def _crawl_inner(with_llm: bool = False):
     # ponytail: 2026-09 — 重置自适应限速 sleep。REST 限流恢复把 sleep 永久 bump 到 6.0
     # (gh.py:53),不重置会让后续 crawl 在同进程内一直慢到下次重启。
     core._SEARCH_PACE["sleep"] = 2.0
-    print(f"[crawl] {today} — {len(CATEGORIES)} categories")
+    _t_crawl = time.monotonic()
+    log(f"[crawl] {today} — {len(CATEGORIES)} categories")
     try:
         from scrapers import status as scraper_status
 
@@ -379,25 +398,30 @@ def _crawl_inner(with_llm: bool = False):
     try:
         from sources.github_graphql import gh_search_batch
 
-        print(
-            f"[crawl] GraphQL batch search: {len(_all_gh_queries)} category queries "
-            f"+ {len(TOP_5K_QUERIES)} 5k+ queries…"
-        )
+        phase(f"GraphQL batch · {_all_gh_queries.__len__()} cats + {len(TOP_5K_QUERIES)} 5k + new-star")
+        _t_gql = time.monotonic()
+        log(f"  → cats ({len(_all_gh_queries)} queries)…")
         _batch.update(gh_search_batch(_all_gh_queries, per_page=30, batch_size=6))
+        bar("cats", 1, 3)
+        log(f"  → 5k ({len(TOP_5K_QUERIES)} queries)…")
         _batch.update(
             gh_search_batch(
                 TOP_5K_QUERIES, per_page=50, batch_size=8, follow_page2=True
             )
         )
+        bar("5k", 2, 3)
         # ponytail: 2026-09 P1 修复 — 低星新星通道。全部 5k 池查询 stars:>500、
         # 分类查询大多 stars:>100+，"刚开源、<500 星、没上 trending"的项目有
         # 真空期（实测 PG 中 stars<500 且无分类的行 = 0）。近 14 天 created +
         # 硬 topic + stars:>50 专门捞这批；走独立通道并入（不参与星标截断）。
+        log("  → new-star (recent low-star AI)…")
         _new_star_queries = [
             f"stars:>50 created:>{_new_star_cutoff} topic:{t}"
             for t in ("llm", "ai-agent", "mcp-server", "claude-code", "ai-coding")
         ]
         _batch.update(gh_search_batch(_new_star_queries, per_page=30, batch_size=6))
+        bar("new-star", 3, 3)
+        done(f"GraphQL done{eta(_t_gql, 3, 3)}")
     except Exception as e:
         print(
             f"  [warn] GraphQL batch unavailable ({e}); REST serial fallback "
@@ -418,7 +442,9 @@ def _crawl_inner(with_llm: bool = False):
         _batch[q] = repos
         return repos
 
-    for cat in CATEGORIES:
+    phase(f"Category fetch · {len(CATEGORIES)} categories")
+    _t_cats = time.monotonic()
+    for ci, cat in enumerate(CATEGORIES, 1):
         seen = set()
         repos = []
         # ponytail: empty `queries` = non-GitHub source category. Dispatch by the
@@ -487,37 +513,51 @@ def _crawl_inner(with_llm: bool = False):
                 "repos": repos,
             }
         )
-        print(f"  ✓ {cat['name']}: {len(repos)} repos")
+        print(f"  ✓ {cat['name']}: {len(repos)} repos", flush=True)
+        bar("cats", ci, len(CATEGORIES), width=32)
+    done(f"categories done{eta(_t_cats, len(CATEGORIES), len(CATEGORIES))}")
 
     # ponytail: 5k+ pass — catch mainstream AI tools not matched by category queries
-    print(f"[crawl] 5k+ pass ({len(TOP_5K_QUERIES)} queries)…")
+    phase(f"5k+ pass · {len(TOP_5K_QUERIES)} queries")
+    _t_5k = time.monotonic()
     # ponytail: 2026-09 P2 — 池内合并键统一小写:GitHub full_name 大小写随改名
     # 变化,精确比较会产生大小写变体漏合并(单次 crawl 内 normalize_git_url 已
     # 小写,这里对齐同一语义;repo["name"] 原样保留供显示)。
     top_5k_repos = {}
-    for q in TOP_5K_QUERIES:
+    for qi, q in enumerate(TOP_5K_QUERIES, 1):
         try:
             for r in _query_repos(q, per_page=100):
                 if not is_ai_relevant(r):
                     continue
                 top_5k_repos.setdefault(r["name"].lower(), r)
         except Exception as e:
-            print(f"  [warn] 5k+ query '{q}' failed: {e}")
+            print(f"  [warn] 5k+ query '{q}' failed: {e}", flush=True)
+        if qi % 5 == 0 or qi == len(TOP_5K_QUERIES):
+            bar("5k queries", qi, len(TOP_5K_QUERIES), width=32)
 
     print(
         f"  ✓ 5k+ pass: {len(top_5k_repos)} repos after AI filter "
-        f"(search phase {time.monotonic() - _search_t0:.0f}s)"
+        f"(search phase {time.monotonic() - _search_t0:.0f}s)",
+        flush=True,
     )
+    done(f"5k+ pass done{eta(_t_5k, len(TOP_5K_QUERIES), len(TOP_5K_QUERIES))}")
 
     # ponytail: manual seed — guaranteed inclusion of well-known AI tools that escape topic search
+    phase(f"Manual seed · {len(MANUAL_SEED_REPOS)} repos")
+    si = 0
     for full_name in MANUAL_SEED_REPOS:
+        si += 1
         if full_name.lower() in top_5k_repos:
+            bar("seed", si, len(MANUAL_SEED_REPOS), width=32)
             continue
         r = gh_fetch_repo(full_name)
         if not r or not is_ai_relevant(r):
+            bar("seed", si, len(MANUAL_SEED_REPOS), width=32)
             continue
         top_5k_repos[full_name.lower()] = r
-        print(f"  ✓ manual seed: {full_name} ({r['stars']} ⭐)")
+        print(f"  ✓ manual seed: {full_name} ({r['stars']} ⭐)", flush=True)
+        bar("seed", si, len(MANUAL_SEED_REPOS), width=32)
+    done(f"manual seed done{eta(_t_crawl, max(si, 1), max(len(MANUAL_SEED_REPOS), 1))}")
 
     # ponytail: GitHub trending — catches fresh AI tools with <5k stars that are hot today.
     # Pull BOTH daily and weekly — daily = today's buzz, weekly = rising stars the daily
@@ -533,8 +573,11 @@ def _crawl_inner(with_llm: bool = False):
         ("daily", "rust"),
         ("daily", "go"),
     ]
+    phase(f"Trending · {len(_trend_routes)} routes (daily/weekly × all-lang + python/ts/rust/go)")
+    _t_trend = time.monotonic()
     print(
-        f"[crawl] GitHub trending ({len(_trend_routes)} routes: daily/weekly × all-lang + python/ts/rust/go)…"
+        f"[crawl] GitHub trending ({len(_trend_routes)} routes: daily/weekly × all-lang + python/ts/rust/go)…",
+        flush=True,
     )
     trending_daily, trending_weekly, _trend_lang = [], [], []
     with ThreadPoolExecutor(max_workers=len(_trend_routes)) as _tex:
@@ -542,7 +585,7 @@ def _crawl_inner(with_llm: bool = False):
             _tex.submit(fetch_github_trending, since, 30, lang): (since, lang)
             for since, lang in _trend_routes
         }
-        for _fut, (_since, _lang) in _futs.items():
+        for ti, (_fut, (_since, _lang)) in enumerate(_futs.items(), 1):
             try:
                 _res = _fut.result()
             except Exception as e:
@@ -558,6 +601,8 @@ def _crawl_inner(with_llm: bool = False):
                     trending_weekly = _res
             else:
                 _trend_lang.extend(_res)
+            bar("trending routes", ti, len(_trend_routes), width=32)
+    done(f"trending done{eta(_t_trend, len(_trend_routes), len(_trend_routes))}")
     trending_seen, trending = set(), []
     for r in trending_daily + trending_weekly + _trend_lang:
         if r["name"].lower() in trending_seen:
@@ -682,8 +727,10 @@ def _crawl_inner(with_llm: bool = False):
     # 现在只抓 README 存 raw_md 缓存（llm_analyze 备料）+ 本地 topic 匹配
     # competitive 桶；中文 5 桶由宿主 LLM /api/save_summary_batch 回写。
     try:
+        phase(f"README cache · {len(deduped)} repos")
+        _t_rm = time.monotonic()
         n_readme = fetch_and_cache_readmes(deduped)
-        print(f"  ✓ readme cached: {n_readme} entries with raw_md")
+        done(f"readme cached: {n_readme}/{len(deduped)} entries{eta(_t_rm, len(deduped), len(deduped))}")
     except Exception as e:
         print(f"  [warn] readme fetch failed: {e}", file=sys.stderr)
 
@@ -737,8 +784,10 @@ def _crawl_inner(with_llm: bool = False):
             )
             conn.commit()
             print(
-                f"[crawl] saved → postgres ai_radar ({n_inserted} added, {n_updated} updated, {len(deduped)} unique this run)"
+                f"[crawl] saved → postgres ai_radar ({n_inserted} added, {n_updated} updated, {len(deduped)} unique this run)",
+                flush=True,
             )
+            done(f"crawl done — {time.monotonic()-_t_crawl:.0f}s total")
             return {
                 "total_unique": len(deduped),
                 "crawl_id": crawl_id,
@@ -787,7 +836,8 @@ def _crawl_inner(with_llm: bool = False):
     }
     latest_file = DATA / "latest.json"
     latest_file.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2))
-    print(f"[crawl] saved → {latest_file} ({len(deduped)} repos, JSON mode)")
+    print(f"[crawl] saved → {latest_file} ({len(deduped)} repos, JSON mode)", flush=True)
+    done(f"crawl done — {time.monotonic()-_t_crawl:.0f}s total")
     return {"total_unique": len(deduped), "fallback": "json", "queries_failed": failed}
 
 

@@ -15,6 +15,7 @@ import json
 import subprocess
 import sys
 import threading
+import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
@@ -82,7 +83,7 @@ def _fetch_readme_from_github(
 def fetch_and_cache_readmes(repos: list, max_workers: int = 6) -> int:
     """为 GitHub repos 抓 README，raw_md 写入 README_ZH_CACHE（llm_analyze 备料）。
     缓存已有 raw_md 的跳过；失败静默。写回时保留磁盘上已有的 sections /
-    analysis_5d 桶数据（宿主 LLM 写的 5 桶不能被覆盖丢）。
+    analysis_5d 桶数据（宿主 LLM 写 5 桶不能被覆盖丢）。
     返回缓存里 raw_md 的总条数。任何失败不阻塞爬取主流程。"""
     cache: dict = {}
     if core.README_ZH_CACHE.exists():
@@ -98,7 +99,19 @@ def fetch_and_cache_readmes(repos: list, max_workers: int = 6) -> int:
     ]
     print(f"[crawl] readme fetch: {len(todo)} to fetch ({len(cache)} cached entries)")
 
+    # ponytail: 2026-09 — README 阶段发 bar (每完成 N 条打一次)。 之前全程无声,
+    # 前端 /api/crawl/progress 拿到 stale 的上一阶段 100%,用户以为卡住。
+    try:
+        from radar_pkg.progress import bar, done as _done
+        _have_bar = True
+    except Exception:
+        _have_bar = False
+    _t_rm = time.monotonic()
+    _done_count = 0
+    _bar_step = max(10, len(todo) // 30) if todo else 1  # ~30 updates total
+
     def _fetch_one(r: dict) -> None:
+        nonlocal _done_count
         full_name = r.get("name") or ""
         if "/" not in full_name:
             return
@@ -115,10 +128,15 @@ def fetch_and_cache_readmes(repos: list, max_workers: int = 6) -> int:
                 "fetched_at": datetime.datetime.now().isoformat(timespec="seconds"),
             }
         )
+        _done_count += 1
+        if _have_bar and (_done_count % _bar_step == 0 or _done_count == len(todo)):
+            bar("readmes", _done_count, len(todo), width=32)
 
     if todo:
         with ThreadPoolExecutor(max_workers=max_workers) as ex:
             list(ex.map(_fetch_one, todo))
+        if _have_bar:
+            _done(f"readme cached: {len(todo)}/{len(todo)} entries ({time.monotonic()-_t_rm:.0f}s)")
     # ponytail: 锁内重读 disk 合并写回。/api/save_summary_batch 也写同一文件,
     # 不重读 disk 直接写 cache 会把并发的新桶数据覆盖丢。
     with _CACHE_LOCK:

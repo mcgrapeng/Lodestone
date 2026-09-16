@@ -2,7 +2,9 @@
 // by Vite at /api/*). Errors surface as thrown exceptions so callers can `try/catch`.
 
 import type {
+  CrawlProgress,
   GainPage,
+  LlmStatus,
   Snapshot,
   Stats,
   Settings,
@@ -126,18 +128,17 @@ export const api = {
     return post('/api/llm/summarize', {})
   },
 
-  async getLlmStatus(): Promise<{
-    configured: boolean
-    provider: string | null
-    running: boolean
-    last_run: string | null
-    last_analyzed: number | null
-    last_total: number | null
-    last_duration_s: number | null
-    last_source: 'pg' | 'json' | null
-    last_model: string | null
-    updated_at: string | null
-  }> {
-    return jsonOrThrow(await fetch(`${BASE}/api/llm/status`))
+  async getLlmStatus(): Promise<LlmStatus> {
+    return jsonOrThrow<LlmStatus>(await fetch(`${BASE}/api/llm/status`))
+  },
+
+  // ponytail: 2026-09 — 前端爬取进度条轮询。返回 last_lines + 当前 phase + bar 状态。
+  // 失败不抛(进度条非关键 UI),返回兜底。
+  async getCrawlProgress(): Promise<CrawlProgress> {
+    try {
+      return await jsonOrThrow<CrawlProgress>(await fetch(`${BASE}/api/crawl/progress`))
+    } catch {
+      return { running: false, phase: null, label: null, current: null, total: null, pct: null, eta: null, pid: null, started_at: null, elapsed_s: null, log_mtime: null, last_lines: [] }
+    }
   },
 }

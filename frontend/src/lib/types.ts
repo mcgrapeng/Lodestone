@@ -115,3 +115,40 @@ export interface TestLlmResult {
   model?: string
   error?: string
 }
+
+// ponytail: 2026-09 — LLM status 类型与 /api/llm/status 一致;Settings 抽屉进度条轮询用。
+export type LlmStatus = {
+  configured: boolean
+  provider: string | null
+  running: boolean
+  current: number | null        // 已分析数(跑批中)
+  total: number | null          // 总数(跑批中)
+  analyzed_running: number | null  // 跑批中成功数
+  started_at: string | null
+  last_run: string | null
+  last_analyzed: number | null
+  last_total: number | null
+  last_duration_s: number | null
+  last_source: 'pg' | 'json' | null
+  last_model: string | null
+  updated_at: string | null
+}
+
+// ponytail: 2026-09 — crawl progress 类型与 /api/crawl/progress 一致;banner 轮询用。
+export type CrawlProgress = {
+  running: boolean
+  phase: string | null
+  label: string | null
+  current: number | null
+  total: number | null
+  pct: number | null
+  eta: string | null
+  pid: number | null
+  started_at: number | null
+  elapsed_s: number | null
+  log_mtime: number | null
+  last_lines: string[]
+}
+
+// ponytail: 兼容旧名
+export type crawlProgress = CrawlProgress

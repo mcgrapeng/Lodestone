@@ -366,10 +366,25 @@ def serve(port=8765):
                     configured = bool(fields.get("api_key")) and bool(fields.get("base_url"))
                 elif provider == "ollama":
                     configured = bool(fields.get("host"))
+                # ponytail: 2026-09 — 进度条数据(running + current + total)。
+                # 跑批时 analyze_many 每 ~2.5% 写一次 llm_status.json,
+                # status dict 里有 current/total/analyzed_running。running 优先看锁,
+                # 锁释放但 status 还残留 running=True 时用 updated_at 兜底(5s 内视为跑完)。
+                running_effective = running
+                current = status.get("current")
+                total = status.get("total")
+                if running_effective and current is None and total is None:
+                    # 没进度数据但锁在 — 启动后第一批还没写盘
+                    current = 0
+                    total = status.get("total") or 0
                 self._json({
                     "configured": configured,
                     "provider": provider or None,
-                    "running": running,
+                    "running": running_effective,
+                    "current": current,
+                    "total": total,
+                    "analyzed_running": status.get("analyzed_running"),
+                    "started_at": status.get("started_at"),
                     "last_run": status.get("last_run_at"),
                     "last_analyzed": status.get("analyzed"),
                     "last_total": status.get("total"),
@@ -377,6 +392,96 @@ def serve(port=8765):
                     "last_source": status.get("source"),
                     "last_model": status.get("model"),
                     "updated_at": status.get("updated_at"),
+                })
+                return
+            # ponytail: 2026-09 — /api/crawl/progress 给前端进度条 banner。
+            # 解析 data/crawl.log 最近阶段 + 当前 bar；running 走 crawl_lock_held，
+            # 不在时返 last_done_at 让前端知道上次成功于何时。
+            if self.path == "/api/crawl/progress":
+                import re as _re
+                log_path = DATA / "crawl.log"
+                running = crawl_lock_held()
+                phase = None
+                label = None
+                current = None
+                total = None
+                pct = None
+                eta = None
+                last_lines: list[str] = []
+                pid = None
+                started_at = None
+                log_mtime = None
+                if log_path.exists():
+                    try:
+                        st = log_path.stat()
+                        log_mtime = st.st_mtime
+                        # ponytail: 读尾部 ~64KB — 单次 crawl 总日志 ~15-25KB,
+                        # 64KB 覆盖完整最近一个阶段(包括可能跨多页的进度)。
+                        with log_path.open("rb") as _f:
+                            _f.seek(max(0, st.st_size - 65536))
+                            text = _f.read().decode("utf-8", errors="replace")
+                        all_lines = [ln for ln in text.splitlines() if ln.strip()]
+                        last_lines = all_lines[-15:]
+                        # ponytail: 2026-09 — 只在「最近 phase 之后」找 bar。
+                        # 之前用 reversed last_lines 找最近 bar → 跨阶段时显示 stale 值
+                        # (README 阶段没发 bar,前端就看到上一阶段 100% trending)。
+                        phase_idx = None
+                        for i in range(len(all_lines) - 1, -1, -1):
+                            if _re.match(r"^──\s+.+?\s+──$", all_lines[i].strip()):
+                                phase_idx = i
+                                break
+                        if phase_idx is not None:
+                            phase = _re.match(
+                                r"^──\s+(.+?)\s+──$", all_lines[phase_idx].strip()
+                            ).group(1)
+                            # 在 phase 行之后找最近 bar
+                            for j in range(len(all_lines) - 1, phase_idx, -1):
+                                _bm = _re.search(
+                                    r"\[\s*[█░]+\s*\]\s+([\d.]+)%\s+(\d+)/(\d+)\s+(\S+?)(?:\s|$)",
+                                    all_lines[j],
+                                )
+                                if _bm:
+                                    pct = float(_bm.group(1))
+                                    current = int(_bm.group(2))
+                                    total = int(_bm.group(3))
+                                    label = _bm.group(4)
+                                    break
+                            # ETA: phase 之后最近 ✓/done 行
+                            for j in range(len(all_lines) - 1, phase_idx, -1):
+                                if all_lines[j].strip().startswith("✓") or " done" in all_lines[j]:
+                                    _em = _re.search(r"\(\d+s(?:, ~\d+s left)?\)", all_lines[j])
+                                    if _em:
+                                        eta = _em.group(0)
+                                    break
+                        # 解析 PID
+                        try:
+                            pid = int(log_path.with_name("crawl.lock").read_text().strip())
+                        except Exception:
+                            pid = None
+                    except Exception:
+                        pass
+                # 起始时间 = crawl.lock mtime(若有)
+                started_at_ts = None
+                lock_path = DATA / "crawl.lock"
+                if lock_path.exists():
+                    try:
+                        started_at_ts = lock_path.stat().st_mtime
+                    except Exception:
+                        pass
+                elapsed_s = round(time.time() - started_at_ts, 1) if started_at_ts else None
+                self._json({
+                    "running": running,
+                    "phase": phase,
+                    "label": label,
+                    "current": current,
+                    "total": total,
+                    "pct": pct,
+                    "eta": eta,
+                    "pid": pid,
+                    "started_at": started_at_ts,
+                    "elapsed_s": elapsed_s,
+                    "log_mtime": log_mtime,
+                    "last_lines": last_lines,
                 })
                 return
             # ponytail: 2026-09 — /api/restart 给 /yz:ai skill 一键重启.

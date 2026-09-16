@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import { X, Check, AlertCircle, Sparkles, Loader2 } from 'lucide-react'
 import { api } from '../lib/api'
-import type { Settings, TestLlmResult } from '../lib/types'
+import type { LlmStatus, Settings, TestLlmResult } from '../lib/types'
 
 interface Props {
   open: boolean
@@ -30,17 +30,8 @@ export function SettingsDrawer({ open, initial, onClose, onSaved }: Props) {
   const [saveError, setSaveError] = useState<string | null>(null)
   // ponytail: 2026-09 P3 — 5 桶生成手动触发相关 state。
   // configured=false 时按钮禁用 + 显示「请先配置 Provider」;
-  // running 时轮询 /api/llm/status 看是否结束。
-  const [llmStatus, setLlmStatus] = useState<{
-    configured: boolean
-    provider: string | null
-    running: boolean
-    last_run: string | null
-    last_analyzed: number | null
-    last_total: number | null
-    last_duration_s: number | null
-    last_model: string | null
-  } | null>(null)
+  // running 时轮询 /api/llm/status 看 current/total 进度 + 何时结束。
+  const [llmStatus, setLlmStatus] = useState<LlmStatus | null>(null)
   const [triggering, setTriggering] = useState(false)
   const [triggerError, setTriggerError] = useState<string | null>(null)
 
@@ -299,8 +290,34 @@ export function SettingsDrawer({ open, initial, onClose, onSaved }: Props) {
               )}
             </div>
 
-            {/* Last run summary */}
-            {llmStatus?.last_run && (
+            {/* ponytail: 2026-09 — 实时进度条。running 时显示 current/total 进度条;done 或未跑时显示上次结果摘要。 */}
+            {llmStatus?.running ? (
+              <div className="mb-2">
+                <div className="mb-1 flex items-center justify-between text-xs">
+                  <span className="text-foreground-subtle">
+                    正在分析 {llmStatus.current ?? 0}/{llmStatus.total ?? '?'} 张
+                    {llmStatus.analyzed_running != null && (
+                      <span className="ml-1 text-primary">· 成功 {llmStatus.analyzed_running}</span>
+                    )}
+                  </span>
+                  <span className="font-mono text-foreground-subtle">
+                    {llmStatus.total && llmStatus.current != null
+                      ? `${Math.round(100 * llmStatus.current / llmStatus.total)}%`
+                      : '启动中…'}
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-primary/15">
+                  <div
+                    className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+                    style={{
+                      width: llmStatus.total && llmStatus.current != null
+                        ? `${Math.min(100, Math.max(0, 100 * llmStatus.current / llmStatus.total))}%`
+                        : '25%',
+                    }}
+                  />
+                </div>
+              </div>
+            ) : llmStatus?.last_run ? (
               <p className="mb-2 text-xs text-foreground-subtle">
                 上次生成: {llmStatus.last_analyzed ?? 0}/{llmStatus.last_total ?? '?'} 张
                 {llmStatus.last_duration_s ? ` · ${llmStatus.last_duration_s}s` : ''}
@@ -308,22 +325,22 @@ export function SettingsDrawer({ open, initial, onClose, onSaved }: Props) {
                 {' · '}
                 <span className="font-mono">{llmStatus.last_run.slice(0, 19).replace('T', ' ')}</span>
               </p>
-            )}
+            ) : null}
 
             <button
               onClick={triggerSummarize}
-              disabled={triggering || !llmStatus?.configured}
+              disabled={triggering || !llmStatus?.configured || llmStatus?.running}
               title={
                 !llmStatus?.configured
                   ? '请先填好下方 Provider 字段并点「保存」'
-                  : llmStatus.running
-                  ? '正在生成中…'
+                  : llmStatus?.running
+                  ? '正在生成中…完成前不可点击'
                   : '用配置的 LLM 对所有 repos 跑一遍 5 桶分析'
               }
               className="w-full rounded bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {llmStatus?.running
-                ? '正在生成…'
+                ? `生成中… ${llmStatus.current ?? 0}/${llmStatus.total ?? '?'}`
                 : triggering
                 ? '已触发,等待后端启动…'
                 : '生成 5 桶分析'}

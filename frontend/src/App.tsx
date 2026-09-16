@@ -11,14 +11,16 @@ import { StatsPanel } from './components/StatsPanel'
 import { RepoDrawer } from './components/RepoDrawer'
 import { SettingsDrawer } from './components/SettingsDrawer'
 import { Skeleton } from './components/Skeleton'
+import { CrawlProgress } from './components/CrawlProgress'
 import { TabNav, type TabId } from './components/TabNav'
 import { api } from './lib/api'
 import { matchRepo, sourceOf, type RepoFilters, type SortKey, type SourceKind } from './lib/filters'
 import { useUrlState } from './lib/useUrlState'
-import type { Repo, Snapshot, Stats, Settings } from './lib/types'
+import type { CrawlProgress as CrawlProgressT, Repo, Snapshot, Stats, Settings } from './lib/types'
 
 // ponytail: Vite proxy forwards /api/* to radar.py serve on :8765, so same-origin fetch.
 const POLL_INTERVAL_MS = 30_000
+const CRAWL_PROGRESS_POLL_MS = 2_000
 
 export function App() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
@@ -30,6 +32,7 @@ export function App() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [refreshToast, setRefreshToast] = useState<string | null>(null)
+  const [crawlProgress, setCrawlProgress] = useState<CrawlProgressT | null>(null)
   const initialFetchedAtRef = useRef<string | null>(null)
 
   // URL 即状态（?tab=&q=&cat=&sort=&src=）— 刷新 / 分享 / 收藏都能还原视图
@@ -72,8 +75,11 @@ export function App() {
     [setUrl],
   )
 
-  // ponytail: load /api/data + /api/stats on mount, then poll /api/data every 30s for
+  // ponytail: load /api/data + /api/stats on mount, then poll both every 30s for
   // fresh snapshots without hammering the backend.
+  // ponytail: 2026-09 — 之前 `if (!stats)` 只拉一次,导致第一次 crawl 跑完前
+  // stats 是空 {} 锁住,UI 永远显示「0 repos」。每次 load 都重拉,小 endpoint,
+  // 不值得缓存判断。
   const load = useCallback(async () => {
     try {
       const snap = await api.getSnapshot()
@@ -81,19 +87,34 @@ export function App() {
       setError(null)
       // ponytail: settings 加载与 snapshot 解耦 — 一次失败不影响另一次
       api.getSettings().then(setSettings).catch(() => setSettings(null))
-      if (!stats) {
-        api.getStats().then(setStats).catch(() => undefined)
-      }
+      api.getStats().then(setStats).catch(() => undefined)
     } catch (e) {
       setError((e as Error).message)
     }
-  }, [stats])
+  }, [])
 
   useEffect(() => {
     load()
     const t = setInterval(load, POLL_INTERVAL_MS)
     return () => clearInterval(t)
   }, [load])
+
+  // ponytail: 2026-09 — 进度条 banner 数据源。2s 轮询 /api/crawl/progress,crawl 不
+  // 在时也轮询(开销 ~50B JSON)以检测外部触发的爬取。running=false 时不显示 banner,
+  // 但保留 polling 方便下次 handleRefresh 立即接上。
+  useEffect(() => {
+    let cancelled = false
+    const tick = async () => {
+      const p = await api.getCrawlProgress()
+      if (!cancelled) setCrawlProgress(p)
+    }
+    tick()
+    const t = setInterval(tick, CRAWL_PROGRESS_POLL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(t)
+    }
+  }, [])
 
   async function handleRefresh() {
     setRefreshing(true)
@@ -253,6 +274,8 @@ export function App() {
           />
         </div>
       </div>
+
+      {crawlProgress && <CrawlProgress progress={crawlProgress} />}
 
       {refreshToast && (
         <div className="fixed left-1/2 top-20 z-50 -translate-x-1/2 rounded-full border border-primary/30 bg-background-muted/95 px-4 py-2 text-sm text-primary shadow-lg shadow-primary/20 backdrop-blur">
