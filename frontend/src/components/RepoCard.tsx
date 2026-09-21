@@ -113,19 +113,19 @@ export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
           />
           <PlatformDot
             cli="codex"
-            installed={false}
+            installed={Boolean(repo.local_installed_codex)}
             disabled={busy.has('codex')}
             onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
           />
           <PlatformDot
             cli="opencode"
-            installed={false}
+            installed={Boolean(repo.local_installed_opencode)}
             disabled={busy.has('opencode')}
             onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
           />
           <PlatformDot
             cli="easycode"
-            installed={false}
+            installed={Boolean(repo.local_installed_easycode)}
             disabled={busy.has('easycode')}
             onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
           />
@@ -212,19 +212,19 @@ export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
         />
         <PlatformDot
           cli="codex"
-          installed={false}
+          installed={Boolean(repo.local_installed_codex)}
           disabled={busy.has('codex')}
           onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
         />
         <PlatformDot
           cli="opencode"
-          installed={false}
+          installed={Boolean(repo.local_installed_opencode)}
           disabled={busy.has('opencode')}
           onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
         />
         <PlatformDot
           cli="easycode"
-          installed={false}
+          installed={Boolean(repo.local_installed_easycode)}
           disabled={busy.has('easycode')}
           onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
         />

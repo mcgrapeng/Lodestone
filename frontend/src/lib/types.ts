@@ -19,6 +19,12 @@ export interface Repo {
   is_ai_relevant?: boolean
   best_category?: string | null
   local_installed?: boolean
+  // ponytail: 2026-09 P3 — /api/data 后端为每个 repo 算 per-CLI 装态,前端 PlatformDot 4 个 dot 各取一个。
+  // 老数据没有这 4 个字段时(全 undefined),前端用 Boolean() 转 false,与之前硬编码 installed={false} 行为一致。
+  local_installed_claude?: boolean
+  local_installed_codex?: boolean
+  local_installed_opencode?: boolean
+  local_installed_easycode?: boolean
   trending?: boolean
   is_fresh?: boolean
   facts?: string
