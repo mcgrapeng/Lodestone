@@ -548,6 +548,27 @@ def _crawl_inner(with_llm: bool = False):
                 except Exception as e:
                     print(f"  [warn] arXiv fetcher failed: {e}", file=sys.stderr)
                     repos = []
+            elif src == "awesome_lists":
+                # ponytail: 2026-09 P2 — new data sources bridge the topic-label gap.
+                # Scraped awesome-* READMEs surface mainstream AI tools that escape
+                # topic-based GitHub search (Tencent/WeKnora, mksglu/context-mode, …).
+                try:
+                    from sources.awesome_lists import crawl as _awesome_lists_crawl
+
+                    repos = list(_awesome_lists_crawl())[:30]
+                except Exception as e:
+                    print(f"  [warn] awesome_lists fetcher failed: {e}", file=sys.stderr)
+                    repos = []
+            elif src == "hackernews_ai":
+                # ponytail: 2026-09 P2 — HN front page surfaces new AI tools faster
+                # than GitHub Trending; AI-keyword filter + GitHub URL extract.
+                try:
+                    from sources.hackernews_ai import crawl as _hackernews_ai_crawl
+
+                    repos = list(_hackernews_ai_crawl(max_stories=100))[:30]
+                except Exception as e:
+                    print(f"  [warn] hackernews_ai fetcher failed: {e}", file=sys.stderr)
+                    repos = []
             # else: an unknown source type — drop with warning so silent data loss is loud
             if not repos and src:
                 print(
