@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { TrendingUp, Sparkles, Globe2, Cpu } from 'lucide-react'
 import type { Snapshot, Stats } from '../lib/types'
 import { formatStars } from '../lib/format'
+import { usePrefersReducedMotion } from '../lib/reduced-motion'
 
 export interface HeroStatsProps {
   snapshot: Snapshot
@@ -9,6 +10,7 @@ export interface HeroStatsProps {
 }
 
 export function HeroStats({ snapshot, stats }: HeroStatsProps) {
+  const reduced = usePrefersReducedMotion()
   // 视觉审查修正：顶栏与统计卡数字统一口径（hot_now + 分类去重），
   // 「今日上榜」从 stars_today 取（JSON 模式下 hot_now 不带 trending flag）
   const dedupRepos = useMemo(() => {
@@ -51,6 +53,12 @@ export function HeroStats({ snapshot, stats }: HeroStatsProps) {
           </h2>
         </div>
 
+        <div className="mb-4 flex items-center gap-2 text-[10px] uppercase tracking-widest text-accent-cyan/80">
+          <span className={reduced ? '' : 'animate-pulse'}>●</span>
+          <span>SCANNING GITHUB · HF · MCP · arXiv</span>
+          <span className="ml-1 px-1.5 py-0.5 rounded bg-accent-orange/20 text-accent-orange">LIVE</span>
+        </div>
+        <div className="scan-bar mb-6 rounded" aria-hidden />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {tiles.map(({ icon: Icon, label, value, sub }) => (
             <div
@@ -67,7 +75,7 @@ export function HeroStats({ snapshot, stats }: HeroStatsProps) {
                 <div className="mt-3 text-[11px] tracking-wider text-foreground-subtle">
                   {label}
                 </div>
-                <div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-white">
+                <div className="mt-1 font-mono text-3xl font-semibold glow-num tabular-nums tracking-tight text-white">
                   {value}
                 </div>
                 <div className="mt-0.5 text-[11px] text-foreground-subtle">{sub}</div>
