@@ -96,6 +96,24 @@ export const api = {
     return post('/api/uninstall', { name })
   },
 
+  // ponytail: 2026-09 P2 — per-platform install/uninstall. Card surfaces
+  // 4 dots (Claude/Codex/OpenCode/EasyCode); click hits /api/install_to_target
+  // for a single CLI instead of prompting in a drawer.
+  async installToTarget(
+    name: string,
+    url: string,
+    target: 'claude' | 'codex' | 'opencode' | 'easycode',
+  ): Promise<InstallStatus> {
+    return post<InstallStatus>('/api/install_to_target', { name, url, target })
+  },
+
+  async uninstallFromTarget(
+    name: string,
+    target: 'claude' | 'codex' | 'opencode' | 'easycode',
+  ): Promise<InstallStatus> {
+    return post<InstallStatus>('/api/uninstall_from_target', { name, target })
+  },
+
   async triggerCrawl(): Promise<{ ok: boolean; pid?: number; error?: string }> {
     const r = await fetch(`${BASE}/api/crawl`, { method: 'POST' })
     if (!r.ok) {
