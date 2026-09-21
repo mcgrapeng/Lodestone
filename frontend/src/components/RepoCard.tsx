@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { Star, GitFork, ExternalLink, Flame, Sparkles, Download, Plus } from 'lucide-react'
 import type { Repo } from '../lib/types'
 import { formatStars, repoOwner, repoSlug } from '../lib/format'
 import { sourceOf } from '../lib/filters'
+import { PlatformDot, type Cli } from './PlatformDot'
+import { api } from '../lib/api'
 
 export interface RepoCardProps {
   repo: Repo
@@ -16,11 +19,25 @@ export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
   const displayName = intro || repo.summary_zh || repo.desc_zh || repo.desc || '—'
   const topics = (repo.topics ?? []).slice(0, 3)
   // ponytail: 2026-09 — 是否是可安装的 skill(github 源 + 是 SKILL.md)。
-  // 未装时 RepoCard 显示「+ 安装」按钮,让用户一眼看到可装的。点开 drawer 选平台。
+  // 未装时 RepoCard 显示「+ 安装」按钮,让用户一眼看到可装。点开 drawer 选平台。
   const installable =
     !repo.local_installed &&
     sourceOf(repo) === 'github' &&
     repo.is_skill === true
+
+  // ponytail: 2026-09 P2 — per-platform install click handler. busy target
+  // disables that dot while the POST is in flight; other dots remain live.
+  const [busy, setBusy] = useState<Cli | null>(null)
+  async function toggleInstall(name: string, url: string, target: Cli) {
+    setBusy(target)
+    try {
+      await api.installToTarget(name, url, target)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setBusy(null)
+    }
+  }
 
   if (variant === 'row') {
     return (
@@ -76,6 +93,37 @@ export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
             </span>
           )}
           <ExternalLink className="h-3.5 w-3.5 text-foreground-subtle transition group-hover:text-primary" />
+        </div>
+        {/* ponytail: 2026-09 P2 — 4 platform dots. stopPropagation prevents the
+            outer <button>'s onOpen handler from firing when a dot is clicked. */}
+        <div
+          className="flex shrink-0 items-center gap-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <PlatformDot
+            cli="claude"
+            installed={Boolean(repo.local_installed)}
+            disabled={busy === 'claude'}
+            onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
+          />
+          <PlatformDot
+            cli="codex"
+            installed={false}
+            disabled={busy === 'codex'}
+            onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
+          />
+          <PlatformDot
+            cli="opencode"
+            installed={false}
+            disabled={busy === 'opencode'}
+            onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
+          />
+          <PlatformDot
+            cli="easycode"
+            installed={false}
+            disabled={busy === 'easycode'}
+            onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
+          />
         </div>
       </button>
     )
@@ -143,6 +191,38 @@ export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
             <Sparkles className="h-3 w-3" />+{formatStars(repo.stars_today)}
           </span>
         )}
+      </div>
+      {/* ponytail: 2026-09 P2 — 4 platform dots (grid variant, pinned bottom-right
+          so they don't crowd the header chips). stopPropagation keeps the card's
+          onOpen from firing when a dot is clicked. */}
+      <div
+        className="absolute bottom-2 right-2 flex shrink-0 items-center gap-1"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <PlatformDot
+          cli="claude"
+          installed={Boolean(repo.local_installed)}
+          disabled={busy === 'claude'}
+          onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
+        />
+        <PlatformDot
+          cli="codex"
+          installed={false}
+          disabled={busy === 'codex'}
+          onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
+        />
+        <PlatformDot
+          cli="opencode"
+          installed={false}
+          disabled={busy === 'opencode'}
+          onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
+        />
+        <PlatformDot
+          cli="easycode"
+          installed={false}
+          disabled={busy === 'easycode'}
+          onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
+        />
       </div>
     </button>
   )
