@@ -35,8 +35,8 @@ type Action = 'install' | 'update' | 'uninstall'
 export function RepoDrawer({ repo, open, onClose, onRepoChanged }: RepoDrawerProps) {
   const [busy, setBusy] = useState<Action | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
-  // 平台多选 — 默认只勾 Claude Code（2026-09 用户决策；此前默认静默装全部平台）
-  const [targets, setTargets] = useState<string[]>(['claude'])
+  // 平台多选 — 默认不勾任何平台（2026-09 用户决策；强制显式选择避免误装）
+  const [targets, setTargets] = useState<string[]>([])
 
   function toggleTarget(id: string) {
     setTargets((prev) =>
@@ -171,7 +171,24 @@ export function RepoDrawer({ repo, open, onClose, onRepoChanged }: RepoDrawerPro
               {/* 安装 / 更新 / 卸载 — skills 闭环 */}
               {installable && (
                 <div className="mb-5">
-                  {/* 平台多选 — 安装/更新都作用于勾选的平台；默认仅 Claude Code */}
+                  {/* 平台多选 — 安装/更新都作用于勾选的平台；默认空（强制显式选择） */}
+                  <div className="mb-2 flex items-center gap-2 text-[11px]">
+                    <span className="text-foreground-subtle">已选 {targets.length}/4</span>
+                    <button
+                      type="button"
+                      onClick={() => setTargets(['claude', 'codex', 'opencode', 'easycode'])}
+                      className="rounded px-1.5 py-0.5 text-foreground-subtle hover:text-foreground"
+                    >
+                      全选
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTargets([])}
+                      className="rounded px-1.5 py-0.5 text-foreground-subtle hover:text-foreground"
+                    >
+                      全不选
+                    </button>
+                  </div>
                   <div className="mb-2 flex flex-wrap items-center gap-1.5">
                     <span className="mr-1 text-[11px] text-foreground-subtle">安装到</span>
                     {PLATFORMS.map((p) => {
@@ -183,7 +200,7 @@ export function RepoDrawer({ repo, open, onClose, onRepoChanged }: RepoDrawerPro
                           aria-pressed={on}
                           onClick={() => toggleTarget(p.id)}
                           className={
-                            'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 transition ' +
+                            'inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-sm font-medium ring-1 transition ' +
                             (on
                               ? 'bg-primary/20 text-primary ring-primary/50'
                               : 'bg-background-muted text-foreground-subtle ring-border-muted hover:text-foreground')
