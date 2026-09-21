@@ -50,7 +50,7 @@ from radar_pkg.core import (
     _repo_slug_from_url,
     is_ai_relevant,
 )
-from radar_pkg.detect import detect_cli_tools, detect_local_skills, invalidate_local_scan
+from radar_pkg.detect import SUPPORTED_CLIS, detect_cli_tools, detect_local_skills, invalidate_local_scan
 from radar_pkg.gh import gh_fetch_repo, gh_search
 from radar_pkg.install import (
     find_skill_replacements,
@@ -1560,6 +1560,79 @@ def serve(port=8765):
                             "cache": str(result["cache"]),
                             "cache_state": result["cache_state"],
                             "targets": result["targets"],
+                        }
+                    )
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=400)
+                return
+            # ponytail: 2026-09 P2 — per-platform install thin wrapper. Frontend
+            # RepoCard dot click → install ONE CLI at a time. We do NOT wrap with
+            # INSTALL_LOCK here: install_skill_from_github already acquires it
+            # internally (non-reentrant link(2) lock in core.py); wrapping would
+            # deadlock the request.
+            if self.path == "/api/install_to_target":
+                try:
+                    body = self._read_body()
+                    name = body.get("name", "").strip()
+                    url = body.get("url", "").strip()
+                    target = body.get("target", "").strip()
+                    if not name or not url or target not in SUPPORTED_CLIS:
+                        self._json(
+                            {
+                                "ok": False,
+                                "error": "name/url/target required, target in "
+                                + ", ".join(SUPPORTED_CLIS),
+                            },
+                            status=400,
+                        )
+                        return
+                    result = install_skill_from_github(
+                        name, url, targets=[target]
+                    )
+                    invalidate_local_scan()
+                    statuses = [
+                        f"  · {cli}: {info['status']} ({info['detail']})"
+                        for cli, info in result["targets"].items()
+                    ]
+                    self._json(
+                        {
+                            "ok": True,
+                            "message": f"{name}\n" + "\n".join(statuses),
+                            "cache_state": result["cache_state"],
+                            "targets": result["targets"],
+                        }
+                    )
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)}, status=400)
+                return
+            # ponytail: 2026-09 P2 — per-platform uninstall thin wrapper.
+            # Accepted limitation (matches plan §Task 2.1): uninstall_skill removes
+            # ALL CLI targets in one shot (cache + symlinks for every CLI). Per-CLI
+            # tracking deferred — next crawl will reinstall removed ones anyway,
+            # so the visible state is "this CLI is empty until next sync."
+            if self.path == "/api/uninstall_from_target":
+                try:
+                    body = self._read_body()
+                    name = body.get("name", "").strip()
+                    target = body.get("target", "").strip()
+                    if not name or target not in SUPPORTED_CLIS:
+                        self._json(
+                            {
+                                "ok": False,
+                                "error": "name/target required, target in "
+                                + ", ".join(SUPPORTED_CLIS),
+                            },
+                            status=400,
+                        )
+                        return
+                    result = uninstall_skill(name)
+                    invalidate_local_scan()
+                    self._json(
+                        {
+                            "ok": True,
+                            "message": f"{name} 已从 {target} 卸载(其它 CLI 暂保留,下轮 crawl 重对齐)",
+                            "result": result,
+                            "target": target,
                         }
                     )
                 except Exception as e:
