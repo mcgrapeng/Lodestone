@@ -7,6 +7,14 @@
 
 @theme {
   /* Appica UI supplies the full token system via styles.css — no overrides here. */
+
+  /* ponytail: 2026-09 P2 — radar HUD/cyberpunk accents (cyan/orange). Hardcoded once
+     at the token level; downstream components reference bg-accent-cyan / text-accent-orange
+     instead of repeating rgba() per-use site. */
+  --color-accent-cyan: #00E5FF;
+  --color-accent-cyan-dim: #0099B3;
+  --color-accent-orange: #FF6B35;
+  --color-accent-orange-dim: #B34723;
 }
 
 @layer base {
@@ -68,6 +76,56 @@
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* ponytail: 2026-09 P2 — radar HUD motion primitives. Each utility is a single-purpose
+     keyframe so callers just slap a class on. Reduce-motion fallback below disables all
+     of them; no per-component @media block needed. */
+
+  @keyframes scan-line {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 100% 50%; }
+  }
+  .scan-bar {
+    background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.8) 50%, transparent);
+    background-size: 200% 100%;
+    animation: scan-line 4s linear infinite;
+    height: 2px;
+  }
+
+  @keyframes glow-num {
+    0%, 100% { text-shadow: 0 0 8px rgba(0, 229, 255, 0.4); }
+    50%      { text-shadow: 0 0 12px rgba(0, 229, 255, 0.7); }
+  }
+  .glow-num { animation: glow-num 4s ease-in-out infinite; }
+
+  @keyframes marquee {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .animate-marquee {
+    animation: marquee 60s linear infinite;
+    display: inline-block;
+    will-change: transform;
+  }
+
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .shimmer {
+    background: linear-gradient(90deg, var(--color-background-muted) 0%, rgba(0, 229, 255, 0.08) 50%, var(--color-background-muted) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scan-bar,
+    .glow-num,
+    .animate-marquee,
+    .shimmer {
+      animation: none;
+    }
   }
 }
 
