@@ -724,6 +724,17 @@ TOP_5K_LIMIT = 1200
 
 AI_TOPIC_HARD = frozenset(
     {
+        # ponytail: 2026-09 — narrow keywords removed from QUERY search because
+        # they over-match (a "mcp-server" topic tag captures generic webservers),
+        # but KEPT here in the AI filter — repos explicitly tagged "mcp-server"
+        # ARE AI-related by the GitHub topic-tag convention.
+        "mcp-server",
+        "mcp-servers",
+        "agent-skills",
+        "agentic",
+        "agentic-ai",
+        "spring-ai",
+        "springai",
         "llm",
         "llms",
         "gpt",
