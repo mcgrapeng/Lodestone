@@ -17,7 +17,7 @@ import { Skeleton } from './components/Skeleton'
 import { CrawlProgress } from './components/CrawlProgress'
 import { TabNav, type TabId } from './components/TabNav'
 import { api } from './lib/api'
-import { matchRepo, sourceOf, type RepoFilters, type SortKey, type SourceKind } from './lib/filters'
+import { matchRepo, sourceOf, type RepoFilters, type SortKey, type SourceKind, type SourceCounts } from './lib/filters'
 import { useUrlState } from './lib/useUrlState'
 import type {
   CrawlProgress as CrawlProgressT,
@@ -246,25 +246,31 @@ export function App() {
   }, [snapshot, stats])
 
   // 视觉审查修正：顶栏数字换成指标卡没有的分源计数（消除与指标卡的重复）
-  const sourceSummary = useMemo(() => {
-    if (!snapshot) return ''
+  // ponytail: FU-2.1 — 拆成 counts + summary 两个 memo,counts 喂 Header marquee,
+  // summary 喂右上小标签。一次去重扫描,两处复用。
+  const sourceCounts = useMemo<SourceCounts>(() => {
+    const zero: SourceCounts = { github: 0, huggingface: 0, mcp: 0, arxiv: 0, other: 0 }
+    if (!snapshot) return zero
     const seen = new Set<string>()
-    const counts: Record<string, number> = {}
+    const counts: SourceCounts = { ...zero }
     const tally = (r: Repo) => {
       if (seen.has(r.name)) return
       seen.add(r.name)
-      const s = sourceOf(r)
-      counts[s] = (counts[s] ?? 0) + 1
+      counts[sourceOf(r)] += 1
     }
     snapshot.hot_now.forEach(tally)
     snapshot.categories.forEach((c) => c.repos.forEach(tally))
-    const parts: string[] = []
-    if (counts.github) parts.push(`GitHub ${counts.github}`)
-    if (counts.huggingface) parts.push(`HF ${counts.huggingface}`)
-    if (counts.mcp) parts.push(`MCP ${counts.mcp}`)
-    if (counts.arxiv) parts.push(`arXiv ${counts.arxiv}`)
-    return parts.join(' · ')
+    return counts
   }, [snapshot])
+
+  const sourceSummary = useMemo(() => {
+    const parts: string[] = []
+    if (sourceCounts.github) parts.push(`GitHub ${sourceCounts.github}`)
+    if (sourceCounts.huggingface) parts.push(`HF ${sourceCounts.huggingface}`)
+    if (sourceCounts.mcp) parts.push(`MCP ${sourceCounts.mcp}`)
+    if (sourceCounts.arxiv) parts.push(`arXiv ${sourceCounts.arxiv}`)
+    return parts.join(' · ')
+  }, [sourceCounts])
 
   // 搜索 tab 徽标计数 — 与 SearchResults 的池子同口径（hot_now + 分类去重）
   const searchCount = useMemo(() => {
@@ -405,6 +411,7 @@ export function App() {
         totalRepos={totalRepos}
         totalCategories={snapshot?.categories.length ?? 0}
         sourceSummary={sourceSummary}
+        sourceCounts={sourceCounts}
       />
 
       {/* sticky 搜索 + tab（同一容器，一层 sticky 偏移） */}

@@ -23,6 +23,7 @@ export interface HeaderProps {
   totalRepos: number
   totalCategories: number
   sourceSummary?: string
+  sourceCounts?: Record<string, number>
 }
 
 export function Header({
@@ -34,6 +35,7 @@ export function Header({
   totalRepos,
   totalCategories,
   sourceSummary,
+  sourceCounts,
 }: HeaderProps) {
   // ponytail: 2026-09 — 相对时间 tick。旧实现 fetch-at 时算一次后定格,刷新后
   // "刚刚" / "1 分钟前" 不变。每 30s 触发一次 setState 让组件重渲染,
@@ -119,10 +121,13 @@ export function Header({
           <span>{refreshing ? '爬取中…' : '刷新雷达'}</span>
         </Button>
       </div>
-      {/* status marquee */}
+      {/* ponytail: FU-2.1 — marquee reads live counts from App's sourceCounts
+          (snapshot.hot_now + categories dedup, same tally as sourceSummary).
+          Counts refresh on /api/data poll (30s); last crawl piggy-backs on the
+          30s relativeTime tick already in this component. */}
       <div className="overflow-hidden border-t border-border-muted bg-background-muted/30">
         <div className="animate-marquee whitespace-nowrap text-[11px] text-accent-cyan/80 py-1.5 px-4">
-          → GitHub: 542 repos · HF: 59 models · MCP: 28 servers · arXiv: 13 papers · last crawl 12min ago ·
+          → GitHub: {sourceCounts?.github ?? 0} · HF: {sourceCounts?.huggingface ?? 0} · MCP: {sourceCounts?.mcp ?? 0} · arXiv: {sourceCounts?.arxiv ?? 0} · last crawl {fetchedAt ? relativeTime(fetchedAt) : '—'} ·
         </div>
       </div>
     </header>

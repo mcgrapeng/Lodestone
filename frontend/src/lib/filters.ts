@@ -6,6 +6,8 @@ import type { Repo } from './types'
 
 export type SourceKind = 'github' | 'huggingface' | 'mcp' | 'arxiv' | 'other'
 
+export type SourceCounts = Record<SourceKind, number>
+
 export type SortKey = 'stars' | 'recent' | 'name'
 
 export interface RepoFilters {
