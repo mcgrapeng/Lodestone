@@ -4,28 +4,32 @@
 
 **每天 5 分钟，给 AI 工程师一份"现在值得关注"清单。**
 
-Lodestone（磁石）= 古代航海家用天然磁铁矿导航。我们把 GitHub、HuggingFace、MCP Registry、arXiv 四个数据洋流汇成一张中文友好的仪表盘——按 20 个用途分类，不刷十几个 RSS。
+> 把 GitHub、HuggingFace、MCP Registry、arXiv、awesome 列表、HackerNews 七个数据洋流汇成一张中文友好仪表盘——按 27 个用途分类，不刷十几个 RSS。
+
+<p>
+  <img src="docs/screenshots/dashboard-hot.png" alt="仪表盘 · 热门 · 1,195 仓库 · 40 卡片 · 含已装/Trending 徽标" width="800">
+</p>
 
 ---
 
-## 🧭 一图流：数据怎么流
+## 🧭 数据怎么流
 
 ```
             4 数据洋流                        4 级爬虫兜底
-                                                  ┌─ httpx ─── 多数直接命中
+                                                   ┌─ httpx ─── 多数直接命中
   GitHub   ──┐                                  ├─ cloudscraper ── 破 Cloudflare
   HuggingFace ─┼─→ 抓 · 去重 · AI 过滤 ──→ 仪表盘 ──┤
   MCP Reg    ─┤                                  ├─ playwright_stealth ── 真浏览器
   arXiv      ─┘                                  └─ jina ── 本地 IP 被封换出口
-                  ↓
-              Postgres（推荐）/ JSON 回退
-                  ↓
-              ┌─ 卡片墙：hot_now / trending / 分类 / 24h 星增
-              ├─ 5 桶详情：是什么 / 能干什么 / 解决什么问题 / 同类 / 何时选它
-              └─ 一键装为 skill（仓库根有 SKILL.md 时）
+                   ↓
+               Postgres（推荐）/ JSON 回退
+                   ↓
+               ┌─ 卡片墙：hot / trending / 分类 / 24h 星增
+               ├─ 5 桶详情：是什么 / 能干什么 / 解决什么问题 / 同类 / 何时选它
+               └─ 一键装为 skill（仓库根有 SKILL.md 时）
 ```
 
-GitHub 抗爬时其他 3 个源照常工作——你不会"今天啥都看不到"。
+GitHub 抗爬时其他 6 个源照常工作——你不会"今天啥都看不到"。
 
 ---
 
@@ -45,8 +49,41 @@ git clone <仓库> ~/lodestone && cd ~/lodestone
 
 完全退出 Claude Code 再重开。说"刷一下 AI 雷达"就能用。
 
-> 📸 **Dashboard 主视图**（DB 加载好后是这个样子）：
-> ![Dashboard](docs/screenshots/dashboard.png)
+---
+
+## 📸 4 个视图
+
+### 热门 · 仪表盘主视图
+
+仪表盘默认视图——1,195 仓库聚合，按 27 个分类全自动分流。**已装**(本地有这个 skill)+ **Trending**(本日新增)徽标告诉你哪些值得装、哪些是新晋热门。
+
+<p>
+  <img src="docs/screenshots/dashboard-hot.png" alt="热门视图：1,195 仓库、4 个 stat 卡片、按⭐星标/热度/存量排序" width="800">
+</p>
+
+### 趋势 · GitHub Trending 24h 星增
+
+每天从 GitHub Trending 拉 25 条，按 24h 星增量排序。**+1.1k** = 24 小时新增的 star 数。Trending 标签 = 在多个来源都登榜。
+
+<p>
+  <img src="docs/screenshots/dashboard-trending.png" alt="趋势视图：GitHub 当日 Trending 14 卡片,按 24h 星增排序" width="800">
+</p>
+
+### 分类 · 27 个用途分流浏览
+
+左侧 27 个分类下拉（AI Agent / RAG / LLM / IDE / MCP / Voice / ...）按仓库数排序。右侧是当前选中分类的卡片墙，支持按星标/最近更新排序，按来源过滤。
+
+<p>
+  <img src="docs/screenshots/dashboard-categories.png" alt="分类视图：左侧 27 个分类,右侧 AI Agent & Skills 分类下的 30/30 repos" width="800">
+</p>
+
+### 统计 · 生态分布
+
+按编程语言和热门 topic 看整个生态的分布。`Python · 465 仓库 · ⭐10.6M` 这种数字告诉你哪里是主流、哪里是边缘。
+
+<p>
+  <img src="docs/screenshots/dashboard-stats.png" alt="统计视图：编程语言 + 热门主题 分布气泡图" width="800">
+</p>
 
 ---
 
@@ -73,7 +110,7 @@ git clone <仓库> ~/lodestone && cd ~/lodestone
 | **MCP Registry** | 官方 MCP server | MCP 协议生态入口 |
 | **arXiv** | 最新 AI 论文 | 模型还没出，论文先发 |
 
-GitHub 抗爬 → 其他 4 个源照常。**一个倒、其他不倒**。
+GitHub 抗爬 → 其他 6 个源照常。**一个倒、其他不倒**。
 
 ---
 
@@ -105,7 +142,7 @@ GitHub 抗爬 → 其他 4 个源照常。**一个倒、其他不倒**。
 - **后端**：Python 3.10+（stdlib + 可选 `pg8000`）
 - **数据库**：PostgreSQL（JSON 回退）
 - **爬虫**：4 引擎分级 fallback，stdlib + 可选依赖
-- **数据源**：5 个互补源（GitHub + HF × 2 + MCP + arXiv）
+- **数据源**：7 个互补源（GitHub + HF × 2 + MCP + arXiv + awesome 列表 + HackerNews）
 - **前端**：React 19 + Vite 6 + Appica UI + Tailwind v4
 - **依赖**：`gh` CLI 已认证；中文 5 桶由宿主 LLM（`/lodestone`）回写；可选自动分析走 Claude / OpenAI / Ollama
 
