@@ -1,4 +1,5 @@
 import { Flame, LayoutGrid, BarChart3, Search, TrendingUp, Package } from 'lucide-react'
+import { motion } from 'motion/react'
 
 export type TabId = 'hot' | 'trending' | 'cats' | 'stats' | 'local' | 'search'
 
@@ -37,8 +38,15 @@ export function TabNav({ active, onChange, searchActive, searchCount, upgradable
             role="tab"
             aria-selected={on}
             onClick={() => onChange(id)}
-            className={`nav-tab ${on ? 'nav-tab-active' : ''}`}
+            className={`nav-tab relative ${on ? 'nav-tab-active' : ''}`}
           >
+            {on && (
+              <motion.div
+                layoutId="tab-underline"
+                className="absolute inset-x-0 bottom-0 h-0.5 bg-accent-cyan"
+                transition={{ duration: 0.18 }}
+              />
+            )}
             <Icon className={`h-3.5 w-3.5 ${on ? 'text-primary' : ''}`} />
             {label}
             {/* ponytail: 2026-09 — 角标一致性。

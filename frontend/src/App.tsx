@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import { Header } from './components/Header'
 import { HeroStats } from './components/HeroStats'
 import { SearchBar } from './components/SearchBar'
@@ -456,64 +457,72 @@ export function App() {
           </div>
         </div>
       ) : (
-        <>
-          {activeTab === 'hot' && (
-            <>
-              <HeroStats snapshot={snapshot} stats={stats} />
-              <HotNowSection repos={snapshot.hot_now} onOpen={openRepo} />
-            </>
-          )}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
+          >
+            {activeTab === 'hot' && (
+              <>
+                <HeroStats snapshot={snapshot} stats={stats} />
+                <HotNowSection repos={snapshot.hot_now} onOpen={openRepo} />
+              </>
+            )}
 
-          {activeTab === 'trending' && (
-            <>
-              <TrendingRail repos={snapshotTrending} onOpen={openRepo} />
-              <GainersSection onOpen={openRepo} />
-            </>
-          )}
+            {activeTab === 'trending' && (
+              <>
+                <TrendingRail repos={snapshotTrending} onOpen={openRepo} />
+                <GainersSection onOpen={openRepo} />
+              </>
+            )}
 
-          {activeTab === 'cats' && (
-            <CategoryBrowser
-              categories={snapshot.categories}
-              selected={url.cat}
-              onSelect={(id) => setUrl({ cat: id })}
-              filters={filters}
-              onFiltersChange={patchFilters}
-              onOpen={openRepo}
-            />
-          )}
+            {activeTab === 'cats' && (
+              <CategoryBrowser
+                categories={snapshot.categories}
+                selected={url.cat}
+                onSelect={(id) => setUrl({ cat: id })}
+                filters={filters}
+                onFiltersChange={patchFilters}
+                onOpen={openRepo}
+              />
+            )}
 
-          {activeTab === 'local' && (
-            <div className="mx-auto max-w-7xl space-y-4 px-6 pt-4">
-              <UpgradeProgressBanner status={installStatus} />
-              {local ? (
-                <LocalTab
-                  local={local}
-                  onRefresh={() => loadLocal({ v: false })}
-                  onOpenOrigin={(originUrl: string) => window.open(originUrl, '_blank')}
-                />
-              ) : localError ? (
-                <div className="card-surface border-red-500/30 p-4 text-sm text-error">
-                  ⚠️ 无法加载 /api/local:{localError}
-                </div>
-              ) : (
-                <div className="card-surface p-8 text-center text-sm text-foreground-subtle">
-                  加载中...
-                </div>
-              )}
-            </div>
-          )}
+            {activeTab === 'local' && (
+              <div className="mx-auto max-w-7xl space-y-4 px-6 pt-4">
+                <UpgradeProgressBanner status={installStatus} />
+                {local ? (
+                  <LocalTab
+                    local={local}
+                    onRefresh={() => loadLocal({ v: false })}
+                    onOpenOrigin={(originUrl: string) => window.open(originUrl, '_blank')}
+                  />
+                ) : localError ? (
+                  <div className="card-surface border-red-500/30 p-4 text-sm text-error">
+                    ⚠️ 无法加载 /api/local:{localError}
+                  </div>
+                ) : (
+                  <div className="card-surface p-8 text-center text-sm text-foreground-subtle">
+                    加载中...
+                  </div>
+                )}
+              </div>
+            )}
 
-          {activeTab === 'search' && url.q && (
-            <SearchResults
-              snapshot={snapshot}
-              filters={filters}
-              onFiltersChange={patchFilters}
-              onOpen={openRepo}
-            />
-          )}
+            {activeTab === 'search' && url.q && (
+              <SearchResults
+                snapshot={snapshot}
+                filters={filters}
+                onFiltersChange={patchFilters}
+                onOpen={openRepo}
+              />
+            )}
 
-          {activeTab === 'stats' && <StatsPanel stats={stats} />}
-        </>
+            {activeTab === 'stats' && <StatsPanel stats={stats} />}
+          </motion.div>
+        </AnimatePresence>
       )}
 
       {drawerRepo && (
