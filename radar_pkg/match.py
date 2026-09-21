@@ -155,25 +155,57 @@ def _installed_segments(local: dict) -> set:
             segs.add(mp_source[mp_name])
     return segs
 
-def _annotate_local_installed(rows, installed_segments: set, plugin_segs: set = None):
+def _per_cli_installed_map(local: dict) -> dict:
+    """Build {owner/repo_lower: {claude, codex, opencode, easycode}} from detect_local_skills() output.
+    Keys are lowercased owner/repo (origin_full preferred, else url → owner/repo). Each CLI
+    flag mirrors the boolean in local['skills'][name][<cli>]. Skills without origin contribute
+    nothing — they aren't matched to a GitHub repo here.
+    """
+    out: dict = {}
+    for _name, meta in (local.get("skills") or {}).items():
+        full = (meta or {}).get("origin_full") or _owner_repo_from_url(
+            (meta or {}).get("url") or ""
+        )
+        if not full:
+            continue
+        out[full.lower()] = {
+            "claude": bool(meta.get("claude", False)),
+            "codex": bool(meta.get("codex", False)),
+            "opencode": bool(meta.get("opencode", False)),
+            "easycode": bool(meta.get("easycode", False)),
+        }
+    return out
+
+
+def _annotate_local_installed(rows, installed_segments: set, plugin_segs: "set | None" = None, per_cli_map: "dict | None" = None):
     """Single-pass walk: list → recurse; dict with 'repos' → descend; dict with 'name' → annotate leaf.
     ponytail: category dicts have BOTH `name` AND `repos`, so a `name`-first check would
     annotate the container instead of descending. Prefer the structural `repos` branch.
     ponytail: `plugin_segs` adds bare plugin-name segs (e.g. "ecc", "superpowers") so we
     match GitHub hot_now like `affaan-m/ECC` against the installed ecc plugin.
+    ponytail: 2026-09 FU-1.1 — `per_cli_map` (output of `_per_cli_installed_map`) adds the
+    4 per-CLI flags RepoCard needs for the "installed on: [claude][codex][opencode][easycode]"
+    dot strip. All 4 default to False if the repo isn't in the map (covers hot_now rows for
+    repos no one has installed).
     """
     if isinstance(rows, list):
         for r in rows:
-            _annotate_local_installed(r, installed_segments, plugin_segs)
+            _annotate_local_installed(r, installed_segments, plugin_segs, per_cli_map)
     elif isinstance(rows, dict):
         if "repos" in rows:
-            _annotate_local_installed(rows["repos"], installed_segments, plugin_segs)
+            _annotate_local_installed(rows["repos"], installed_segments, plugin_segs, per_cli_map)
         elif "name" in rows:
             full_lower = {s.lower() for s in installed_segments if "/" in s}
             name_lower = rows["name"].lower()
             seg_only = name_lower.split("/")[-1]
             seg_match = plugin_segs is not None and seg_only in plugin_segs
             rows["local_installed"] = name_lower in full_lower or seg_match
+            if per_cli_map is not None:
+                flags = per_cli_map.get(name_lower) or {}
+                rows["local_installed_claude"] = bool(flags.get("claude", False))
+                rows["local_installed_codex"] = bool(flags.get("codex", False))
+                rows["local_installed_opencode"] = bool(flags.get("opencode", False))
+                rows["local_installed_easycode"] = bool(flags.get("easycode", False))
 
 def _build_plugin_segs(local: dict) -> set:
     """Return bare plugin-name segs (e.g. 'ecc', 'superpowers') for hot_now seg matching.

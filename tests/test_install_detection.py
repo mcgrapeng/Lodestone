@@ -114,6 +114,87 @@ def test_annotate_no_false_positive():
     assert rows["local_installed"] is False
 
 
+# ── per-CLI flags (2026-09 FU-1.1, RepoCard dot strip) ──────────────
+
+
+def test_per_cli_map_builds_from_skills():
+    """_per_cli_installed_map turns a detect_local_skills-shaped dict into
+    {owner/repo_lower: {claude, codex, opencode, easycode}}. origin_full preferred over url."""
+    local = {
+        "skills": {
+            "ecc": {"origin_full": "affaan-m/ecc", "claude": True, "codex": True, "opencode": False, "easycode": False},
+            "firecrawl": {"url": "https://github.com/firecrawl/firecrawl", "claude": False, "codex": False, "opencode": True, "easycode": False},
+            "handmade": {"claude": True, "codex": False, "opencode": False, "easycode": False},  # no origin → dropped
+        },
+    }
+    m = radar._per_cli_installed_map(local)
+    assert m == {
+        "affaan-m/ecc": {"claude": True, "codex": True, "opencode": False, "easycode": False},
+        "firecrawl/firecrawl": {"claude": False, "codex": False, "opencode": True, "easycode": False},
+    }
+
+
+def test_annotate_sets_per_cli_flags_when_match():
+    """When per_cli_map is supplied, each leaf repo gets the 4 flags set
+    (lookup by case-insensitive full owner/repo)."""
+    rows = {"name": "affaan-m/ECC"}
+    per_cli = {"affaan-m/ecc": {"claude": True, "codex": True, "opencode": False, "easycode": False}}
+    radar._annotate_local_installed(rows, set(), set(), per_cli)
+    assert rows["local_installed_claude"] is True
+    assert rows["local_installed_codex"] is True
+    assert rows["local_installed_opencode"] is False
+    assert rows["local_installed_easycode"] is False
+
+
+def test_annotate_per_cli_default_false_when_not_in_map():
+    """Repos absent from the lookup (the common case — most hot_now repos aren't installed)
+    must get all 4 flags as False, not raise KeyError."""
+    rows = {"name": "someone/never-installed"}
+    radar._annotate_local_installed(rows, set(), set(), {})
+    assert rows["local_installed_claude"] is False
+    assert rows["local_installed_codex"] is False
+    assert rows["local_installed_opencode"] is False
+    assert rows["local_installed_easycode"] is False
+
+
+def test_annotate_per_cli_omitted_keeps_legacy_behavior():
+    """Existing callers passing no per_cli_map must NOT get the new keys at all
+    (no surface-area regression for /api/top or anyone else)."""
+    rows = {"name": "affaan-m/ecc"}
+    radar._annotate_local_installed(rows, {"affaan-m/ecc"}, set())
+    assert rows["local_installed"] is True
+    assert "local_installed_claude" not in rows
+    assert "local_installed_codex" not in rows
+    assert "local_installed_opencode" not in rows
+    assert "local_installed_easycode" not in rows
+
+
+def test_annotate_per_cli_descends_into_categories():
+    """category dicts have both 'name' AND 'repos' — only the leaf repos under
+    'repos' should get the new flags, never the category container itself."""
+    rows = {
+        "name": "agents",
+        "repos": [
+            {"name": "affaan-m/ecc"},
+            {"name": "unrelated/x"},
+        ],
+    }
+    per_cli = {"affaan-m/ecc": {"claude": True, "codex": False, "opencode": True, "easycode": False}}
+    radar._annotate_local_installed(rows, set(), set(), per_cli)
+    # container untouched
+    assert "local_installed_claude" not in rows
+    # leaf 1 — matched
+    r0 = rows["repos"][0]
+    assert r0["local_installed_claude"] is True
+    assert r0["local_installed_opencode"] is True
+    # leaf 2 — not in map → all False
+    r1 = rows["repos"][1]
+    assert r1["local_installed_claude"] is False
+    assert r1["local_installed_codex"] is False
+    assert r1["local_installed_opencode"] is False
+    assert r1["local_installed_easycode"] is False
+
+
 # ── 平台表(根因 A)──────────────────────────────────────────────
 
 

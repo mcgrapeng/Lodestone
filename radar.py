@@ -72,6 +72,7 @@ from radar_pkg.match import (  # noqa: F401
     _installed_segments,
     _annotate_local_installed,
     _build_plugin_segs,
+    _per_cli_installed_map,
 )
 from radar_pkg.detect import (  # noqa: F401
     _SKILL_PLATFORM_PATHS,

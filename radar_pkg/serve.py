@@ -61,7 +61,7 @@ from radar_pkg.install import (
     set_capability_origin,
     uninstall_skill,
 )
-from radar_pkg.match import _annotate_local_installed, _build_plugin_segs, _installed_segments, _load_repo_index
+from radar_pkg.match import _annotate_local_installed, _build_plugin_segs, _installed_segments, _load_repo_index, _per_cli_installed_map
 
 """radar_pkg.serve — 由 radar.py 搬移(2026-09 架构拆分)。"""
 # ponytail: 2026-09 — /api/health 用的进程级启动时间戳(模块加载即设定一次)
@@ -548,9 +548,13 @@ def serve(port=8765):
                         local_sk = detect_local_skills()
                         segs = _installed_segments(local_sk)
                         plugin_segs = _build_plugin_segs(local_sk)
-                        _annotate_local_installed(hot, segs, plugin_segs)
-                        _annotate_local_installed(cats, segs, plugin_segs)
-                        _annotate_local_installed(trending_rows, segs, plugin_segs)
+                        # ponytail: 2026-09 FU-1.1 — per-CLI dot strip on RepoCard.
+                        # Built once per request; hot_now / categories / trending_rows each
+                        # get the same 4 flags below.
+                        per_cli = _per_cli_installed_map(local_sk)
+                        _annotate_local_installed(hot, segs, plugin_segs, per_cli)
+                        _annotate_local_installed(cats, segs, plugin_segs, per_cli)
+                        _annotate_local_installed(trending_rows, segs, plugin_segs, per_cli)
                         return self._json(
                             {
                                 "hot_now": hot,
@@ -576,8 +580,10 @@ def serve(port=8765):
                     local_sk = detect_local_skills()
                     segs = _installed_segments(local_sk)
                     plugin_segs = _build_plugin_segs(local_sk)
-                    _annotate_local_installed(hot, segs, plugin_segs)
-                    _annotate_local_installed(cats, segs, plugin_segs)
+                    # ponytail: 2026-09 FU-1.1 — per-CLI flags (mirror of PG path above).
+                    per_cli = _per_cli_installed_map(local_sk)
+                    _annotate_local_installed(hot, segs, plugin_segs, per_cli)
+                    _annotate_local_installed(cats, segs, plugin_segs, per_cli)
                     return self._json(
                         {
                             "hot_now": hot,
