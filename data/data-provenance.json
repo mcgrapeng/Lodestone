@@ -1,0 +1,14 @@
+{
+ "queries_total": 220,
+ "sources": [
+  "arxiv",
+  "github",
+  "hf_models",
+  "hf_spaces",
+  "mcp_registry"
+ ],
+ "seed_repos": 46,
+ "crawled_at": "2026-09-21T09:02:41+00:00",
+ "top_5k_limit": 1200,
+ "ai_topic_hard_count": 85
+}

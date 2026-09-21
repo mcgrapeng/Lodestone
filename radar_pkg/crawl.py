@@ -16,6 +16,7 @@ from radar_pkg.progress import phase, bar, eta, log, done
 import db
 from radar_pkg.core import (
     AI_TOPIC_BLOCKLIST,
+    AI_TOPIC_HARD,
     CATEGORIES,
     CRAWL_LOCK,
     CRAWL_LOCK_STALE_S,
@@ -84,6 +85,34 @@ def crawl_lock_held() -> bool:
         return True
     except OSError:
         return False
+
+
+def _write_provenance() -> None:
+    """FU-3.1 — write data/data-provenance.json with crawl-coverage counts.
+    Reads from CATEGORIES registry (sources), TOP_5K_QUERIES / TOP_5K_LIMIT,
+    AI_TOPIC_HARD, and the JSON seed file. Atomic write (tmp + replace) so a
+    crash mid-write doesn't corrupt the file. data/ is gitignored — tracked via
+    `git add -f data/data-provenance.json`."""
+    sources = sorted({c.get("source", "github") for c in CATEGORIES})
+    seed_path = DATA / "awesome_lists_seed.json"
+    seed_count = 0
+    if seed_path.is_file():
+        try:
+            seed_count = len(json.loads(seed_path.read_text()).get("repos", []))
+        except Exception:
+            seed_count = 0
+    payload = {
+        "queries_total": len(TOP_5K_QUERIES),
+        "sources": sources,
+        "seed_repos": seed_count,
+        "crawled_at": datetime.datetime.now(datetime.timezone.utc).isoformat(
+            timespec="seconds"
+        ),
+        "top_5k_limit": TOP_5K_LIMIT,
+        "ai_topic_hard_count": len(AI_TOPIC_HARD),
+    }
+    core.atomic_json_write(DATA / "data-provenance.json", payload)
+    print(f"[crawl] wrote provenance → {DATA / 'data-provenance.json'}", flush=True)
 
 
 def crawl(with_llm: bool = False):
@@ -902,6 +931,7 @@ def _crawl_inner(with_llm: bool = False):
                 flush=True,
             )
             done(f"crawl done — {time.monotonic()-_t_crawl:.0f}s total")
+            _write_provenance()
             return {
                 "total_unique": len(deduped),
                 "crawl_id": crawl_id,
@@ -952,6 +982,7 @@ def _crawl_inner(with_llm: bool = False):
     core.atomic_json_write(latest_file, snapshot)
     print(f"[crawl] saved → {latest_file} ({len(deduped)} repos, JSON mode)", flush=True)
     done(f"crawl done — {time.monotonic()-_t_crawl:.0f}s total")
+    _write_provenance()
     return {"total_unique": len(deduped), "fallback": "json", "queries_failed": failed}
 
 
