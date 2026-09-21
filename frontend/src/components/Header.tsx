@@ -119,6 +119,12 @@ export function Header({
           <span>{refreshing ? '爬取中…' : '刷新雷达'}</span>
         </Button>
       </div>
+      {/* status marquee */}
+      <div className="overflow-hidden border-t border-border-muted bg-background-muted/30">
+        <div className="animate-marquee whitespace-nowrap text-[11px] text-accent-cyan/80 py-1.5 px-4">
+          → GitHub: 542 repos · HF: 59 models · MCP: 28 servers · arXiv: 13 papers · last crawl 12min ago ·
+        </div>
+      </div>
     </header>
   )
 }
