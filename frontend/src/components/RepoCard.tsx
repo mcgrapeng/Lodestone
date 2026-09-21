@@ -138,7 +138,7 @@ export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
     <button
       type="button"
       onClick={() => onOpen(repo)}
-      className="group card-surface relative flex h-48 w-full flex-col p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-brand-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="group card-surface relative flex h-48 w-full flex-col p-4 text-left transition-all duration-200 ease-out hover:scale-[1.015] hover:-translate-y-0.5 hover:border-accent-cyan/30 hover:shadow-[0_0_0_1px_rgba(0,229,255,0.3)] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       {/* 顶部 accent 线 — hover 时从左到右亮起 */}
       <span className="absolute inset-x-4 top-0 h-px origin-left scale-x-0 bg-gradient-to-r from-primary/60 via-secondary/40 to-transparent transition-transform duration-300 group-hover:scale-x-100" />
