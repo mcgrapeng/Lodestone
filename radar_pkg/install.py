@@ -106,6 +106,11 @@ def install_skill_from_github(name, url, targets=None, force_update=False):
         # ponytail: 2026-09 用户决策 — 默认只装 Claude Code(config.toml [install]
         # default_targets 可改);其余平台由前端勾选显式传入
         targets = list(_DEFAULT_INSTALL_TARGETS)
+    if not targets:
+        # ponytail: 2026-09 P2 — 拒绝空 targets。空列表让 lock 之后的 inner 流程
+        # 走 0 次 symlink + sidecar,静默写一份空 sidecar,前端轮询看不到任何状态。
+        # validation 早返不占锁,跟 invalid name 同级。
+        raise ValueError("targets must be non-empty list of CLI names")
     if (
         not name
         or not all(c.isalnum() or c in "-_." for c in name.replace("/", ""))
