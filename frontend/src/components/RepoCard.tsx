@@ -25,17 +25,22 @@ export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
     sourceOf(repo) === 'github' &&
     repo.is_skill === true
 
-  // ponytail: 2026-09 P2 — per-platform install click handler. busy target
-  // disables that dot while the POST is in flight; other dots remain live.
-  const [busy, setBusy] = useState<Cli | null>(null)
+  // ponytail: 2026-09 P2 — per-platform install click handler. busy is a Set so
+  // multiple installs can be in flight concurrently without the later `finally
+  // setBusy(null)` un-disabling an earlier sibling that's still mid-flight.
+  const [busy, setBusy] = useState<Set<Cli>>(new Set())
   async function toggleInstall(name: string, url: string, target: Cli) {
-    setBusy(target)
+    setBusy((prev) => new Set(prev).add(target))
     try {
       await api.installToTarget(name, url, target)
     } catch (e) {
       console.error(e)
     } finally {
-      setBusy(null)
+      setBusy((prev) => {
+        const next = new Set(prev)
+        next.delete(target)
+        return next
+      })
     }
   }
 
@@ -103,25 +108,25 @@ export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
           <PlatformDot
             cli="claude"
             installed={Boolean(repo.local_installed)}
-            disabled={busy === 'claude'}
+            disabled={busy.has('claude')}
             onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
           />
           <PlatformDot
             cli="codex"
             installed={false}
-            disabled={busy === 'codex'}
+            disabled={busy.has('codex')}
             onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
           />
           <PlatformDot
             cli="opencode"
             installed={false}
-            disabled={busy === 'opencode'}
+            disabled={busy.has('opencode')}
             onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
           />
           <PlatformDot
             cli="easycode"
             installed={false}
-            disabled={busy === 'easycode'}
+            disabled={busy.has('easycode')}
             onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
           />
         </div>
@@ -202,25 +207,25 @@ export function RepoCard({ repo, variant = 'grid', onOpen }: RepoCardProps) {
         <PlatformDot
           cli="claude"
           installed={Boolean(repo.local_installed)}
-          disabled={busy === 'claude'}
+          disabled={busy.has('claude')}
           onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
         />
         <PlatformDot
           cli="codex"
           installed={false}
-          disabled={busy === 'codex'}
+          disabled={busy.has('codex')}
           onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
         />
         <PlatformDot
           cli="opencode"
           installed={false}
-          disabled={busy === 'opencode'}
+          disabled={busy.has('opencode')}
           onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
         />
         <PlatformDot
           cli="easycode"
           installed={false}
-          disabled={busy === 'easycode'}
+          disabled={busy.has('easycode')}
           onToggle={(cli) => toggleInstall(repo.name, repo.url, cli)}
         />
       </div>
