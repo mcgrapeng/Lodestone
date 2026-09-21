@@ -1,12 +1,8 @@
 import type { ReactNode } from 'react'
 
-export function Skeleton({ className = '' }: { className?: string }) {
-  return (
-    <div
-      className={`animate-pulse rounded-md bg-background-subtle ${className}`}
-      aria-hidden
-    />
-  )
+export function Skeleton({ className = '', height = 'h-4' }: { className?: string; height?: string }) {
+  // ponytail: cyan shimmer matches Phase 3 theme
+  return <div className={`rounded-md bg-background-muted shimmer ${height} w-full ${className}`} aria-hidden />
 }
 
 export function SkeletonStack({
