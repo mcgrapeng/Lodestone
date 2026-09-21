@@ -458,7 +458,7 @@ CATEGORIES = [
     },
 ]
 
-TOP_5K_QUERIES = [
+TOP_5K_QUERIES = list(dict.fromkeys([
     # ponytail: 关注 AI 应用开发, 不关注学术研究. 每个 query 一行 (GitHub API 422 on OR-combined).
     # 每个 query 最多 per_page=100, rate limit 30/min, sleep 2s 之间.
     # threshold stars:>500 而非 1000 — 大量有价值的应用工具 500-999 stars 之间, 不应漏.
@@ -718,7 +718,7 @@ TOP_5K_QUERIES = [
     'stars:>500 topic:multi-agent',
     'stars:>500 topic:agent',
     'stars:>500 topic:mcp',
-]
+]))
 
 TOP_5K_LIMIT = 1200
 
