@@ -7,6 +7,7 @@ import { api } from '../lib/api'
 import { SingleUpgradeRow } from './UpgradeProgressBanner'
 import { AnimatedNumber } from './animated/AnimatedNumber'
 import { CacheStatusBanner } from './CacheStatusBanner'
+import { PlatformDot } from './PlatformDot'
 import { cn } from '../lib/utils'
 import type { LocalData, LocalSkill } from '../lib/types'
 
@@ -227,10 +228,13 @@ export function LocalTab({ local, onRefresh, onOpenOrigin }: Props) {
             <thead>
               <tr>
                   <th className="w-[18%]">Skill</th>
-                <th className="w-[48%]">简介</th>
+                <th className="w-[38%]">简介</th>
                 <th className="w-[6%]">⭐</th>
-                <th className="w-[12%]">状态</th>
-                <th className="w-[20%] text-right">操作</th>
+                {/* ponytail: 2026-09 P2 — 4 个只读 PlatformDot 标 skill 在哪几个 CLI
+                    已装。点击装/卸载走 RepoCard,LocalTab 是只读视图(disabled)。 */}
+                <th className="w-[14%]">平台</th>
+                <th className="w-[10%]">状态</th>
+                <th className="w-[14%] text-right">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -634,6 +638,16 @@ function SkillRow({
       </td>
       <td className="font-mono text-xs text-foreground-subtle">
         {(info.stars ?? 0) > 0 ? `⭐ ${(info.stars ?? 0).toLocaleString()}` : '—'}
+      </td>
+      <td>
+        {/* ponytail: 2026-09 P2 — 只读 4 dot 行。info['claude'] 等是布尔(后端
+            /api/local 检测后填),disabled=true 阻止点击(操作走 RepoCard)。 */}
+        <div className="flex gap-1">
+          <PlatformDot cli="claude"   installed={Boolean(info.claude)}   size="sm" disabled />
+          <PlatformDot cli="codex"    installed={Boolean(info.codex)}    size="sm" disabled />
+          <PlatformDot cli="opencode" installed={Boolean(info.opencode)} size="sm" disabled />
+          <PlatformDot cli="easycode" installed={Boolean(info.easycode)} size="sm" disabled />
+        </div>
       </td>
       <td>
         <div className="flex items-center gap-2">
