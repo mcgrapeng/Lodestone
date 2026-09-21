@@ -223,11 +223,11 @@ export function LocalTab({ local, onRefresh, onOpenOrigin }: Props) {
           // ponytail: 2026-09 — Appica Table 是样式化的 <table> 元素(不是 compound 子组件),
           // 直接用原生 <thead> / <tbody> / <tr> / <th> / <td> 配合 Appica 类。
           // <Table> 提供圆角/striped/hover 样式,语义 HTML 给 a11y + 排序扩展。
-          <Table size="sm" hoverableRows>
+          <Table size="sm" hoverableRows className="table-fixed">
             <thead>
               <tr>
-                  <th className="w-[20%]">Skill</th>
-                <th className="w-[42%]">简介</th>
+                  <th className="w-[18%]">Skill</th>
+                <th className="w-[48%]">简介</th>
                 <th className="w-[6%]">⭐</th>
                 <th className="w-[12%]">状态</th>
                 <th className="w-[20%] text-right">操作</th>
@@ -487,7 +487,7 @@ function LocalSection({
           </div>
           {action ? <div className="ml-auto">{action}</div> : null}
         </header>
-        <div>{children}</div>
+        <div className="overflow-x-auto">{children}</div>
       </Card>
     </section>
   )
@@ -629,7 +629,7 @@ function SkillRow({
           </button>
         </div>
       </td>
-      <td className="truncate text-xs text-foreground-muted" title={description}>
+      <td className="truncate text-xs text-foreground-muted max-w-[400px]" title={description}>
         {description || <span className="text-foreground-subtle">—</span>}
       </td>
       <td className="font-mono text-xs text-foreground-subtle">
