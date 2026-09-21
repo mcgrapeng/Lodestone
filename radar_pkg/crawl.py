@@ -647,6 +647,32 @@ def _crawl_inner(with_llm: bool = False):
         bar("seed", si, len(MANUAL_SEED_REPOS), width=32)
     done(f"manual seed done{eta(_t_crawl, max(si, 1), max(len(MANUAL_SEED_REPOS), 1))}")
 
+    # ponytail: 2026-09 P2 — JSON seed merge. data/awesome_lists_seed.json (46 entries)
+    # catches known-mainstream projects that escape topic search (Tencent/WeKnora,
+    # mksglu/context-mode, alibaba/open-code-review). Loaded AFTER MANUAL_SEED_REPOS
+    # so JSON wins on duplicate names; net-new entries add to the 5k pool.
+    _seed_path = DATA / "awesome_lists_seed.json"
+    if _seed_path.is_file():
+        try:
+            _seed_data = json.loads(_seed_path.read_text())
+            _seed_entries = _seed_data.get("repos", [])
+            si = 0
+            _merged = 0
+            for entry in _seed_entries:
+                si += 1
+                full_name = entry.get("name")
+                if not full_name:
+                    continue
+                r = gh_fetch_repo(full_name)
+                if not r or not is_ai_relevant(r):
+                    continue
+                top_5k_repos[full_name.lower()] = r
+                _merged += 1
+                print(f"  ✓ json seed: {full_name} ({r['stars']} ⭐)", flush=True)
+            print(f"  ✓ json seed: merged {_merged}/{len(_seed_entries)} entries", flush=True)
+        except Exception as _e:
+            print(f"  ! json seed merge failed: {_e}", flush=True)
+
     # ponytail: GitHub trending — catches fresh AI tools with <5k stars that are hot today.
     # Pull BOTH daily and weekly — daily = today's buzz, weekly = rising stars the daily
     # doesn't yet show. Dedupe on name so a repo on both lists is counted once.
