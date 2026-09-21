@@ -720,7 +720,7 @@ TOP_5K_QUERIES = [
     'stars:>500 topic:mcp',
 ]
 
-TOP_5K_LIMIT = 800
+TOP_5K_LIMIT = 1200
 
 AI_TOPIC_HARD = frozenset(
     {
@@ -777,20 +777,13 @@ AI_TOPIC_HARD = frozenset(
         "ai-coding",
         "ai-coding-agent",
         "prompt-engineering",
-        "agentic",
-        "agentic-ai",
         "autonomous-agent",
         "multi-agent",
-        "agent-skills",
         "ai-agent",
-        "mcp-server",
-        "spring-ai",
-        "springai",
         # ponytail: 2026-09 补齐 topics 变体 — 分类结果启用完整过滤后
         # 这些变体缺了会误伤正经 AI 项目（Qwen-VL / playwright-mcp 实测踩过）
         "mcp",
         "mcp-client",
-        "mcp-servers",
         "model-context-protocol",
         "large-language-model",
         "large-language-models",
@@ -811,6 +804,13 @@ AI_TOPIC_HARD = frozenset(
         "text-generation",
         "fine-tuning",
         "fine-tuning-framework",
+        "machine-learning",
+        "deep-learning",
+        "neural-network",
+        "tensorflow",
+        "pytorch",
+        "data-science",
+        "mlops",
     }
 )
 
