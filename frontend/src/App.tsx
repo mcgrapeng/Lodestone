@@ -269,6 +269,8 @@ export function App() {
     if (sourceCounts.huggingface) parts.push(`HF ${sourceCounts.huggingface}`)
     if (sourceCounts.mcp) parts.push(`MCP ${sourceCounts.mcp}`)
     if (sourceCounts.arxiv) parts.push(`arXiv ${sourceCounts.arxiv}`)
+    if (sourceCounts.awesome_lists) parts.push(`Awesome ${sourceCounts.awesome_lists}`)
+    if (sourceCounts.hackernews_ai) parts.push(`HN ${sourceCounts.hackernews_ai}`)
     return parts.join(' · ')
   }, [sourceCounts])
 

@@ -127,7 +127,7 @@ export function Header({
           30s relativeTime tick already in this component. */}
       <div className="overflow-hidden border-t border-border-muted bg-background-muted/30">
         <div className="animate-marquee whitespace-nowrap text-[11px] text-accent-cyan/80 py-1.5 px-4">
-          → GitHub: {sourceCounts?.github ?? 0} · HF: {sourceCounts?.huggingface ?? 0} · MCP: {sourceCounts?.mcp ?? 0} · arXiv: {sourceCounts?.arxiv ?? 0} · last crawl {fetchedAt ? relativeTime(fetchedAt) : '—'} ·
+          → GitHub: {sourceCounts?.github ?? 0} · HF: {sourceCounts?.huggingface ?? 0} · MCP: {sourceCounts?.mcp ?? 0} · arXiv: {sourceCounts?.arxiv ?? 0}{sourceCounts?.awesome_lists ? ` · Awesome: ${sourceCounts.awesome_lists}` : ''}{sourceCounts?.hackernews_ai ? ` · HN: ${sourceCounts.hackernews_ai}` : ''} · last crawl {fetchedAt ? relativeTime(fetchedAt) : '—'} ·
         </div>
       </div>
     </header>
