@@ -92,7 +92,14 @@ def _write_provenance() -> None:
     Reads from CATEGORIES registry (sources), TOP_5K_QUERIES / TOP_5K_LIMIT,
     AI_TOPIC_HARD, and the JSON seed file. Atomic write (tmp + replace) so a
     crash mid-write doesn't corrupt the file. data/ is gitignored — tracked via
-    `git add -f data/data-provenance.json`."""
+    `git add -f data/data-provenance.json`.
+
+    2026-09 FU-marquee — also records per-source seen counts via each module's
+    `_get_count()` (awesome_lists + hackernews_ai export it; others default to 0).
+    Importing all source modules at function scope (not module scope) so that
+    crawl.py doesn't pull HTTP-touching modules when only provenance is needed.
+    """
+    from sources import awesome_lists, hackernews_ai
     sources = sorted({c.get("source", "github") for c in CATEGORIES})
     seed_path = DATA / "awesome_lists_seed.json"
     seed_count = 0
@@ -101,9 +108,25 @@ def _write_provenance() -> None:
             seed_count = len(json.loads(seed_path.read_text()).get("repos", []))
         except Exception:
             seed_count = 0
+    # ponytail: huggingface aggregates Models (no Spaces module exists yet);
+    # github_graphql/mcp_registry/arxiv_papers don't track a `seen` set today.
+    # hasattr guard keeps this resilient if a future module adds _get_count.
+    def _safe_count(mod) -> int:
+        return mod._get_count() if hasattr(mod, "_get_count") else 0
+
+    from sources import github_graphql, huggingface_models, mcp_registry, arxiv_papers
+    sources_count = {
+        "github": _safe_count(github_graphql),
+        "huggingface": _safe_count(huggingface_models),
+        "mcp": _safe_count(mcp_registry),
+        "arxiv": _safe_count(arxiv_papers),
+        "awesome_lists": _safe_count(awesome_lists),
+        "hackernews_ai": _safe_count(hackernews_ai),
+    }
     payload = {
         "queries_total": len(TOP_5K_QUERIES),
         "sources": sources,
+        "sources_count": sources_count,
         "seed_repos": seed_count,
         "crawled_at": datetime.datetime.now(datetime.timezone.utc).isoformat(
             timespec="seconds"
