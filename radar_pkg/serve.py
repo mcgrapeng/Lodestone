@@ -1611,11 +1611,9 @@ def serve(port=8765):
                 except Exception as e:
                     self._json({"ok": False, "error": str(e)}, status=400)
                 return
-            # ponytail: 2026-09 P2 — per-platform uninstall thin wrapper.
-            # Accepted limitation (matches plan §Task 2.1): uninstall_skill removes
-            # ALL CLI targets in one shot (cache + symlinks for every CLI). Per-CLI
-            # tracking deferred — next crawl will reinstall removed ones anyway,
-            # so the visible state is "this CLI is empty until next sync."
+            # ponytail: 2026-09 FU-3.1 — per-CLI uninstall 真正落地,只卸指定 CLI
+            # 的 symlink 并从 SKILL_ORIGINS 的 targets 列表里剔除该 CLI,其它 CLI
+            # 保留不动。
             if self.path == "/api/uninstall_from_target":
                 try:
                     body = self._read_body()
@@ -1631,12 +1629,12 @@ def serve(port=8765):
                             status=400,
                         )
                         return
-                    result = uninstall_skill(name)
+                    result = uninstall_skill(name, targets=[target])
                     invalidate_local_scan()
                     self._json(
                         {
                             "ok": True,
-                            "message": f"{name} 已从 {target} 卸载(其它 CLI 暂保留,下轮 crawl 重对齐)",
+                            "message": f"{name} 已从 {target} 卸载",
                             "result": result,
                             "target": target,
                         }

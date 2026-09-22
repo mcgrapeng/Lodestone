@@ -590,32 +590,53 @@ def upgrade_all(skills: dict, callback=None, upgradable: dict | None = None) -> 
         # ponytail: 2026-09 P4 — 整批结束释放锁,避免升级期间任何 sync 调用都被卡30 min。
         core.release_named_lock(core.INSTALL_LOCK)
 
-def uninstall_skill(name: str) -> dict:
-    """Remove a skill: unlink from ALL platform skills dirs, drop cache dir, remove sidecar entry.
-    Returns {removed_links: [paths], cache: path_or_null}.
+def uninstall_skill(name: str, targets: list[str] | None = None) -> dict:
+    """Remove a skill. targets=None: ALL platform skills dirs + cache + sidecar entry
+    (legacy behavior). targets=[cli,..]: only unlink those CLIs and prune them from
+    the entry's targets list; cache preserved as long as another CLI still references it.
+    Returns {ok, removed_links, error?}.
     2026-09 闭环修复:① 名字校验与 install 契约对齐(owner/repo 或裸 repo 段均可,
     此前字符集不含 '/' 直接 400);② 链接清理遍历平台表全平台(此前硬编码
-    claude/codex,opencode/easycode 链接残留导致卸载后「已装」徽标不消失)。
+    claude/codex,opencode/easycode 链接残留导致卸载后「已装」徽标不消失);
+    ③ FU-3.1 — targets 参数真正按 CLI 区分,不再一锅端。
     ponytail: 2026-09 — 持 INSTALL_LOCK 防止与并发 install/upgrade 撞 SKILL_ORIGINS
     与 symlink。撞锁返 409-like 错误让前端能给用户清晰反馈。"""
     # ponytail: 持锁 — 名字校验先做(避免无效输入占锁)
     seg = name.split("/")[-1] if "/" in name else name
     if not seg or not all(c.isalnum() or c in "-_." for c in seg) or ".." in seg:
         raise ValueError(f"invalid skill name: {name!r}")
+    if targets is not None:
+        for t in targets:
+            if t not in SUPPORTED_CLIS:
+                raise ValueError(
+                    f"unsupported target CLI: {t!r}. Supported: {SUPPORTED_CLIS}"
+                )
     if not core.acquire_named_lock(core.INSTALL_LOCK, core.INSTALL_LOCK_STALE_S):
         return {"ok": False, "error": "另一个 install/upgrade 正在跑,稍后重试"}
     try:
-        return _uninstall_skill_locked(seg)
+        return _uninstall_skill_locked(seg, targets=targets)
     finally:
         core.release_named_lock(core.INSTALL_LOCK)
 
 
-def _uninstall_skill_locked(seg: str) -> dict:
-    """uninstall_skill 的临界区实现 — 调用方必须已持 INSTALL_LOCK。"""
+def _uninstall_skill_locked(seg: str, targets: list[str] | None = None) -> dict:
+    """uninstall_skill 的临界区实现 — 调用方必须已持 INSTALL_LOCK。
+    targets=None:全平台全清,跟旧契约一致;targets=[cli,...]:只卸指定 CLI,
+    仍被其它 CLI 引用的 entry 保留,cache 不动。"""
     removed = []
-    for skills_root in [
-        Path(p).expanduser() for p in detect._SKILL_PLATFORM_PATHS.values()
-    ]:
+    # ponytail: targets=None → 遍历平台表全平台;targets 给定 → 仅遍历指定 CLI
+    if targets is None:
+        roots = [
+            (cli, Path(p).expanduser())
+            for cli, p in detect._SKILL_PLATFORM_PATHS.items()
+        ]
+    else:
+        roots = [
+            (cli, Path(detect._SKILL_PLATFORM_PATHS[cli]).expanduser())
+            for cli in targets
+            if cli in detect._SKILL_PLATFORM_PATHS
+        ]
+    for _cli, skills_root in roots:
         link = skills_root / seg
         if link.is_symlink() or link.exists():
             try:
@@ -634,40 +655,49 @@ def _uninstall_skill_locked(seg: str) -> dict:
             # ponytail: 2026-09 — 修复 cache 残留 bug。sidecar key 可能是 "test/e2e-skill"
             # (全名)或 "e2e-skill" (裸名,legacy),但 uninstall 调用方传 seg(裸名)。
             # 必须两种都试 pop,不然 cache 永远留着。
-            entry = skill_map.pop(seg, None)
-            if not entry and "/" in seg:
-                # seg 不带斜杠(legacy 形态),但 sidecar 里的 key 是 seg——重试无意义
-                pass
-            # 上面 seg pop 失败的话,再按全名 owner/repo 试 — caller 可能传了 "owner/repo"
-            if not entry:
-                # ponytail: 这个分支处理 caller 传全名 "owner/repo" 但 _uninstall_skill_locked
-                # 内部仍用裸 seg —— 改用 seg 在两边试。复用"test__e2e-skill"格式来 lookup。
-                pass
-            # 实际修复: 同时按"全名"和"裸 seg"两种 key 找 entry
-            if not entry:
-                # seg 可能拼写错或 key 用了全名 —— 用全名 / seg 都试
+            key = None
+            entry = skill_map.get(seg)
+            if entry is None:
                 for k in list(skill_map.keys()):
                     if k == seg or k.endswith("/" + seg):
-                        entry = skill_map.pop(k)
+                        key = k
+                        entry = skill_map[k]
                         break
-            if entry:
-                owner = entry.get("owner", "")
-                repo = entry.get("repo", seg)
-                # ponytail: check both new (owner__repo) and legacy (bare repo) cache paths
-                candidates = [core.SKILLS_CACHE / f"{owner}__{repo}"]
-                if owner:
-                    candidates.append(core.SKILLS_CACHE / repo)
-                still_used = False
-                for r in skill_map.values():
-                    if r.get("owner") == owner and r.get("repo") == repo:
-                        still_used = True
-                        break
-                for cache_dir in candidates:
-                    if cache_dir.exists() and not still_used:
-                        try:
-                            shutil.rmtree(cache_dir)
-                        except OSError:
-                            pass
+            else:
+                key = seg
+            if entry is not None:
+                cli_to_remove = set(targets) if targets is not None else None
+                if cli_to_remove is None:
+                    new_targets = []
+                else:
+                    # ponytail: per-CLI 卸载 → 保留顺序,只剔除指定 CLI
+                    new_targets = [
+                        t for t in entry.get("targets", []) if t not in cli_to_remove
+                    ]
+                if not new_targets:
+                    # ponytail: 无残留 CLI → 真删,顺手清 cache
+                    skill_map.pop(key)
+                    owner = entry.get("owner", "")
+                    repo = entry.get("repo", seg)
+                    # ponytail: check both new (owner__repo) and legacy (bare repo) cache paths
+                    candidates = [core.SKILLS_CACHE / f"{owner}__{repo}"]
+                    if owner:
+                        candidates.append(core.SKILLS_CACHE / repo)
+                    still_used = False
+                    for r in skill_map.values():
+                        if r.get("owner") == owner and r.get("repo") == repo:
+                            still_used = True
+                            break
+                    for cache_dir in candidates:
+                        if cache_dir.exists() and not still_used:
+                            try:
+                                shutil.rmtree(cache_dir)
+                            except OSError:
+                                pass
+                else:
+                    # ponytail: 仍有 CLI 引用 → 写回保留版本的 entry,cache 不动
+                    entry["targets"] = new_targets
+                    skill_map[key] = entry
             core.atomic_json_write(core.SKILL_ORIGINS, origins)
         except (OSError, ValueError):
             pass
