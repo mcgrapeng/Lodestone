@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import {
   Select,
@@ -12,6 +12,7 @@ import { applyFilters, sourceOf, type RepoFilters, type SourceKind } from '../li
 import { stripEmoji } from '../lib/format'
 import { RepoCard } from './RepoCard'
 import { FilterBar } from './FilterBar'
+import { api } from '../lib/api'
 
 export interface CategoryBrowserProps {
   categories: Category[]
@@ -20,7 +21,11 @@ export interface CategoryBrowserProps {
   filters: RepoFilters
   onFiltersChange: (patch: Partial<RepoFilters>) => void
   onOpen: (repo: Repo) => void
+  // ponytail: 2026-09 — 批量装/卸完成后通知父级刷新数据(可空,仅当上层挂了回调才调)。
+  onRefresh?: () => void
 }
+
+type BatchTarget = 'claude' | 'codex' | 'opencode' | 'easycode'
 
 // ponytail: 2026-09 UI 重构 — 分类导航从横向滚动 chip 条(26 类挤一条,滚动条丑)
 // 改为左侧固定侧边栏(≥lg 全分类可见,appica monochrome token)+ 窄屏 Select 折叠。
@@ -31,6 +36,7 @@ export function CategoryBrowser({
   filters,
   onFiltersChange,
   onOpen,
+  onRefresh,
 }: CategoryBrowserProps) {
   const currentId =
     selected && categories.some((c) => c.id === selected) ? selected : categories[0]?.id ?? null
@@ -48,6 +54,50 @@ export function CategoryBrowser({
     for (const r of cat.repos) seen.add(sourceOf(r))
     return [...seen].sort()
   }, [cat])
+
+  // ponytail: 2026-09 — 批量装/卸工具栏状态。
+  // busy 用 `install-${target}` / `uninstall-${target}` 字符串让按钮在 UI 区分当前跑的是哪一类,
+  // progress 由轮询 /api/install/status 拿到。brief 原本写 s.computing/s.current_index,
+  // 但后端 write_install_status 实际写的是 running/current/total,这里用真实字段。
+  const [batchTarget, setBatchTarget] = useState<BatchTarget>('claude')
+  const [batchBusy, setBatchBusy] = useState<string | null>(null)
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null)
+
+  useEffect(() => {
+    if (!batchBusy) return
+    const interval = setInterval(async () => {
+      const s = await api.getInstallStatus()
+      if (!s.running) {
+        clearInterval(interval)
+        setBatchBusy(null)
+        setBatchProgress(null)
+        onRefresh?.()
+      } else {
+        setBatchProgress({ current: s.current ?? 0, total: s.total ?? 0 })
+      }
+    }, 1500)
+    return () => clearInterval(interval)
+  }, [batchBusy, onRefresh])
+
+  async function batchInstall() {
+    if (!cat) return
+    setBatchBusy(`install-${batchTarget}`)
+    try {
+      await api.installCategory(cat.id, batchTarget)
+    } finally {
+      // ponytail: 保持 busy 直到 polling 捕获 running=false,避免按钮闪回 ready 又被卡死。
+    }
+  }
+
+  async function batchUninstall() {
+    if (!cat) return
+    setBatchBusy(`uninstall-${batchTarget}`)
+    try {
+      await api.uninstallCategory(cat.id, batchTarget)
+    } finally {
+      // 同上
+    }
+  }
 
   if (!categories.length) return null
 
@@ -125,6 +175,41 @@ export function CategoryBrowser({
                 <span className="chip">
                   {repos.length} / {cat.repos.length} repos
                 </span>
+              </div>
+
+              {/* ponytail: 2026-09 — 一键全装/全卸工具栏。
+                  target 选 CLI,busy 时禁用并显示进度 current/total。 */}
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-border-muted bg-background-muted/40 p-2 text-xs">
+                <span className="text-foreground-subtle">批量目标:</span>
+                <select
+                  value={batchTarget}
+                  onChange={(e) => setBatchTarget(e.target.value as BatchTarget)}
+                  disabled={!!batchBusy}
+                  className="rounded bg-background px-2 py-1 ring-1 ring-border-muted"
+                >
+                  <option value="claude">Claude Code</option>
+                  <option value="codex">Codex</option>
+                  <option value="opencode">OpenCode</option>
+                  <option value="easycode">EasyCode</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={batchInstall}
+                  disabled={!!batchBusy}
+                  className="rounded bg-primary/20 px-3 py-1 text-primary ring-1 ring-primary/40 hover:bg-primary/30 disabled:opacity-50"
+                >
+                  {batchBusy?.startsWith('install') && batchProgress
+                    ? `装 ${batchProgress.current}/${batchProgress.total}`
+                    : '全装到该类'}
+                </button>
+                <button
+                  type="button"
+                  onClick={batchUninstall}
+                  disabled={!!batchBusy}
+                  className="rounded bg-error/15 px-3 py-1 text-error ring-1 ring-error/40 hover:bg-error/25 disabled:opacity-50"
+                >
+                  {batchBusy?.startsWith('uninstall') ? '卸中…' : '全卸该类'}
+                </button>
               </div>
 
               <FilterBar

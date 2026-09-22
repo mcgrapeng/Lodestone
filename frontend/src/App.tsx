@@ -496,6 +496,7 @@ export function App() {
                 filters={filters}
                 onFiltersChange={patchFilters}
                 onOpen={openRepo}
+                onRefresh={load}
               />
             )}
 
