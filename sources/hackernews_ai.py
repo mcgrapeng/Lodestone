@@ -35,6 +35,13 @@ def _get_json(url: str):
 _GH_URL = re.compile(r"https?://github\.com/([A-Za-z0-9][\w.-]*)/([A-Za-z0-9][\w.-]*)")
 
 
+_SEEN: set[str] = set()
+
+
+def _get_count() -> int:
+    return len(_SEEN)
+
+
 def _has_ai_signal(text: str) -> bool:
     if not text:
         return False
@@ -53,7 +60,7 @@ def _extract_github_urls(text: str) -> set[tuple[str, str]]:
 
 
 def crawl(max_stories: int = 100) -> Iterator[dict]:
-    seen: set[str] = set()
+    seen = _SEEN
     ids = _get_json(TOPSTORY_URL) or []
     for sid in ids[:max_stories]:
         item = _get_json(ITEM_URL.format(sid=sid))

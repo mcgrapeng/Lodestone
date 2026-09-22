@@ -45,6 +45,13 @@ LISTS = [
 _GH_REPO_LINK = re.compile(r"https?://github\.com/([A-Za-z0-9][\w.-]*)/([A-Za-z0-9][\w.-]*)")
 
 
+_SEEN: set[str] = set()
+
+
+def _get_count() -> int:
+    return len(_SEEN)
+
+
 def _fetch_readme(full_name: str, ref_path: str) -> Optional[str]:
     try:
         r = subprocess.run(
@@ -75,7 +82,7 @@ def _extract_github_links(md: str) -> set[tuple[str, str]]:
 
 
 def crawl() -> Iterator[dict]:
-    seen: set[str] = set()
+    seen = _SEEN
     for full_name, ref_path in LISTS:
         print(f"  · awesome: {full_name}", file=sys.stderr)
         md = _fetch_readme(full_name, ref_path)
