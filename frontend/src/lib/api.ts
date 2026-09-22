@@ -191,25 +191,6 @@ export const api = {
     return jsonOrThrow<InstallStatus>(await fetch(`${BASE}/api/install/status`))
   },
 
-  // ponytail: 2026-09 — 一键全装/全卸分类下所有 skill 到指定 CLI。
-  // 后端走 /api/install_category / /api/uninstall_category,异步跑批,前端轮询
-  // /api/install/status 看进度(computing=false 即收尾)。
-  async installCategory(
-    categoryId: string,
-    target: 'claude' | 'codex' | 'opencode' | 'easycode',
-    except?: string[],
-  ): Promise<{ ok: boolean; job_id?: string; error?: string }> {
-    return post('/api/install_category', { category_id: categoryId, target, except })
-  },
-
-  async uninstallCategory(
-    categoryId: string,
-    target: 'claude' | 'codex' | 'opencode' | 'easycode',
-    except?: string[],
-  ): Promise<{ ok: boolean; job_id?: string; error?: string }> {
-    return post('/api/uninstall_category', { category_id: categoryId, target, except })
-  },
-
   // ponytail: 2026-09 — 手动触发 upgradable 重算 + 轮询状态。
   // 首次进本机 tab / 看到 0 项可升级时点「立即重算」按钮调。
   async triggerRefresh(): Promise<{ ok: boolean; started?: boolean; already_running?: boolean; error?: string }> {
