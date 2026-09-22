@@ -20,7 +20,7 @@ export function FilterBar({ filters, onChange, availableSources }: FilterBarProp
   // 旧 fallback 只列 3 个,URL ?src=arxiv 时 FilterBar 不显示对应 chip,用户看不到过滤生效。
   const srcOptions: Array<SourceKind | 'all'> = availableSources?.length
     ? ['all', ...availableSources]
-    : ['all', 'github', 'huggingface', 'mcp', 'arxiv', 'other']
+    : ['all', 'github', 'huggingface', 'mcp', 'arxiv', 'awesome_lists', 'hackernews_ai', 'other']
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">

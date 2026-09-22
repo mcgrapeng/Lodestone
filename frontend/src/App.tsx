@@ -249,7 +249,7 @@ export function App() {
   // ponytail: FU-2.1 — 拆成 counts + summary 两个 memo,counts 喂 Header marquee,
   // summary 喂右上小标签。一次去重扫描,两处复用。
   const sourceCounts = useMemo<SourceCounts>(() => {
-    const zero: SourceCounts = { github: 0, huggingface: 0, mcp: 0, arxiv: 0, other: 0 }
+    const zero: SourceCounts = { github: 0, huggingface: 0, mcp: 0, arxiv: 0, awesome_lists: 0, hackernews_ai: 0, other: 0 }
     if (!snapshot) return zero
     const seen = new Set<string>()
     const counts: SourceCounts = { ...zero }

@@ -4,7 +4,7 @@
 
 import type { Repo } from './types'
 
-export type SourceKind = 'github' | 'huggingface' | 'mcp' | 'arxiv' | 'other'
+export type SourceKind = 'github' | 'huggingface' | 'mcp' | 'arxiv' | 'awesome_lists' | 'hackernews_ai' | 'other'
 
 export type SourceCounts = Record<SourceKind, number>
 
@@ -31,11 +31,16 @@ export function sourceOf(repo: Repo): SourceKind {
   if (src.startsWith('github') || src === 'github_search_html' || src === 'gh_graphql') {
     return 'github'
   }
+  // ponytail: 2026-09 — 新增 awesome_lists + hackernews_ai 两个 source。
+  // crawler 直接把 source 字段写成这两个名字;旧快照可能没写,则按 URL 兜底。
+  if (src === 'awesome_lists') return 'awesome_lists'
+  if (src === 'hackernews_ai') return 'hackernews_ai'
   // 旧快照可能缺 source 字段 — 按 URL 兜底
   const url = repo.url ?? ''
   if (url.includes('huggingface.co')) return 'huggingface'
   if (url.includes('arxiv.org')) return 'arxiv'
   if (url.includes('github.com')) return 'github'
+  if (url.includes('github.com/eugeneyan/awesome-llm') || url.includes('awesome-rag')) return 'awesome_lists'
   return 'other'
 }
 
@@ -45,6 +50,8 @@ export const SOURCE_LABELS: Record<SourceKind | 'all', string> = {
   huggingface: 'HuggingFace',
   mcp: 'MCP',
   arxiv: 'arXiv',
+  awesome_lists: 'Awesome 列表',
+  hackernews_ai: 'HN AI',
   other: '其他',
 }
 
