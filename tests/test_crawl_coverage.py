@@ -34,12 +34,16 @@ class CrawlCoverageTest(unittest.TestCase):
             self.assertIn(name, seeded, f"{name} not in manual seed")
 
     def test_ai_topic_hard_relaxed(self):
-        """Removed keywords absent, new keywords present."""
+        """Wide keywords added; narrow keywords KEPT (mcp-server, etc. are positive
+        AI-topic signals — repos tagged mcp-server ARE AI-related by GitHub convention).
+        Only QUERY search was widened; AI_TOPIC_HARD was tightened vs. added."""
         from radar_pkg.core import AI_TOPIC_HARD
-        for k in ("mcp-server", "agent-skills", "spring-ai"):
-            self.assertNotIn(k, AI_TOPIC_HARD, f"{k} should be removed")
         for k in ("pytorch", "tensorflow", "deep-learning"):
             self.assertIn(k, AI_TOPIC_HARD, f"{k} should be added")
+        # ponytail: narrow keywords stay — they signal AI when tagged
+        self.assertIn("mcp-server", AI_TOPIC_HARD)
+        self.assertIn("agent-skills", AI_TOPIC_HARD)
+        self.assertIn("spring-ai", AI_TOPIC_HARD)
 
     def test_top_5k_limit_bumped(self):
         from radar_pkg.core import TOP_5K_LIMIT
