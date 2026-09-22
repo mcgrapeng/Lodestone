@@ -193,7 +193,8 @@ def _annotate_local_installed(rows, installed_segments: set, plugin_segs: "set |
             _annotate_local_installed(r, installed_segments, plugin_segs, per_cli_map)
     elif isinstance(rows, dict):
         if "repos" in rows:
-            _annotate_local_installed(rows["repos"], installed_segments, plugin_segs, per_cli_map)
+            for r in rows["repos"]:
+                _annotate_local_installed(r, installed_segments, plugin_segs, per_cli_map)
         elif "name" in rows:
             full_lower = {s.lower() for s in installed_segments if "/" in s}
             name_lower = rows["name"].lower()
