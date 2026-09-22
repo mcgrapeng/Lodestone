@@ -87,6 +87,55 @@ def crawl_lock_held() -> bool:
         return False
 
 
+def _count_from_snapshot(mod_name: str) -> int:
+    """Read latest.json and count distinct repos whose source field maps to mod_name.
+
+    Mirrors frontend/src/lib/filters.ts::sourceOf() — keeps data-provenance.json
+    in sync with the marquee tally in App.tsx. Returns 0 when latest.json is
+    missing or unreadable (caller may fall back to module._get_count()).
+    """
+    latest = DATA / "latest.json"
+    if not latest.is_file():
+        return 0
+    try:
+        snap = json.loads(latest.read_text())
+    except Exception:
+        return 0
+    # ponytail: 2026-09 — same dedup rule as marquee (repo.name). hot_now is
+    # Top-40 + curated tail; categories[] holds per-source buckets; both feed
+    # the marquee so both feed this count. URL fallback omitted — every repo
+    # written by a fetcher sets a `source` field today.
+    seen: set = set()
+    rules = [
+        ("huggingface", lambda s: s.startswith("huggingface")),
+        ("mcp", lambda s: s == "mcp_registry"),
+        ("arxiv", lambda s: s == "arxiv"),
+        ("github", lambda s: s.startswith("github") or s in ("github_search_html", "gh_graphql")),
+        ("awesome_lists", lambda s: s == "awesome_lists"),
+        ("hackernews_ai", lambda s: s == "hackernews_ai"),
+    ]
+    rule = next((pred for name, pred in rules if name == mod_name), None)
+    if rule is None:
+        return 0
+    n = 0
+    for r in snap.get("hot_now", []) or []:
+        name = r.get("name")
+        if not name or name in seen:
+            continue
+        if rule(r.get("source", "")):
+            seen.add(name)
+            n += 1
+    for c in snap.get("categories", []) or []:
+        for r in c.get("repos", []) or []:
+            name = r.get("name")
+            if not name or name in seen:
+                continue
+            if rule(r.get("source", "")):
+                seen.add(name)
+                n += 1
+    return n
+
+
 def _write_provenance() -> None:
     """FU-3.1 — write data/data-provenance.json with crawl-coverage counts.
     Reads from CATEGORIES registry (sources), TOP_5K_QUERIES / TOP_5K_LIMIT,
@@ -94,8 +143,9 @@ def _write_provenance() -> None:
     crash mid-write doesn't corrupt the file. data/ is gitignored — tracked via
     `git add -f data/data-provenance.json`.
 
-    2026-09 FU-marquee — also records per-source seen counts via each module's
-    `_get_count()` (awesome_lists + hackernews_ai export it; others default to 0).
+    2026-09 FU-marquee — per-source counts come from the just-written latest.json
+    (matches the marquee tally in App.tsx); module._get_count() used as a fallback
+    for awesome_lists/hackernews_ai when latest.json hasn't been written yet.
     Importing all source modules at function scope (not module scope) so that
     crawl.py doesn't pull HTTP-touching modules when only provenance is needed.
     """
@@ -108,20 +158,21 @@ def _write_provenance() -> None:
             seed_count = len(json.loads(seed_path.read_text()).get("repos", []))
         except Exception:
             seed_count = 0
-    # ponytail: huggingface aggregates Models (no Spaces module exists yet);
-    # github_graphql/mcp_registry/arxiv_papers don't track a `seen` set today.
-    # hasattr guard keeps this resilient if a future module adds _get_count.
+    # ponytail: 2026-09 — github/huggingface/mcp/arxiv fetchers don't export
+    # _get_count(), so the old hasattr guard always returned 0 for those 4.
+    # Read the just-written latest.json instead (mirror of frontend sourceOf()).
+    # awesome_lists + hackernews_ai keep module._get_count() as the offline
+    # fallback in case latest.json hasn't been written yet (e.g. tests).
     def _safe_count(mod) -> int:
         return mod._get_count() if hasattr(mod, "_get_count") else 0
 
-    from sources import github_graphql, huggingface_models, mcp_registry, arxiv_papers
     sources_count = {
-        "github": _safe_count(github_graphql),
-        "huggingface": _safe_count(huggingface_models),
-        "mcp": _safe_count(mcp_registry),
-        "arxiv": _safe_count(arxiv_papers),
-        "awesome_lists": _safe_count(awesome_lists),
-        "hackernews_ai": _safe_count(hackernews_ai),
+        "github": _count_from_snapshot("github"),
+        "huggingface": _count_from_snapshot("huggingface"),
+        "mcp": _count_from_snapshot("mcp"),
+        "arxiv": _count_from_snapshot("arxiv"),
+        "awesome_lists": _count_from_snapshot("awesome_lists") or _safe_count(awesome_lists),
+        "hackernews_ai": _count_from_snapshot("hackernews_ai") or _safe_count(hackernews_ai),
     }
     payload = {
         "queries_total": len(TOP_5K_QUERIES),
