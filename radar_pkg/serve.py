@@ -31,6 +31,31 @@ import db  # ponytail: PG 查询(serve 各端点直接使用)
 from radar_pkg.crawl import audit, crawl, crawl_lock_held, summarize_lock_held, today
 
 
+# ponytail: 2026-09 FU-marquee — short labels shown in the Header marquee text
+# next to each source's seen count (rendered by App.tsx + Header.tsx).
+_SOURCE_LABEL = {
+    "github": "GitHub", "huggingface": "HF", "mcp": "MCP", "arxiv": "arXiv",
+    "awesome_lists": "Awesome", "hackernews_ai": "HN",
+}
+_SOURCE_ORDER = ("github", "huggingface", "mcp", "arxiv", "awesome_lists", "hackernews_ai")
+
+
+def _sources_payload() -> list[dict]:
+    """Read data/data-provenance.json and shape the 6-entry sources array for /api/data.
+    Falls back to zeros if the file is missing or unreadable (e.g. pre-first-crawl)."""
+    prov_path = core.DATA / "data-provenance.json"
+    counts: dict = {}
+    if prov_path.is_file():
+        try:
+            counts = json.loads(prov_path.read_text()).get("sources_count", {})
+        except Exception:
+            counts = {}
+    return [
+        {"name": name, "label": _SOURCE_LABEL[name], "count": int(counts.get(name, 0))}
+        for name in _SOURCE_ORDER
+    ]
+
+
 def _pid_alive(pid: int) -> bool:
     """共用:跨平台检测 pid 是否还活着(serve.py cancel 路径 + core.py lock 路径)。"""
     if pid <= 0:
@@ -563,6 +588,8 @@ def serve(port=8765):
                                 # 2026-09 P0 — 与 JSON 路径对齐,前端 HeroStats/Trending tab 不再退化
                                 "stars_today": stars_today,
                                 "trending": trending_rows,
+                                # 2026-09 FU-marquee — per-source seen counts from data-provenance.json
+                                "sources": _sources_payload(),
                             },
                             etag=True,
                         )
@@ -594,6 +621,8 @@ def serve(port=8765):
                             "stars_today": snap.get("stars_today") or {},
                             # 2026-09：trending 专区列表（趋势 tab 消费）
                             "trending": snap.get("trending") or [],
+                            # 2026-09 FU-marquee — per-source seen counts from data-provenance.json
+                            "sources": _sources_payload(),
                         },
                         etag=True,
                     )
@@ -602,6 +631,7 @@ def serve(port=8765):
                         "hot_now": [],
                         "categories": [],
                         "fetched_at": None,
+                        "sources": _sources_payload(),
                         "note": "no data — run ./radar.py crawl",
                     }
                 )
