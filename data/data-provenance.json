@@ -7,8 +7,16 @@
   "hf_spaces",
   "mcp_registry"
  ],
+ "sources_count": {
+  "github": 2,
+  "huggingface": 1,
+  "mcp": 1,
+  "arxiv": 1,
+  "awesome_lists": 1,
+  "hackernews_ai": 1
+ },
  "seed_repos": 46,
- "crawled_at": "2026-09-21T09:02:41+00:00",
+ "crawled_at": "2026-09-22T03:55:58+00:00",
  "top_5k_limit": 1200,
- "ai_topic_hard_count": 85
+ "ai_topic_hard_count": 92
 }
